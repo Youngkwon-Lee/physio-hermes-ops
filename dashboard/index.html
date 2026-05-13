@@ -93,6 +93,10 @@
           <div id="d-summary">timeline 항목을 선택하세요</div>
         </div>
         <div class="queue-item" style="margin-bottom:10px">
+          <div class="muted">generation close summary</div>
+          <pre id="d-gen-close">-</pre>
+        </div>
+        <div class="queue-item" style="margin-bottom:10px">
           <div class="muted">linked report (json)</div>
           <pre id="d-report">-</pre>
         </div>
@@ -203,6 +207,7 @@
         document.getElementById('d-eid').textContent = '-';
         document.getElementById('d-status').textContent = '-';
         document.getElementById('d-summary').textContent = '조건에 맞는 이벤트 없음';
+        document.getElementById('d-gen-close').textContent = '-';
         document.getElementById('d-report').textContent = '-';
       }
     }
@@ -235,6 +240,7 @@
       document.getElementById('d-eid').textContent = e.event_id || '-';
       document.getElementById('d-status').textContent = e.status || '-';
       document.getElementById('d-summary').textContent = `${e.wave_id || '-'} / ${e.profile_id || '-'} / ${e.notes || e.summary || '-'}`;
+      document.getElementById('d-gen-close').textContent = '-';
 
       const reportPath = e.links?.report || (Array.isArray(e.artifact_paths) ? e.artifact_paths[0] : null);
       if(!reportPath){ document.getElementById('d-report').textContent = 'linked report 없음'; return; }
@@ -245,6 +251,23 @@
         } else {
           const report = await getJson(`../${reportPath}`);
           document.getElementById('d-report').textContent = JSON.stringify(report, null, 2);
+
+          const isGenClose = String(e.run_id || '').startsWith('generation-close-');
+          if (isGenClose) {
+            const breakdown = report.status_breakdown || {};
+            document.getElementById('d-gen-close').textContent = JSON.stringify({
+              decision: report.decision || '-',
+              wave_id: report.wave_id || e.wave_id || '-',
+              event_count: report.event_count ?? '-',
+              status_breakdown: {
+                PASS: breakdown.PASS ?? 0,
+                'PASS*': breakdown['PASS*'] ?? 0,
+                CHECK: breakdown.CHECK ?? 0,
+                FAIL: breakdown.FAIL ?? 0
+              },
+              closed_at: report.closed_at || '-'
+            }, null, 2);
+          }
         }
       }catch(_){
         document.getElementById('d-report').textContent = `report load 실패: ${reportPath}`;
