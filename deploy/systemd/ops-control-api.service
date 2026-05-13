@@ -1,0 +1,21 @@
+[Unit]
+Description=Physio Hermes Ops Control API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/physio-hermes-ops
+Environment=OPS_CTL_HOST=127.0.0.1
+Environment=OPS_CTL_PORT=8788
+Environment=OPS_CTL_REQUIRE_TOKEN=1
+EnvironmentFile=%h/.config/physio-hermes-ops/ops-control-api.env
+ExecStart=/usr/bin/python3 %h/physio-hermes-ops/scripts/ops_control_api.py
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=%h/physio-hermes-ops/lineage %h/physio-hermes-ops/.runtime
+
+[Install]
+WantedBy=default.target

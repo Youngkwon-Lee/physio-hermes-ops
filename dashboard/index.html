@@ -21,6 +21,7 @@
     .btn{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
     .btn:hover{background:#182846}
     .cmdbox{margin-top:8px;border:1px dashed var(--line);border-radius:8px;padding:8px;font-size:12px;color:#c8d8f7;background:#0e1627;white-space:pre-wrap}
+    .mini{font-size:12px;color:var(--muted)}
     .agent,.queue-item{display:block;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#10182a}
     .agent-row{display:flex;justify-content:space-between;align-items:center}
     .tag{font-size:11px;padding:2px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
@@ -89,7 +90,9 @@
           <button class="btn" id="act-copy-pause">cron 전체 pause 실행</button>
           <button class="btn" id="act-copy-resume-core">core cron resume 실행</button>
           <button class="btn" id="act-copy-finalize">generation finalize 1회 실행</button>
+          <button class="btn" id="act-set-token">API 토큰 설정</button>
         </div>
+        <div class="mini">보안모드: API 토큰 필수(브라우저 localStorage 사용)</div>
         <div class="cmdbox" id="action-feedback">action: 준비됨</div>
         <div id="timeline"></div>
       </section>
@@ -118,6 +121,8 @@
         </div>
         <div class="section-title">Generation History</div>
         <div id="gen-history"></div>
+        <div class="section-title">Ops Action History</div>
+        <div id="ops-history"></div>
         <div class="section-title">Wave Queue (next)</div>
         <div id="queue"></div>
       </aside>
@@ -140,6 +145,15 @@
         : 'http://127.0.0.1:8788',
       token: localStorage.getItem('opsCtlToken') || ''
     };
+
+    function setToken(){
+      const next = prompt('OPS API 토큰 입력 (비우면 제거)', OPS_API.token || '');
+      if(next === null) return;
+      OPS_API.token = (next || '').trim();
+      if(OPS_API.token) localStorage.setItem('opsCtlToken', OPS_API.token);
+      else localStorage.removeItem('opsCtlToken');
+      setActionFeedback(OPS_API.token ? 'token 저장됨' : 'token 제거됨');
+    }
 
     const ACTION_PREVIEW = {
       refresh: 'python3 scripts/export_cron_status.py',
@@ -428,7 +442,9 @@
       try{
         const r = await fetch(`${OPS_API.baseUrl}/health`, {cache:'no-store'});
         if(!r.ok) throw new Error('down');
-        el.textContent = 'api: 🟢 ready';
+        const payload = await r.json();
+        const auth = payload.auth_required ? '🔐' : '🟢';
+        el.textContent = `api: ${auth} ready`;
         el.style.borderColor = '#2a5f44';
         el.style.color = '#8fe3b3';
       }catch(_){
@@ -484,6 +500,32 @@
       }
     }
 
+    async function loadOpsHistory(){
+      const box = document.getElementById('ops-history');
+      if(!box) return;
+      try{
+        const headers = {};
+        if(OPS_API.token) headers['Authorization'] = `Bearer ${OPS_API.token}`;
+        const res = await fetch(`${OPS_API.baseUrl}/actions/recent`, {cache:'no-store', headers});
+        const payload = await res.json().catch(()=>({}));
+        if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
+        const rows = payload.items || [];
+        box.innerHTML = '';
+        if(!rows.length){
+          box.innerHTML = '<div class="muted">ops history empty</div>';
+          return;
+        }
+        rows.slice(0,8).forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'queue-item';
+          div.innerHTML = `<div><strong>${r.action || '-'}</strong></div><div class="muted">${r.time || '-'} · ${r.ok ? 'ok' : 'fail'}${r.dry_run ? ' · dry_run' : ''}</div>`;
+          box.appendChild(div);
+        });
+      }catch(err){
+        box.innerHTML = `<div class="muted">ops history load 실패: ${err.message}</div>`;
+      }
+    }
+
     async function boot(){
       try{
         const [eventsTxt, queueTxt, stateTxt] = await Promise.all([
@@ -500,6 +542,7 @@
         await loadControlApiHealth();
         await loadRalphDetail();
         await loadGenerationHistory();
+        await loadOpsHistory();
       }catch(err){
         document.getElementById('timeline').innerHTML = `<div class="muted">load error: ${err.message}<br/>repo root에서 <code>python -m http.server 8787</code> 후 접속</div>`;
       }
@@ -519,6 +562,7 @@
     }
 
     function bindActions(){
+      document.getElementById('act-set-token')?.addEventListener('click', setToken);
       document.getElementById('act-refresh')?.addEventListener('click', async () => {
         try{
           const payload = await executeAction('refresh');

@@ -2,14 +2,21 @@
 import json
 import os
 import subprocess
+import time
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Lock
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = os.getenv("OPS_CTL_HOST", "127.0.0.1")
 PORT = int(os.getenv("OPS_CTL_PORT", "8788"))
 TOKEN = os.getenv("OPS_CTL_TOKEN", "")
+REQUIRE_TOKEN = os.getenv("OPS_CTL_REQUIRE_TOKEN", "1") == "1"
+AUDIT_LOG = Path(os.getenv("OPS_CTL_AUDIT_LOG", str(ROOT / "lineage" / "actions_audit.jsonl")))
+LOCK_PATH = Path(os.getenv("OPS_CTL_LOCK_FILE", str(ROOT / ".runtime" / "ops_control.lock")))
+MAX_RETRIES = max(1, int(os.getenv("OPS_CTL_MAX_RETRIES", "2")))
+RETRY_DELAY = float(os.getenv("OPS_CTL_RETRY_DELAY_SEC", "1.0"))
 
 COMMANDS = {
     "refresh": [["python3", "scripts/export_cron_status.py"]],
@@ -38,15 +45,60 @@ COMMANDS = {
     ],
 }
 
+RUNTIME_LOCK = Lock()
 
-def run_cmd(cmd):
-    p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+
+def now():
+    return datetime.now().isoformat(timespec="seconds")
+
+
+def _ensure_parent(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def audit(entry: dict):
+    _ensure_parent(AUDIT_LOG)
+    with AUDIT_LOG.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def run_cmd(cmd, timeout_sec=180):
+    attempts = []
+    for n in range(1, MAX_RETRIES + 1):
+        p = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True, timeout=timeout_sec)
+        rec = {
+            "attempt": n,
+            "exit_code": p.returncode,
+            "stdout": (p.stdout or "")[-4000:],
+            "stderr": (p.stderr or "")[-4000:],
+        }
+        attempts.append(rec)
+        if p.returncode == 0:
+            break
+        if n < MAX_RETRIES:
+            time.sleep(RETRY_DELAY)
+
+    last = attempts[-1]
     return {
         "cmd": " ".join(cmd),
-        "exit_code": p.returncode,
-        "stdout": (p.stdout or "")[-4000:],
-        "stderr": (p.stderr or "")[-4000:],
+        "exit_code": last["exit_code"],
+        "stdout": last["stdout"],
+        "stderr": last["stderr"],
+        "attempts": attempts,
     }
+
+
+def read_recent_audits(limit=20):
+    if not AUDIT_LOG.exists():
+        return []
+    rows = AUDIT_LOG.read_text(encoding="utf-8").splitlines()
+    out = []
+    for line in rows[-limit:]:
+        try:
+            out.append(json.loads(line))
+        except Exception:
+            continue
+    return list(reversed(out))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -62,6 +114,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _unauthorized_if_needed(self):
+        if not REQUIRE_TOKEN:
+            return None
+        if not TOKEN:
+            return self._json(500, {"ok": False, "error": "server_token_not_configured"})
+        auth = self.headers.get("Authorization", "")
+        if auth != f"Bearer {TOKEN}":
+            return self._json(401, {"ok": False, "error": "unauthorized"})
+        return None
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -71,17 +133,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith("/health"):
-            return self._json(200, {"ok": True, "time": datetime.now().isoformat(timespec="seconds")})
+            return self._json(200, {
+                "ok": True,
+                "time": now(),
+                "auth_required": REQUIRE_TOKEN,
+                "audit_log": str(AUDIT_LOG),
+                "lock_file": str(LOCK_PATH),
+            })
+        if self.path.startswith("/actions/recent"):
+            if self._unauthorized_if_needed() is not None:
+                return
+            return self._json(200, {"ok": True, "items": read_recent_audits(20)})
         return self._json(404, {"ok": False, "error": "not_found"})
 
     def do_POST(self):
         if self.path != "/action":
             return self._json(404, {"ok": False, "error": "not_found"})
 
-        if TOKEN:
-            auth = self.headers.get("Authorization", "")
-            if auth != f"Bearer {TOKEN}":
-                return self._json(401, {"ok": False, "error": "unauthorized"})
+        if self._unauthorized_if_needed() is not None:
+            return
 
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -97,21 +167,43 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"ok": False, "error": "unknown_action", "allowed": sorted(COMMANDS)})
 
         if dry_run:
-            return self._json(200, {
+            payload = {
                 "ok": True,
                 "dry_run": True,
                 "action": action,
                 "commands": [" ".join(c) for c in seq],
-            })
+            }
+            audit({"time": now(), "action": action, "dry_run": True, "ok": True})
+            return self._json(200, payload)
 
-        results = [run_cmd(c) for c in seq]
-        ok = all(r["exit_code"] == 0 for r in results)
-        return self._json(200 if ok else 500, {
-            "ok": ok,
-            "action": action,
-            "time": datetime.now().isoformat(timespec="seconds"),
-            "results": results,
-        })
+        with RUNTIME_LOCK:
+            if LOCK_PATH.exists():
+                return self._json(409, {"ok": False, "error": "busy", "lock_file": str(LOCK_PATH)})
+            _ensure_parent(LOCK_PATH)
+            LOCK_PATH.write_text(now(), encoding="utf-8")
+
+            try:
+                results = [run_cmd(c) for c in seq]
+                ok = all(r["exit_code"] == 0 for r in results)
+                payload = {
+                    "ok": ok,
+                    "action": action,
+                    "time": now(),
+                    "results": results,
+                }
+                audit({
+                    "time": payload["time"],
+                    "action": action,
+                    "ok": ok,
+                    "result_count": len(results),
+                    "failed_commands": [r["cmd"] for r in results if r["exit_code"] != 0],
+                })
+                return self._json(200 if ok else 500, payload)
+            finally:
+                try:
+                    LOCK_PATH.unlink(missing_ok=True)
+                except Exception:
+                    pass
 
     def log_message(self, format, *args):
         return
@@ -119,5 +211,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"ops-control-api listening on http://{HOST}:{PORT}")
+    print(f"ops-control-api listening on http://{HOST}:{PORT} (auth_required={REQUIRE_TOKEN})")
     server.serve_forever()

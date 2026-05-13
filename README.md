@@ -11,6 +11,7 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 
 ## 디렉토리
 - `docs/planning/` : 운영 문서
+- `docs/runbook/` : 실행/장애 대응 runbook
 - `docs/specs/` : lineage/event 스키마
 - `docs/planning/smoke_sandbox/` : 스모크 리허설 샘플 아티팩트
 - `profiles/` : 프로필 템플릿(민감정보 제외)
