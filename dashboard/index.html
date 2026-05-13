@@ -48,6 +48,7 @@
       <span class="badge" id="ctl-heartbeat">heartbeat: -</span>
       <span class="badge" id="ctl-ralph">ralph: -</span>
       <span class="badge" id="ctl-generation">generation: -</span>
+      <span class="badge" id="ctl-api">api: -</span>
     </div>
   </header>
   <main class="wrap">
@@ -84,10 +85,10 @@
           </select>
         </div>
         <div class="actions">
-          <button class="btn" id="act-refresh">지금 새로고침</button>
-          <button class="btn" id="act-copy-pause">cron 전체 pause 명령 복사</button>
-          <button class="btn" id="act-copy-resume-core">core cron resume 명령 복사</button>
-          <button class="btn" id="act-copy-finalize">generation finalize 1회 실행 명령 복사</button>
+          <button class="btn" id="act-refresh">지금 새로고침(실행)</button>
+          <button class="btn" id="act-copy-pause">cron 전체 pause 실행</button>
+          <button class="btn" id="act-copy-resume-core">core cron resume 실행</button>
+          <button class="btn" id="act-copy-finalize">generation finalize 1회 실행</button>
         </div>
         <div class="cmdbox" id="action-feedback">action: 준비됨</div>
         <div id="timeline"></div>
@@ -133,9 +134,16 @@
     async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
     function parseJsonl(txt){ return txt.split('\n').map(s=>s.trim()).filter(Boolean).map(JSON.parse); }
     function pickTs(e){ return e.timestamp || e.ts || ''; }
-    const ACTION_COMMANDS = {
-      pauseAll: [
-        'hermes cron list --all',
+    const OPS_API = {
+      baseUrl: (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+        ? `${location.protocol}//${location.hostname}:8788`
+        : 'http://127.0.0.1:8788',
+      token: localStorage.getItem('opsCtlToken') || ''
+    };
+
+    const ACTION_PREVIEW = {
+      refresh: 'python3 scripts/export_cron_status.py',
+      pause_all: [
         'hermes cron pause 61fbb6fbc580',
         'hermes cron pause 3320eb412834',
         'hermes cron pause 8d13ba66655d',
@@ -144,17 +152,16 @@
         'hermes cron pause 22e0930cff69',
         'hermes cron pause 4fa36ebb15d2'
       ].join('\n'),
-      resumeCore: [
-        'hermes cron resume 61fbb6fbc580   # wave-spawn',
-        'hermes cron resume 3320eb412834   # wave-dispatcher',
-        'hermes cron resume 8d13ba66655d   # watchdog',
-        'hermes cron resume b96d745a16c9   # export-cron-status',
-        'hermes cron resume 9f39d5d4dd0a   # heartbeat'
+      resume_core: [
+        'hermes cron resume 61fbb6fbc580',
+        'hermes cron resume 3320eb412834',
+        'hermes cron resume 8d13ba66655d',
+        'hermes cron resume b96d745a16c9',
+        'hermes cron resume 9f39d5d4dd0a'
       ].join('\n'),
-      finalizeOnce: [
-        'hermes cron run 4fa36ebb15d2     # generation-finalize',
-        'hermes cron pause 4fa36ebb15d2   # paused-safe 유지',
-        'hermes cron list --all'
+      finalize_once: [
+        'hermes cron run 4fa36ebb15d2',
+        'hermes cron pause 4fa36ebb15d2'
       ].join('\n')
     };
 
@@ -415,6 +422,45 @@
       }
     }
 
+    async function loadControlApiHealth(){
+      const el = document.getElementById('ctl-api');
+      if(!el) return;
+      try{
+        const r = await fetch(`${OPS_API.baseUrl}/health`, {cache:'no-store'});
+        if(!r.ok) throw new Error('down');
+        el.textContent = 'api: 🟢 ready';
+        el.style.borderColor = '#2a5f44';
+        el.style.color = '#8fe3b3';
+      }catch(_){
+        el.textContent = 'api: 🔴 down';
+        el.style.borderColor = '#8a2f2f';
+        el.style.color = '#ff9b9b';
+      }
+    }
+
+    async function executeAction(action){
+      const headers = {'Content-Type':'application/json'};
+      if(OPS_API.token) headers['Authorization'] = `Bearer ${OPS_API.token}`;
+      const res = await fetch(`${OPS_API.baseUrl}/action`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({action})
+      });
+      const payload = await res.json().catch(() => ({}));
+      if(!res.ok || !payload.ok){
+        throw new Error(payload.error || `action failed (${res.status})`);
+      }
+      return payload;
+    }
+
+    function briefResult(payload){
+      const lines = (payload.results || []).map(r => {
+        const tail = (r.stderr || r.stdout || '').trim().split('\n').slice(-1)[0] || '-';
+        return `${r.exit_code === 0 ? '✅' : '❌'} ${r.cmd} :: ${tail}`;
+      });
+      return lines.join('\n').slice(0, 2500);
+    }
+
     async function loadGenerationHistory(){
       const box = document.getElementById('gen-history');
       if(!box) return;
@@ -451,6 +497,7 @@
         await loadHeartbeat();
         await loadRalph();
         await loadGenerationBadge();
+        await loadControlApiHealth();
         await loadRalphDetail();
         await loadGenerationHistory();
       }catch(err){
@@ -473,20 +520,50 @@
 
     function bindActions(){
       document.getElementById('act-refresh')?.addEventListener('click', async () => {
-        await boot();
-        setActionFeedback('action: 수동 새로고침 완료');
+        try{
+          const payload = await executeAction('refresh');
+          setActionFeedback(`action: refresh 완료\n${briefResult(payload)}`);
+          await boot();
+        }catch(err){
+          const ok = await copyToClipboard(ACTION_PREVIEW.refresh);
+          setActionFeedback(ok ? `action 실패(${err.message}) · fallback 명령 복사` : `action 실패(${err.message})\n${ACTION_PREVIEW.refresh}`);
+        }
       });
+
       document.getElementById('act-copy-pause')?.addEventListener('click', async () => {
-        const ok = await copyToClipboard(ACTION_COMMANDS.pauseAll);
-        setActionFeedback(ok ? 'action: pause 명령 복사 완료' : `action:\n${ACTION_COMMANDS.pauseAll}`);
+        if(!confirm('cron 전체를 pause 할까요?')) return;
+        try{
+          const payload = await executeAction('pause_all');
+          setActionFeedback(`action: pause_all 완료\n${briefResult(payload)}`);
+          await boot();
+        }catch(err){
+          const ok = await copyToClipboard(ACTION_PREVIEW.pause_all);
+          setActionFeedback(ok ? `action 실패(${err.message}) · fallback 명령 복사` : `action 실패(${err.message})\n${ACTION_PREVIEW.pause_all}`);
+        }
       });
+
       document.getElementById('act-copy-resume-core')?.addEventListener('click', async () => {
-        const ok = await copyToClipboard(ACTION_COMMANDS.resumeCore);
-        setActionFeedback(ok ? 'action: core resume 명령 복사 완료' : `action:\n${ACTION_COMMANDS.resumeCore}`);
+        if(!confirm('core cron(resume)을 실행할까요?')) return;
+        try{
+          const payload = await executeAction('resume_core');
+          setActionFeedback(`action: resume_core 완료\n${briefResult(payload)}`);
+          await boot();
+        }catch(err){
+          const ok = await copyToClipboard(ACTION_PREVIEW.resume_core);
+          setActionFeedback(ok ? `action 실패(${err.message}) · fallback 명령 복사` : `action 실패(${err.message})\n${ACTION_PREVIEW.resume_core}`);
+        }
       });
+
       document.getElementById('act-copy-finalize')?.addEventListener('click', async () => {
-        const ok = await copyToClipboard(ACTION_COMMANDS.finalizeOnce);
-        setActionFeedback(ok ? 'action: finalize 명령 복사 완료' : `action:\n${ACTION_COMMANDS.finalizeOnce}`);
+        if(!confirm('generation finalize 1회 실행할까요?')) return;
+        try{
+          const payload = await executeAction('finalize_once');
+          setActionFeedback(`action: finalize_once 완료\n${briefResult(payload)}`);
+          await boot();
+        }catch(err){
+          const ok = await copyToClipboard(ACTION_PREVIEW.finalize_once);
+          setActionFeedback(ok ? `action 실패(${err.message}) · fallback 명령 복사` : `action 실패(${err.message})\n${ACTION_PREVIEW.finalize_once}`);
+        }
       });
     }
 
