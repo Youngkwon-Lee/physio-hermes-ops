@@ -255,6 +255,24 @@
           const isGenClose = String(e.run_id || '').startsWith('generation-close-');
           if (isGenClose) {
             const breakdown = report.status_breakdown || {};
+            const failN = Number(breakdown.FAIL ?? 0);
+            const checkN = Number(breakdown.CHECK ?? 0);
+            const decision = String(report.decision || '').toUpperCase();
+
+            let recommendation = 'CHECK_REQUIRED';
+            let reason = 'insufficient generation decision context';
+
+            if (decision === 'RED' || failN > 0) {
+              recommendation = 'HOLD';
+              reason = (decision === 'RED') ? 'decision RED' : `FAIL detected (${failN})`;
+            } else if (decision === 'YELLOW' || checkN > 0) {
+              recommendation = 'LIMITED_RESUME';
+              reason = (decision === 'YELLOW') ? 'decision YELLOW' : `CHECK detected (${checkN})`;
+            } else if (decision === 'GREEN' && failN === 0 && checkN === 0) {
+              recommendation = 'RESUME';
+              reason = 'decision GREEN and no FAIL/CHECK';
+            }
+
             document.getElementById('d-gen-close').textContent = JSON.stringify({
               decision: report.decision || '-',
               wave_id: report.wave_id || e.wave_id || '-',
@@ -265,6 +283,8 @@
                 CHECK: breakdown.CHECK ?? 0,
                 FAIL: breakdown.FAIL ?? 0
               },
+              resume_recommendation: recommendation,
+              recommendation_reason: reason,
               closed_at: report.closed_at || '-'
             }, null, 2);
           }
