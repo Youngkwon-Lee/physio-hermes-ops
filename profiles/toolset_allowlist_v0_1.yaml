@@ -1,0 +1,18 @@
+version: v0.1
+profiles:
+  physio-orchestrator:
+    toolsets: [terminal, file, skills, todo, session_search, delegation, messaging]
+  physio-planner:
+    toolsets: [web, file, skills, todo, session_search]
+  physio-frontend:
+    toolsets: [browser, terminal, file, vision, skills]
+  physio-backend:
+    toolsets: [terminal, file, code_execution, skills]
+  physio-qa:
+    toolsets: [browser, terminal, file, vision, skills]
+  physio-designer:
+    toolsets: [browser, file, vision, skills]
+  physio-marketing:
+    toolsets: [web, file, skills]
+  physio-ops-reporter:
+    toolsets: [terminal, file, skills, session_search, messaging]
