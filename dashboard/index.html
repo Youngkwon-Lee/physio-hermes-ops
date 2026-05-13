@@ -15,8 +15,12 @@
     .label{font-size:12px;color:var(--muted)} .value{font-size:28px;font-weight:800;margin-top:6px}
     .layout{display:grid;grid-template-columns:260px 1fr 420px;gap:14px}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
-    .filters{display:flex;gap:8px;margin-bottom:10px}
+    .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
     .filters select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px 0}
+    .btn{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
+    .btn:hover{background:#182846}
+    .cmdbox{margin-top:8px;border:1px dashed var(--line);border-radius:8px;padding:8px;font-size:12px;color:#c8d8f7;background:#0e1627;white-space:pre-wrap}
     .agent,.queue-item{display:block;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#10182a}
     .agent-row{display:flex;justify-content:space-between;align-items:center}
     .tag{font-size:11px;padding:2px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
@@ -79,6 +83,13 @@
             <option value="score_asc">sort: score 낮은순</option>
           </select>
         </div>
+        <div class="actions">
+          <button class="btn" id="act-refresh">지금 새로고침</button>
+          <button class="btn" id="act-copy-pause">cron 전체 pause 명령 복사</button>
+          <button class="btn" id="act-copy-resume-core">core cron resume 명령 복사</button>
+          <button class="btn" id="act-copy-finalize">generation finalize 1회 실행 명령 복사</button>
+        </div>
+        <div class="cmdbox" id="action-feedback">action: 준비됨</div>
         <div id="timeline"></div>
       </section>
 
@@ -122,6 +133,30 @@
     async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
     function parseJsonl(txt){ return txt.split('\n').map(s=>s.trim()).filter(Boolean).map(JSON.parse); }
     function pickTs(e){ return e.timestamp || e.ts || ''; }
+    const ACTION_COMMANDS = {
+      pauseAll: [
+        'hermes cron list --all',
+        'hermes cron pause 61fbb6fbc580',
+        'hermes cron pause 3320eb412834',
+        'hermes cron pause 8d13ba66655d',
+        'hermes cron pause b96d745a16c9',
+        'hermes cron pause 9f39d5d4dd0a',
+        'hermes cron pause 22e0930cff69',
+        'hermes cron pause 4fa36ebb15d2'
+      ].join('\n'),
+      resumeCore: [
+        'hermes cron resume 61fbb6fbc580   # wave-spawn',
+        'hermes cron resume 3320eb412834   # wave-dispatcher',
+        'hermes cron resume 8d13ba66655d   # watchdog',
+        'hermes cron resume b96d745a16c9   # export-cron-status',
+        'hermes cron resume 9f39d5d4dd0a   # heartbeat'
+      ].join('\n'),
+      finalizeOnce: [
+        'hermes cron run 4fa36ebb15d2     # generation-finalize',
+        'hermes cron pause 4fa36ebb15d2   # paused-safe 유지',
+        'hermes cron list --all'
+      ].join('\n')
+    };
 
     function computeLoopStatus(events){
       if(!events.length) return 'PENDING';
@@ -423,6 +458,39 @@
       }
     }
 
+    async function copyToClipboard(txt){
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(txt);
+        return true;
+      }
+      return false;
+    }
+
+    function setActionFeedback(msg){
+      const el = document.getElementById('action-feedback');
+      if(el) el.textContent = msg;
+    }
+
+    function bindActions(){
+      document.getElementById('act-refresh')?.addEventListener('click', async () => {
+        await boot();
+        setActionFeedback('action: 수동 새로고침 완료');
+      });
+      document.getElementById('act-copy-pause')?.addEventListener('click', async () => {
+        const ok = await copyToClipboard(ACTION_COMMANDS.pauseAll);
+        setActionFeedback(ok ? 'action: pause 명령 복사 완료' : `action:\n${ACTION_COMMANDS.pauseAll}`);
+      });
+      document.getElementById('act-copy-resume-core')?.addEventListener('click', async () => {
+        const ok = await copyToClipboard(ACTION_COMMANDS.resumeCore);
+        setActionFeedback(ok ? 'action: core resume 명령 복사 완료' : `action:\n${ACTION_COMMANDS.resumeCore}`);
+      });
+      document.getElementById('act-copy-finalize')?.addEventListener('click', async () => {
+        const ok = await copyToClipboard(ACTION_COMMANDS.finalizeOnce);
+        setActionFeedback(ok ? 'action: finalize 명령 복사 완료' : `action:\n${ACTION_COMMANDS.finalizeOnce}`);
+      });
+    }
+
+    bindActions();
     boot(); setInterval(boot, 10000);
     document.getElementById('filter-wave').addEventListener('change', applyFilters);
     document.getElementById('filter-profile').addEventListener('change', applyFilters);
