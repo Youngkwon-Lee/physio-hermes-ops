@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-05-13T17:45:24",
+  "source_ok": true,
+  "raw_output_present": true,
+  "items": {
+    "wave_spawn": {
+      "name": "physio-wave-spawn",
+      "enabled": false,
+      "state": "paused",
+      "next_run_at": "2026-05-14T09:15:00+09:00"
+    },
+    "wave_dispatcher": {
+      "name": "physio-wave-dispatcher",
+      "enabled": false,
+      "state": "paused",
+      "next_run_at": "2026-05-13T17:21:55.624424+09:00"
+    },
+    "watchdog": {
+      "name": "physio-watchdog-fail-check",
+      "enabled": true,
+      "state": "scheduled",
+      "next_run_at": "2026-05-13T17:54:19.200439+09:00"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "generated_at": "2026-05-13T18:28:09",
+  "loop_name": "ralph",
+  "alive": true,
+  "mode": "paused-safe",
+  "signals": {
+    "heartbeat_alive": true,
+    "spawn_state": "paused",
+    "dispatch_state": "paused"
+  },
+  "summary": "ralph loop standby healthy (heartbeat alive, spawn/dispatch paused)"
+}

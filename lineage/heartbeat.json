@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-05-13T18:23:59",
+  "alive": true,
+  "source": "physio-heartbeat",
+  "event_count": 9,
+  "last_event_at": "2026-05-13T15:50:03",
+  "last_wave": "wave-2",
+  "dispatch_cursor": {
+    "queue_index": 1,
+    "task_index": 0,
+    "last_dispatched_at": "2026-05-13T16:00:16"
+  }
+}
