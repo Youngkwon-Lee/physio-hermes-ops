@@ -90,7 +90,8 @@
           <button class="btn" id="act-copy-pause">cron 전체 pause 실행</button>
           <button class="btn" id="act-copy-resume-core">core cron resume 실행</button>
           <button class="btn" id="act-copy-finalize">generation finalize 1회 실행</button>
-          <button class="btn" id="act-set-token">API 토큰 설정</button>
+          <button class="btn" id="act-set-read-token">READ 토큰 설정</button>
+          <button class="btn" id="act-set-exec-token">EXEC 토큰 설정</button>
         </div>
         <div class="mini">보안모드: API 토큰 필수(브라우저 localStorage 사용)</div>
         <div class="cmdbox" id="action-feedback">action: 준비됨</div>
@@ -143,17 +144,22 @@
       baseUrl: (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
         ? `${location.protocol}//${location.hostname}:8788`
         : 'http://127.0.0.1:8788',
-      token: localStorage.getItem('opsCtlToken') || ''
+      readToken: localStorage.getItem('opsCtlReadToken') || localStorage.getItem('opsCtlToken') || '',
+      execToken: localStorage.getItem('opsCtlExecToken') || localStorage.getItem('opsCtlToken') || ''
     };
 
-    function setToken(){
-      const next = prompt('OPS API 토큰 입력 (비우면 제거)', OPS_API.token || '');
+    function setToken(scope){
+      const key = scope === 'read' ? 'opsCtlReadToken' : 'opsCtlExecToken';
+      const label = scope === 'read' ? 'READ' : 'EXEC';
+      const current = scope === 'read' ? OPS_API.readToken : OPS_API.execToken;
+      const next = prompt(`${label} 토큰 입력 (비우면 제거)`, current || '');
       if(next === null) return;
-      OPS_API.token = (next || '').trim();
-      if(OPS_API.token) localStorage.setItem('opsCtlToken', OPS_API.token);
-      else localStorage.removeItem('opsCtlToken');
-      setActionFeedback(OPS_API.token ? 'token 저장됨' : 'token 제거됨');
+      const v = (next || '').trim();
+      if(scope === 'read') OPS_API.readToken = v; else OPS_API.execToken = v;
+      if(v) localStorage.setItem(key, v); else localStorage.removeItem(key);
+      setActionFeedback(`${label} token ${v ? '저장됨' : '제거됨'}`);
     }
+
 
     const ACTION_PREVIEW = {
       refresh: 'python3 scripts/export_cron_status.py',
@@ -456,7 +462,7 @@
 
     async function executeAction(action){
       const headers = {'Content-Type':'application/json'};
-      if(OPS_API.token) headers['Authorization'] = `Bearer ${OPS_API.token}`;
+      if(OPS_API.execToken) headers['Authorization'] = `Bearer ${OPS_API.execToken}`;
       const res = await fetch(`${OPS_API.baseUrl}/action`, {
         method: 'POST',
         headers,
@@ -505,7 +511,7 @@
       if(!box) return;
       try{
         const headers = {};
-        if(OPS_API.token) headers['Authorization'] = `Bearer ${OPS_API.token}`;
+        if(OPS_API.readToken) headers['Authorization'] = `Bearer ${OPS_API.readToken}`;
         const res = await fetch(`${OPS_API.baseUrl}/actions/recent`, {cache:'no-store', headers});
         const payload = await res.json().catch(()=>({}));
         if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
@@ -562,7 +568,8 @@
     }
 
     function bindActions(){
-      document.getElementById('act-set-token')?.addEventListener('click', setToken);
+      document.getElementById('act-set-read-token')?.addEventListener('click', () => setToken('read'));
+      document.getElementById('act-set-exec-token')?.addEventListener('click', () => setToken('exec'));
       document.getElementById('act-refresh')?.addEventListener('click', async () => {
         try{
           const payload = await executeAction('refresh');

@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 HOST = os.getenv("OPS_CTL_HOST", "127.0.0.1")
 PORT = int(os.getenv("OPS_CTL_PORT", "8788"))
 TOKEN = os.getenv("OPS_CTL_TOKEN", "")
+READ_TOKEN = os.getenv("OPS_CTL_READ_TOKEN", TOKEN)
+EXEC_TOKEN = os.getenv("OPS_CTL_EXEC_TOKEN", TOKEN)
 REQUIRE_TOKEN = os.getenv("OPS_CTL_REQUIRE_TOKEN", "1") == "1"
 AUDIT_LOG = Path(os.getenv("OPS_CTL_AUDIT_LOG", str(ROOT / "lineage" / "actions_audit.jsonl")))
 LOCK_PATH = Path(os.getenv("OPS_CTL_LOCK_FILE", str(ROOT / ".runtime" / "ops_control.lock")))
@@ -114,14 +116,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _unauthorized_if_needed(self):
+    def _require_auth(self, scope="read"):
         if not REQUIRE_TOKEN:
             return None
-        if not TOKEN:
-            return self._json(500, {"ok": False, "error": "server_token_not_configured"})
+
+        expected = READ_TOKEN if scope == "read" else EXEC_TOKEN
+        if not expected:
+            return self._json(500, {"ok": False, "error": f"server_{scope}_token_not_configured"})
+
         auth = self.headers.get("Authorization", "")
-        if auth != f"Bearer {TOKEN}":
-            return self._json(401, {"ok": False, "error": "unauthorized"})
+        if auth != f"Bearer {expected}":
+            return self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
         return None
 
     def do_OPTIONS(self):
@@ -137,11 +142,12 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "time": now(),
                 "auth_required": REQUIRE_TOKEN,
+                "auth_mode": "split" if (READ_TOKEN != EXEC_TOKEN) else "single",
                 "audit_log": str(AUDIT_LOG),
                 "lock_file": str(LOCK_PATH),
             })
         if self.path.startswith("/actions/recent"):
-            if self._unauthorized_if_needed() is not None:
+            if self._require_auth("read") is not None:
                 return
             return self._json(200, {"ok": True, "items": read_recent_audits(20)})
         return self._json(404, {"ok": False, "error": "not_found"})
@@ -150,7 +156,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/action":
             return self._json(404, {"ok": False, "error": "not_found"})
 
-        if self._unauthorized_if_needed() is not None:
+        if self._require_auth("exec") is not None:
             return
 
         try:
@@ -211,5 +217,5 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"ops-control-api listening on http://{HOST}:{PORT} (auth_required={REQUIRE_TOKEN})")
+    print(f"ops-control-api listening on http://{HOST}:{PORT} (auth_required={REQUIRE_TOKEN}, auth_mode={'split' if READ_TOKEN != EXEC_TOKEN else 'single'})")
     server.serve_forever()

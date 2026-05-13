@@ -8,6 +8,8 @@ WorkingDirectory=%h/physio-hermes-ops
 Environment=OPS_CTL_HOST=127.0.0.1
 Environment=OPS_CTL_PORT=8788
 Environment=OPS_CTL_REQUIRE_TOKEN=1
+Environment=OPS_CTL_MAX_RETRIES=2
+Environment=OPS_CTL_RETRY_DELAY_SEC=1.0
 EnvironmentFile=%h/.config/physio-hermes-ops/ops-control-api.env
 ExecStart=/usr/bin/python3 %h/physio-hermes-ops/scripts/ops_control_api.py
 Restart=always
