@@ -41,6 +41,7 @@
       <span class="badge" id="ctl-watchdog">watchdog: -</span>
       <span class="badge" id="ctl-heartbeat">heartbeat: -</span>
       <span class="badge" id="ctl-ralph">ralph: -</span>
+      <span class="badge" id="ctl-generation">generation: -</span>
     </div>
   </header>
   <main class="wrap">
@@ -97,6 +98,8 @@
           <div class="muted">ralph detail</div>
           <pre id="d-ralph">-</pre>
         </div>
+        <div class="section-title">Generation History</div>
+        <div id="gen-history"></div>
         <div class="section-title">Wave Queue (next)</div>
         <div id="queue"></div>
       </aside>
@@ -314,6 +317,44 @@
       }
     }
 
+    async function loadGenerationBadge(){
+      const el = document.getElementById('ctl-generation');
+      if(!el) return;
+      try{
+        const g = await getJson('../lineage/generation_cycle_state.json');
+        const d = String(g.decision || 'unknown').toUpperCase();
+        const emoji = d === 'GREEN' ? '🟢' : (d === 'YELLOW' ? '🟡' : (d === 'RED' ? '🔴' : '•'));
+        el.textContent = `generation: ${emoji} ${d}`;
+        el.style.borderColor = d === 'GREEN' ? '#2a5f44' : (d === 'RED' ? '#8a2f2f' : '#8a6d3b');
+        el.style.color = d === 'GREEN' ? '#8fe3b3' : (d === 'RED' ? '#ff9b9b' : '#f6c453');
+      }catch(_){
+        el.textContent = 'generation: ?';
+      }
+    }
+
+    async function loadGenerationHistory(){
+      const box = document.getElementById('gen-history');
+      if(!box) return;
+      try{
+        const txt = await getText('../lineage/generation_history.jsonl');
+        const rows = parseJsonl(txt);
+        const recent = rows.slice(-8).reverse();
+        box.innerHTML = '';
+        if(!recent.length){
+          box.innerHTML = '<div class="muted">history empty</div>';
+          return;
+        }
+        recent.forEach(r => {
+          const div = document.createElement('div');
+          div.className = 'queue-item';
+          div.innerHTML = `<div><strong>${r.wave_id || '-'} / ${r.profile_id || '-'}</strong></div><div class="muted">${r.promoted_at || '-'} · score ${r.score ?? '-'} · ${r.status || '-'}</div>`;
+          box.appendChild(div);
+        });
+      }catch(_){
+        box.innerHTML = '<div class="muted">history load 실패</div>';
+      }
+    }
+
     async function boot(){
       try{
         const [eventsTxt, queueTxt, stateTxt] = await Promise.all([
@@ -326,7 +367,9 @@
         await loadCronStatus();
         await loadHeartbeat();
         await loadRalph();
+        await loadGenerationBadge();
         await loadRalphDetail();
+        await loadGenerationHistory();
       }catch(err){
         document.getElementById('timeline').innerHTML = `<div class="muted">load error: ${err.message}<br/>repo root에서 <code>python -m http.server 8787</code> 후 접속</div>`;
       }
