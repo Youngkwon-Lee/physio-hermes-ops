@@ -3,44 +3,340 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Physio Hermes Mini Nautilus Dashboard</title>
+  <title>Physio Nautilus Ops UI</title>
   <style>
-    body { font-family: Inter, system-ui, sans-serif; background:#0b1020; color:#e6edf3; margin:0; }
-    .wrap { max-width:1000px; margin:40px auto; padding:0 16px; }
-    .cards { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
-    .card { background:#161b2f; border:1px solid #2c3658; border-radius:12px; padding:14px; }
-    .num { font-size:28px; font-weight:700; }
-    table { width:100%; border-collapse: collapse; margin-top:16px; background:#161b2f; }
-    th,td { border-bottom:1px solid #2c3658; padding:10px; text-align:left; }
-    .ok{color:#49d17d}.warn{color:#ffcd57}.bad{color:#ff6b6b}
-    code{background:#1d2542;padding:2px 6px;border-radius:6px}
+    :root{--bg:#0a0f1c;--panel:#121a2b;--panel2:#0f1726;--line:#23324d;--txt:#e6edf7;--muted:#8fa3c7;--ok:#33d17a;--warn:#f6c453;--bad:#ff6b6b;--acc:#6ea8ff}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2b55 0%,var(--bg) 45%);color:var(--txt);font-family:Inter,system-ui,sans-serif}
+    .top{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--line)}
+    .brand{font-weight:800}.badge{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+    .wrap{max-width:1400px;margin:0 auto;padding:20px}
+    .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:14px}
+    .label{font-size:12px;color:var(--muted)} .value{font-size:28px;font-weight:800;margin-top:6px}
+    .layout{display:grid;grid-template-columns:260px 1fr 420px;gap:14px}
+    .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+    .filters{display:flex;gap:8px;margin-bottom:10px}
+    .filters select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+    .agent,.queue-item{display:block;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#10182a}
+    .agent-row{display:flex;justify-content:space-between;align-items:center}
+    .tag{font-size:11px;padding:2px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}.ok{background:var(--ok)}.warn{background:var(--warn)}.bad{background:var(--bad)}
+    .timeline-item{padding:10px;border-left:2px solid var(--line);margin-left:8px;position:relative;cursor:pointer;border-radius:8px}
+    .timeline-item:hover{background:#132038}
+    .timeline-item.active{background:#182846;border-left-color:var(--acc)}
+    .timeline-item::before{content:'';position:absolute;left:-6px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
+    .muted{color:var(--muted);font-size:12px}
+    pre{margin:0;white-space:pre-wrap;font-size:12px;color:#c8d8f7;max-height:420px;overflow:auto}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:1200px){.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Physio Hermes Mini Nautilus</h1>
-  <p>파일 기반 lineage + nightly 운영 대시보드 (MVP)</p>
-  <div class="cards">
-    <div class="card"><div>Loop State</div><div class="num ok">ACTIVE</div></div>
-    <div class="card"><div>Profiles</div><div class="num">8</div></div>
-    <div class="card"><div>Status Rule</div><div class="num">PASS*</div></div>
-    <div class="card"><div>Per-task Timeout</div><div class="num">1800s</div></div>
-  </div>
+  <header class="top">
+    <div class="brand">Physio Nautilus Ops UI</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span class="badge">LIVE / JSONL</span>
+      <span class="badge" id="ctl-spawn">spawn: -</span>
+      <span class="badge" id="ctl-dispatch">dispatch: -</span>
+      <span class="badge" id="ctl-watchdog">watchdog: -</span>
+      <span class="badge" id="ctl-heartbeat">heartbeat: -</span>
+      <span class="badge" id="ctl-ralph">ralph: -</span>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="kpis">
+      <div class="card"><div class="label">Loop Status</div><div class="value" id="kpi-status">-</div></div>
+      <div class="card"><div class="label">Current Wave</div><div class="value" id="kpi-wave">-</div></div>
+      <div class="card"><div class="label">Avg Score</div><div class="value" id="kpi-score">-</div></div>
+      <div class="card"><div class="label">Queue Cursor</div><div class="value" id="kpi-cursor">-</div></div>
+    </section>
 
-  <h2>Lineage Source</h2>
-  <p><code>lineage/events.jsonl</code> 를 기준으로 <code>scripts/lineage_report.py</code>에서 집계.</p>
+    <section class="layout">
+      <aside class="card">
+        <div class="section-title">Profiles</div>
+        <div id="profiles"></div>
+      </aside>
 
-  <h2>Execution Chain</h2>
-  <table>
-    <thead><tr><th>Stage</th><th>Owner</th><th>Output</th><th>Gate</th></tr></thead>
-    <tbody>
-      <tr><td>Plan</td><td>physio-planner</td><td>TASK_SPEC</td><td class="ok">PASS</td></tr>
-      <tr><td>Build</td><td>physio-frontend/backend</td><td>Code diff</td><td class="ok">PASS</td></tr>
-      <tr><td>Verify</td><td>physio-qa</td><td>QA_VERIFY</td><td class="warn">PASS*</td></tr>
-      <tr><td>Orchestrate</td><td>physio-orchestrator</td><td>ORCH_STATUS</td><td class="warn">PASS*</td></tr>
-      <tr><td>Report</td><td>physio-ops-reporter</td><td>Morning brief</td><td class="ok">PASS</td></tr>
-    </tbody>
-  </table>
-</div>
+      <section class="card">
+        <div class="section-title">Lineage Timeline (클릭하면 상세)</div>
+        <div class="filters">
+          <select id="filter-wave"><option value="ALL">wave: ALL</option></select>
+          <select id="filter-profile"><option value="ALL">profile: ALL</option></select>
+          <select id="filter-status">
+            <option value="ALL">status: ALL</option>
+            <option value="PASS">PASS</option>
+            <option value="PASS*">PASS*</option>
+            <option value="CHECK">CHECK</option>
+            <option value="FAIL">FAIL</option>
+          </select>
+          <select id="sort-mode">
+            <option value="time_desc">sort: 최신순</option>
+            <option value="time_asc">sort: 오래된순</option>
+            <option value="score_desc">sort: score 높은순</option>
+            <option value="score_asc">sort: score 낮은순</option>
+          </select>
+        </div>
+        <div id="timeline"></div>
+      </section>
+
+      <aside class="card">
+        <div class="section-title">Event Detail</div>
+        <div class="two-col" style="margin-bottom:10px">
+          <div class="queue-item"><div class="muted">event_id</div><div id="d-eid">-</div></div>
+          <div class="queue-item"><div class="muted">status</div><div id="d-status">-</div></div>
+        </div>
+        <div class="queue-item" style="margin-bottom:10px">
+          <div class="muted">summary</div>
+          <div id="d-summary">timeline 항목을 선택하세요</div>
+        </div>
+        <div class="queue-item" style="margin-bottom:10px">
+          <div class="muted">linked report (json)</div>
+          <pre id="d-report">-</pre>
+        </div>
+        <div class="queue-item" style="margin-bottom:10px">
+          <div class="muted">ralph detail</div>
+          <pre id="d-ralph">-</pre>
+        </div>
+        <div class="section-title">Wave Queue (next)</div>
+        <div id="queue"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const STATUS_CLASS = {"PASS":"ok","PASS*":"ok","CHECK":"warn","FAIL":"bad","PENDING":"warn"};
+    const ORDERED_PROFILES = ["physio-orchestrator","physio-planner","physio-frontend","physio-backend","physio-qa","physio-ops-reporter"];
+    let CURRENT_EVENTS = [];
+    let FILTERED_EVENTS = [];
+
+    async function getText(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.text(); }
+    async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
+    function parseJsonl(txt){ return txt.split('\n').map(s=>s.trim()).filter(Boolean).map(JSON.parse); }
+    function pickTs(e){ return e.timestamp || e.ts || ''; }
+
+    function computeLoopStatus(events){
+      if(!events.length) return 'PENDING';
+      const recent = events.slice(-8);
+      if(recent.some(e => e.status === 'FAIL')) return 'RED';
+      if(recent.some(e => e.status === 'CHECK' || e.status === 'PASS*')) return 'YELLOW';
+      return 'GREEN';
+    }
+
+    function renderProfiles(events){
+      const latest = new Map(); events.forEach(e => latest.set(e.profile_id, e));
+      const box = document.getElementById('profiles'); box.innerHTML = '';
+      ORDERED_PROFILES.forEach(p => {
+        const e = latest.get(p); const status = e ? e.status : 'PENDING'; const cls = STATUS_CLASS[status] || 'warn';
+        const note = e ? `${e.wave_id || '-'} / ${pickTs(e)}` : 'no event';
+        const div = document.createElement('div'); div.className = 'agent';
+        div.innerHTML = `<div class="agent-row"><span>${p}</span><span class="tag"><span class="dot ${cls}"></span>${status}</span></div><div class="muted">${note}</div>`;
+        box.appendChild(div);
+      });
+    }
+
+    function populateFilters(events){
+      const waveSel = document.getElementById('filter-wave');
+      const profileSel = document.getElementById('filter-profile');
+      const wCur = waveSel.value || 'ALL';
+      const pCur = profileSel.value || 'ALL';
+
+      const waves = [...new Set(events.map(e => e.wave_id).filter(Boolean))].sort();
+      const profiles = [...new Set(events.map(e => e.profile_id).filter(Boolean))].sort();
+
+      waveSel.innerHTML = '<option value="ALL">wave: ALL</option>' + waves.map(w => `<option value="${w}">${w}</option>`).join('');
+      profileSel.innerHTML = '<option value="ALL">profile: ALL</option>' + profiles.map(p => `<option value="${p}">${p}</option>`).join('');
+
+      waveSel.value = waves.includes(wCur) ? wCur : 'ALL';
+      profileSel.value = profiles.includes(pCur) ? pCur : 'ALL';
+    }
+
+    function applyFilters(){
+      const w = document.getElementById('filter-wave').value;
+      const p = document.getElementById('filter-profile').value;
+      const s = document.getElementById('filter-status').value;
+      const sortMode = document.getElementById('sort-mode').value;
+
+      FILTERED_EVENTS = CURRENT_EVENTS.filter(e =>
+        (w === 'ALL' || e.wave_id === w) &&
+        (p === 'ALL' || e.profile_id === p) &&
+        (s === 'ALL' || e.status === s)
+      );
+
+      const scoreOf = (e) => {
+        const n = Number(e.score);
+        return Number.isNaN(n) ? -1 : n;
+      };
+
+      if (sortMode === 'time_asc') {
+        FILTERED_EVENTS.sort((a,b)=>String(pickTs(a)).localeCompare(String(pickTs(b))));
+      } else if (sortMode === 'score_desc') {
+        FILTERED_EVENTS.sort((a,b)=>scoreOf(b)-scoreOf(a));
+      } else if (sortMode === 'score_asc') {
+        FILTERED_EVENTS.sort((a,b)=>scoreOf(a)-scoreOf(b));
+      } else {
+        FILTERED_EVENTS.sort((a,b)=>String(pickTs(b)).localeCompare(String(pickTs(a))));
+      }
+
+      renderTimeline(FILTERED_EVENTS);
+    }
+
+    function renderTimeline(events){
+      const box = document.getElementById('timeline'); box.innerHTML = '';
+      const recent = events.slice(-10);
+      recent.forEach((e, idx) => {
+        const div = document.createElement('div'); div.className = 'timeline-item';
+        div.dataset.index = String(events.length - recent.length + idx);
+        div.innerHTML = `<strong>${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${e.status} · score ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
+        div.onclick = () => selectEvent(Number(div.dataset.index));
+        box.appendChild(div);
+      });
+      if(events.length) selectEvent(events.length - 1);
+      else {
+        document.getElementById('d-eid').textContent = '-';
+        document.getElementById('d-status').textContent = '-';
+        document.getElementById('d-summary').textContent = '조건에 맞는 이벤트 없음';
+        document.getElementById('d-report').textContent = '-';
+      }
+    }
+
+    async function loadRalphDetail(){
+      const el = document.getElementById('d-ralph');
+      if(!el) return;
+      try{
+        const r = await getJson('../lineage/ralph_loop_state.json');
+        el.textContent = JSON.stringify({
+          loop_name: r.loop_name,
+          mode: r.mode,
+          alive: r.alive,
+          summary: r.summary,
+          signals: r.signals,
+          updated_at: r.updated_at
+        }, null, 2);
+      }catch(_){
+        el.textContent = 'ralph state load 실패';
+      }
+    }
+
+    async function selectEvent(i){
+      const e = FILTERED_EVENTS[i];
+      if(!e) return;
+      document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('active'));
+      const target = [...document.querySelectorAll('.timeline-item')].find(el => Number(el.dataset.index) === i);
+      if(target) target.classList.add('active');
+
+      document.getElementById('d-eid').textContent = e.event_id || '-';
+      document.getElementById('d-status').textContent = e.status || '-';
+      document.getElementById('d-summary').textContent = `${e.wave_id || '-'} / ${e.profile_id || '-'} / ${e.notes || e.summary || '-'}`;
+
+      const reportPath = e.links?.report || (Array.isArray(e.artifact_paths) ? e.artifact_paths[0] : null);
+      if(!reportPath){ document.getElementById('d-report').textContent = 'linked report 없음'; return; }
+      try{
+        if (String(reportPath).endsWith('.md')) {
+          const md = await getText(`../${reportPath}`);
+          document.getElementById('d-report').textContent = md.slice(0, 4000);
+        } else {
+          const report = await getJson(`../${reportPath}`);
+          document.getElementById('d-report').textContent = JSON.stringify(report, null, 2);
+        }
+      }catch(_){
+        document.getElementById('d-report').textContent = `report load 실패: ${reportPath}`;
+      }
+    }
+
+    function renderQueue(queue, state){
+      const box = document.getElementById('queue'); box.innerHTML = '';
+      if(!queue.length){ box.innerHTML = '<div class="muted">queue empty</div>'; return; }
+      const qidx = Number(state.queue_index || 0); const tidx = Number(state.task_index || 0); const item = queue[qidx];
+      if(!item){ box.innerHTML = '<div class="muted">all queue consumed</div>'; return; }
+      const tasks = item.tasks || [];
+      tasks.slice(tidx, tidx + 4).forEach((t, i) => {
+        const n = tidx + i + 1;
+        const div = document.createElement('div'); div.className = 'queue-item';
+        div.innerHTML = `<div><strong>${item.next_wave} / task ${n}</strong></div><div class="muted">profile: ${t.profile_id}</div><pre>goal: ${t.goal}</pre>`;
+        box.appendChild(div);
+      });
+    }
+
+    function setKpis(events, queue, state){
+      const scores = events.map(e => Number(e.score)).filter(n => !Number.isNaN(n));
+      const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '-';
+      const currentWave = events.length ? (events[events.length-1].wave_id || '-') : '-';
+      const qidx = Number(state.queue_index || 0), tidx = Number(state.task_index || 0), total = (queue[qidx]?.tasks || []).length;
+      document.getElementById('kpi-status').textContent = computeLoopStatus(events);
+      document.getElementById('kpi-wave').textContent = currentWave;
+      document.getElementById('kpi-score').textContent = String(avg);
+      document.getElementById('kpi-cursor').textContent = `${qidx}/${total ? `${tidx}/${total}` : 'done'}`;
+    }
+
+    function setControlBadge(el, item, short){
+      if(!el || !item){ return; }
+      const state = item.state || 'unknown';
+      const emoji = (state === 'paused') ? '⏸' : (state === 'scheduled' ? '▶' : '•');
+      el.textContent = `${short}: ${emoji} ${state}`;
+      el.style.borderColor = state === 'paused' ? '#8a6d3b' : '#2a5f44';
+      el.style.color = state === 'paused' ? '#f6c453' : '#8fe3b3';
+    }
+
+    async function loadCronStatus(){
+      try{
+        const data = await getJson('./cron_status.json');
+        setControlBadge(document.getElementById('ctl-spawn'), data.items?.wave_spawn, 'spawn');
+        setControlBadge(document.getElementById('ctl-dispatch'), data.items?.wave_dispatcher, 'dispatch');
+        setControlBadge(document.getElementById('ctl-watchdog'), data.items?.watchdog, 'watchdog');
+      }catch(_){/* ignore */}
+    }
+
+    async function loadHeartbeat(){
+      const el = document.getElementById('ctl-heartbeat');
+      if(!el) return;
+      try{
+        const hb = await getJson('../lineage/heartbeat.json');
+        const ok = !!hb.alive;
+        el.textContent = `heartbeat: ${ok ? '💓 alive' : '💔 down'}`;
+        el.style.borderColor = ok ? '#2a5f44' : '#8a2f2f';
+        el.style.color = ok ? '#8fe3b3' : '#ff9b9b';
+      }catch(_){
+        el.textContent = 'heartbeat: ?';
+      }
+    }
+
+    async function loadRalph(){
+      const el = document.getElementById('ctl-ralph');
+      if(!el) return;
+      try{
+        const r = await getJson('../lineage/ralph_loop_state.json');
+        const ok = !!r.alive && (r.summary || '').includes('healthy');
+        el.textContent = `ralph: ${ok ? '🟢 healthy' : '🟡 check'}`;
+        el.style.borderColor = ok ? '#2a5f44' : '#8a6d3b';
+        el.style.color = ok ? '#8fe3b3' : '#f6c453';
+      }catch(_){
+        el.textContent = 'ralph: ?';
+      }
+    }
+
+    async function boot(){
+      try{
+        const [eventsTxt, queueTxt, stateTxt] = await Promise.all([
+          getText('../lineage/events.jsonl'), getText('../lineage/wave_queue.jsonl'), getText('../lineage/dispatch_state.json')
+        ]);
+        const events = parseJsonl(eventsTxt).sort((a,b)=>String(pickTs(a)).localeCompare(String(pickTs(b))));
+        const queue = parseJsonl(queueTxt); const state = JSON.parse(stateTxt);
+        CURRENT_EVENTS = events;
+        setKpis(events, queue, state); renderProfiles(events); populateFilters(events); applyFilters(); renderQueue(queue, state);
+        await loadCronStatus();
+        await loadHeartbeat();
+        await loadRalph();
+        await loadRalphDetail();
+      }catch(err){
+        document.getElementById('timeline').innerHTML = `<div class="muted">load error: ${err.message}<br/>repo root에서 <code>python -m http.server 8787</code> 후 접속</div>`;
+      }
+    }
+
+    boot(); setInterval(boot, 10000);
+    document.getElementById('filter-wave').addEventListener('change', applyFilters);
+    document.getElementById('filter-profile').addEventListener('change', applyFilters);
+    document.getElementById('filter-status').addEventListener('change', applyFilters);
+    document.getElementById('sort-mode').addEventListener('change', applyFilters);
+  </script>
 </body>
 </html>
