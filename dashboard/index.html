@@ -25,6 +25,8 @@
     .timeline-item:hover{background:#132038}
     .timeline-item.active{background:#182846;border-left-color:var(--acc)}
     .timeline-item::before{content:'';position:absolute;left:-6px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
+    .timeline-item.gen-close{border-left-color:#b889ff;background:rgba(115,86,173,0.18)}
+    .timeline-item.gen-close::before{background:#c89bff}
     .muted{color:var(--muted);font-size:12px}
     pre{margin:0;white-space:pre-wrap;font-size:12px;color:#c8d8f7;max-height:420px;overflow:auto}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -188,8 +190,11 @@
       const recent = events.slice(-10);
       recent.forEach((e, idx) => {
         const div = document.createElement('div'); div.className = 'timeline-item';
+        const isGenClose = String(e.run_id || '').startsWith('generation-close-');
+        if (isGenClose) div.classList.add('gen-close');
+        const label = isGenClose ? '♻️ GEN-CLOSE · ' : '';
         div.dataset.index = String(events.length - recent.length + idx);
-        div.innerHTML = `<strong>${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${e.status} · score ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
+        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${e.status} · score ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
         div.onclick = () => selectEvent(Number(div.dataset.index));
         box.appendChild(div);
       });
