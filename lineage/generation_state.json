@@ -1,0 +1,15 @@
+{
+  "version": "v0.1",
+  "updated_at": "2026-05-13T10:53:41.866449+00:00",
+  "source": "promote_generation_seed.py",
+  "source_event_id": "evt-20260513-001",
+  "last_promoted_at": "2026-05-13T10:53:41.866465+00:00",
+  "current_seed": {
+    "event_id": "evt-20260513-001",
+    "wave_id": "wave-1",
+    "profile_id": "physio-planner",
+    "score": 92,
+    "status": "PASS",
+    "timestamp": "2026-05-13T13:50:00+09:00"
+  }
+}
