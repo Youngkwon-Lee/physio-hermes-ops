@@ -1,0 +1,14 @@
+{
+  "version": "v0.3",
+  "closed_at": "2026-05-13T12:03:48.807301+00:00",
+  "wave_id": "wave-2",
+  "event_count": 6,
+  "decision": "YELLOW",
+  "status_breakdown": {
+    "PASS": 1,
+    "PASS*": 5,
+    "CHECK": 0,
+    "FAIL": 0
+  },
+  "source": "close_generation_cycle.py"
+}
