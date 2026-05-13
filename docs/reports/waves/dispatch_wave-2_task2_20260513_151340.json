@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-05-13T15:13:40",
+  "queue_index": 0,
+  "task_index": 1,
+  "trigger_wave": "wave-1",
+  "wave_id": "wave-2",
+  "result": {
+    "profile_id": "physio-frontend",
+    "goal": "Polish UI tasks from seed scope",
+    "started_at": "2026-05-13T15:11:37",
+    "ended_at": "2026-05-13T15:13:40",
+    "exit_code": 124,
+    "status": "PASS*",
+    "output_tail": "+- [ ] 현재 목업이 다중 KPI 카드와 반응형 grid를 제공하며, 실제 앱 반영/실측 증거는 별도 문서에 남긴다.\n - [ ] “같은 행 카드 간 간격 일관성”은 다중 카드 목업 기준으로 검토 가능하고, 실제 뷰포트 렌더는 별도 QA가 필요하다고 명시한다.\n \n ### 증거/메모\n  ┊ 🔧 patch     /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  0.3s [error]\n  ┊ 🔧 patch     /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  0.3s [error]\n  ┊ 🔧 patch     /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  1.1s\n  ┊ review diff\na//home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md → b//home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md\n@@ -157,6 +157,6 @@\n - 후속 액션:\n \n ## 현재 sandbox 기준 예상 리스크\n-- 로그인 오류 문구의 실제 최종 카피가 sandbox에 없어 작업 1은 완료 판정 근거가 부족할 수 있다.\n-- KPI 카드는 단일 목업만 있어 작업 2의 “같은 행 간격 일관성”은 부분 검증에 그칠 수 있다.\n-- verify 명령은 정의되어 있지만 실행 결과가 첨부되지 않으면 작업 3은 문서 정리 완료까지만 판정 가능하다.+- 로그인 오류 문구와 KPI 다중 카드 목업은 sandbox에 반영됐지만, 실제 앱 컴포넌트 반영 여부는 아직 별도 확인이 필요하다.\n+- 데스크톱/태블릿 레이아웃은 코드 기준 근거만 있고, 브라우저 렌더 캡처/실측 spacing 증거는 아직 없다.\n+- verify 명령은 정의되어 있지만 실행 결과가 첨부되지 않으면 작업 3은 문서 정리 완료까지만 판정 가능하다.\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  0.9s\n  ┊ 💻 $         git diff -- docs/planning/smoke_sandbox/QA_VERIFY_V2.md docs/planning/smoke_sandbox/ORCH_STATUS_V2.md docs/planning/smoke_sandbox/ui_mock.tsx docs/planning/smoke_sandbox/FRONTEND_UI_POLISH_V1.md  0.3s"
+  }
+}

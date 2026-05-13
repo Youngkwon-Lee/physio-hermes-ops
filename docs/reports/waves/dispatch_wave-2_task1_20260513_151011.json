@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-05-13T15:10:11",
+  "queue_index": 0,
+  "task_index": 0,
+  "trigger_wave": "wave-1",
+  "wave_id": "wave-2",
+  "result": {
+    "profile_id": "physio-planner",
+    "goal": "Refine next wave task spec from previous best seed",
+    "started_at": "2026-05-13T15:08:10",
+    "ended_at": "2026-05-13T15:10:11",
+    "exit_code": 124,
+    "status": "PASS*",
+    "output_tail": "  ┊ 📖 read      ./physio-hermes-ops/docs/planning/smoke_sandbox/TASK_SPEC_V2.md  1.0s\n  ┊ 📖 read      ./physio-hermes-ops/docs/planning/smoke_sandbox/ORCH_STATUS_V2.md  1.0s\n  ┊ 🔎 grep      V3|NEXT_WAVE|seed|TASK_SPEC  0.5s\n  ┊ 📖 read      ./physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  0.9s\n  ┊ 🔎 grep      best seed|next wave|seed 후보|refine|refined  0.5s\n  ┊ 📖 read      ./physio-hermes-ops/docs/planning/smoke_sandbox/TASK_SPEC_V3.md  0.9s\n  ┊ 📖 read      ./physio-hermes-ops/docs/planning/smoke_sandbox/BACKEND_HARDENING_V1.md  1.0s\n  ┊ 📖 read      ./physio-hermes-ops/docs/planning/smoke_sandbox/FRONTEND_UI_POLISH_V1.md  0.9s\n  ┊ 🔎 grep      source_event|필수 산출물|운영 메모|next wave|wave  0.5s\n  ┊ 🔎 grep      TASK_SPEC_V4|next wave|previous best seed|queued wave|wave task spec|best seed  0.3s\n  ┊ 🔎 find      *.md  0.5s\n  ┊ 📖 read      ./physio-hermes-ops/docs/planning/WAVE_SPAWN_RUNBOOK_V0_1.md  0.9s\n  ┊ 🔎 find      *wave_queue*  0.3s\n  ┊ 🔎 find      *events.jsonl  0.3s\n  ┊ 📖 read      ./physio-hermes-ops/lineage/wave_queue.jsonl  0.8s\n  ┊ 📖 read      ./physio-hermes-ops/lineage/events.jsonl  0.9s\n  ┊ 🔎 grep      TASK_SPEC_V3|TASK_SPEC_V4|Refine next wave task spec|physio-planner|artifact_paths  0.5s\n  ┊ 📖 read      ./physio-hermes-ops/scripts/dispatch_wave_queue.py  0.9s\n  ┊ 🔎 find      *  0.7s\n  ┊ 📖 read      ./physio-hermes-ops/lineage/dispatch_state.json  0.5s [error]"
+  }
+}
