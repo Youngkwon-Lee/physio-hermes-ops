@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Physio Hermes Mini Nautilus Dashboard</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; background:#0b1020; color:#e6edf3; margin:0; }
+    .wrap { max-width:1000px; margin:40px auto; padding:0 16px; }
+    .cards { display:grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+    .card { background:#161b2f; border:1px solid #2c3658; border-radius:12px; padding:14px; }
+    .num { font-size:28px; font-weight:700; }
+    table { width:100%; border-collapse: collapse; margin-top:16px; background:#161b2f; }
+    th,td { border-bottom:1px solid #2c3658; padding:10px; text-align:left; }
+    .ok{color:#49d17d}.warn{color:#ffcd57}.bad{color:#ff6b6b}
+    code{background:#1d2542;padding:2px 6px;border-radius:6px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Physio Hermes Mini Nautilus</h1>
+  <p>파일 기반 lineage + nightly 운영 대시보드 (MVP)</p>
+  <div class="cards">
+    <div class="card"><div>Loop State</div><div class="num ok">ACTIVE</div></div>
+    <div class="card"><div>Profiles</div><div class="num">8</div></div>
+    <div class="card"><div>Status Rule</div><div class="num">PASS*</div></div>
+    <div class="card"><div>Per-task Timeout</div><div class="num">1800s</div></div>
+  </div>
+
+  <h2>Lineage Source</h2>
+  <p><code>lineage/events.jsonl</code> 를 기준으로 <code>scripts/lineage_report.py</code>에서 집계.</p>
+
+  <h2>Execution Chain</h2>
+  <table>
+    <thead><tr><th>Stage</th><th>Owner</th><th>Output</th><th>Gate</th></tr></thead>
+    <tbody>
+      <tr><td>Plan</td><td>physio-planner</td><td>TASK_SPEC</td><td class="ok">PASS</td></tr>
+      <tr><td>Build</td><td>physio-frontend/backend</td><td>Code diff</td><td class="ok">PASS</td></tr>
+      <tr><td>Verify</td><td>physio-qa</td><td>QA_VERIFY</td><td class="warn">PASS*</td></tr>
+      <tr><td>Orchestrate</td><td>physio-orchestrator</td><td>ORCH_STATUS</td><td class="warn">PASS*</td></tr>
+      <tr><td>Report</td><td>physio-ops-reporter</td><td>Morning brief</td><td class="ok">PASS</td></tr>
+    </tbody>
+  </table>
+</div>
+</body>
+</html>

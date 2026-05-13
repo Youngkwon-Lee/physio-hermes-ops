@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Physio Hermes Lineage Event v0.1",
+  "type": "object",
+  "required": [
+    "event_id",
+    "timestamp",
+    "run_id",
+    "wave_id",
+    "profile_id",
+    "stage",
+    "status",
+    "score"
+  ],
+  "properties": {
+    "event_id": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "run_id": { "type": "string" },
+    "wave_id": { "type": "string" },
+    "parent_wave_id": { "type": ["string", "null"] },
+    "profile_id": {
+      "type": "string",
+      "enum": [
+        "physio-orchestrator",
+        "physio-planner",
+        "physio-frontend",
+        "physio-backend",
+        "physio-qa",
+        "physio-designer",
+        "physio-marketing",
+        "physio-ops-reporter"
+      ]
+    },
+    "stage": { "type": "string", "enum": ["plan", "build", "verify", "orchestrate", "report"] },
+    "status": { "type": "string", "enum": ["PASS", "PASS*", "CHECK", "FAIL"] },
+    "exit_code": { "type": ["integer", "null"] },
+    "artifact_paths": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "cost_tokens": { "type": "integer", "minimum": 0 },
+    "retry_count": { "type": "integer", "minimum": 0 },
+    "notes": { "type": "string" },
+    "links": {
+      "type": "object",
+      "properties": {
+        "commit": { "type": ["string", "null"] },
+        "pr": { "type": ["string", "null"] },
+        "report": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
