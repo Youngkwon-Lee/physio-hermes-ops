@@ -1,9 +1,9 @@
 {
-  "version": "v0.1",
-  "updated_at": "2026-05-13T10:53:41.866449+00:00",
+  "version": "v0.2",
+  "updated_at": "2026-05-13T11:06:18.492675+00:00",
   "source": "promote_generation_seed.py",
   "source_event_id": "evt-20260513-001",
-  "last_promoted_at": "2026-05-13T10:53:41.866465+00:00",
+  "last_promoted_at": "2026-05-13T11:06:18.492675+00:00",
   "current_seed": {
     "event_id": "evt-20260513-001",
     "wave_id": "wave-1",
