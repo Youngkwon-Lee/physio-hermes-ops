@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-05-13T15:37:46",
+  "queue_index": 0,
+  "task_index": 3,
+  "trigger_wave": "wave-1",
+  "wave_id": "wave-2",
+  "result": {
+    "profile_id": "physio-qa",
+    "goal": "Verify PASS/PASS* criteria and produce evidence",
+    "started_at": "2026-05-13T15:35:44",
+    "ended_at": "2026-05-13T15:37:46",
+    "exit_code": 124,
+    "status": "PASS*",
+    "output_tail": "Query: You are executing a queued wave task in physio-hermes-ops. Return brief \nactionable output only. Task goal: Verify PASS/PASS* criteria and produce \nevidence\nInitializing agent...\n────────────────────────────────────────\n\n  ┊ 📚 skill     kanban-worker  0.1s\n  ┊ 📚 skill     physio-app-scope-gated-verification-triage  0.1s\n  ┊ 🔎 find      *physio-hermes-ops*  2.5s\n  ┊ 💻 $         pwd && hostname  0.3s\n  ┊ 🔎 find      *physio*  0.5s\n  ┊ 🔎 find      *wave*  0.5s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/lineage/wave_queue.jsonl  0.9s\n  ┊ 🔎 grep      PASS\\*|PASS/PASS|criteria  0.5s\n  ┊ 🔎 grep      evidence  0.5s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/TASK_SPEC_V3.md  1.0s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/FRONTEND_UI_POLISH_V1.md  0.8s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/BACKEND_HARDENING_V1.md  0.9s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  0.9s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/ORCH_STATUS_V2.md  0.9s"
+  }
+}

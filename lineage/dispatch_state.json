@@ -1,7 +1,9 @@
 {
-  "queue_index": 0,
-  "task_index": 2,
-  "completed_waves": [],
+  "queue_index": 1,
+  "task_index": 0,
+  "completed_waves": [
+    "wave-2"
+  ],
   "last_dispatched_wave": "wave-2",
-  "last_dispatched_at": "2026-05-13T15:13:40"
+  "last_dispatched_at": "2026-05-13T16:00:16"
 }

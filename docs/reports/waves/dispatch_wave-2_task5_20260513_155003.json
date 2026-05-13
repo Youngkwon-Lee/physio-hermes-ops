@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-05-13T15:50:03",
+  "queue_index": 0,
+  "task_index": 4,
+  "trigger_wave": "wave-1",
+  "wave_id": "wave-2",
+  "result": {
+    "profile_id": "physio-orchestrator",
+    "goal": "Aggregate and decide GREEN/YELLOW/RED",
+    "started_at": "2026-05-13T15:48:00",
+    "ended_at": "2026-05-13T15:50:03",
+    "exit_code": 124,
+    "status": "PASS*",
+    "output_tail": "\n  ┊ 📚 skills    list software-development  0.7s\n  ┊ 🔎 find      *physio-hermes-ops*  2.3s\n  ┊ 🔎 grep      GREEN|YELLOW|RED|aggregate|wave task  0.9s\n  ┊ 📖 read      ./physio-hermes-ops/lineage/wave_queue.jsonl  0.9s\n  ┊ 📖 read      ./physio-hermes-ops/lineage/events.jsonl  0.9s\n  ┊ 📖 read      ./physio-hermes-ops/scripts/emit_ops_reporter_brief.py  0.9s\n  ┊ 💻 $         python3 scripts/emit_ops_reporter_brief.py  0.3s\n  ┊ 🔎 find      dispatch_wave-2_*  0.5s [error]\n  ┊ 🔎 find      *dispatch_wave-2*  0.7s [error]\n  ┊ 🔎 grep      \"status\"|\"summary\"|\"next\"  0.7s [error]\n  ┊ 💻 $         pwd  0.3s\n  ┊ 💻 $         python3 - <<'PY'\nfrom pathlib import Path\nfor p in Path('.').resolve().glob('**/physio-hermes-ops'):\n    print(p)\n    break\nPY  0.3s\n  ┊ 🔎 find      *dispatch_wave-2*  0.5s\n  ┊ 🔎 grep      dispatch_wave-2_task  0.4s"
+  }
+}

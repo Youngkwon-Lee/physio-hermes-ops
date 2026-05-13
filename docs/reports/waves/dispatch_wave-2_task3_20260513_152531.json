@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-05-13T15:25:31",
+  "queue_index": 0,
+  "task_index": 2,
+  "trigger_wave": "wave-1",
+  "wave_id": "wave-2",
+  "result": {
+    "profile_id": "physio-backend",
+    "goal": "Harden backend logic from seed scope",
+    "started_at": "2026-05-13T15:23:29",
+    "ended_at": "2026-05-13T15:25:31",
+    "exit_code": 124,
+    "status": "PASS*",
+    "output_tail": "actionable output only. Task goal: Harden backend logic from seed scope\nInitializing agent...\n────────────────────────────────────────\n\n  ┊ 📚 skill     physio-hermes-ops-wave-backend-hardening  0.0s\n  ┊ 🔎 find      physio-hermes-ops  2.5s\n  ┊ 🔎 find      wave_queue.jsonl  2.3s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/lineage/wave_queue.jsonl  0.8s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/TASK_SPEC_V3.md  1.0s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/ORCH_STATUS_V2.md  1.0s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/QA_VERIFY_V2.md  1.0s\n  ┊ 📖 read      /home/yk/physio-hermes-ops/docs/planning/smoke_sandbox/backend_mock.ts  1.0s\n⚠️  API call failed (attempt 1/3): APIError\n   🔌 Provider: openai-codex  Model: gpt-5.4\n   🌐 Endpoint: https://chatgpt.com/backend-api/codex\n   📝 Error: Our servers are currently overloaded. Please try again later.\n   ⏱️  Elapsed: 25.52s  Context: 13 msgs, ~12,580 tokens\n⏳ Retrying in 3.0s (attempt 1/3)...\n  ┊ 🔎 find      package.json  0.7s\n  ┊ 🔎 find      tsconfig*.json  0.7s"
+  }
+}

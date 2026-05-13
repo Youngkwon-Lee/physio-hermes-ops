@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-05-13T15:13:16",
+  "queue_index": 0,
+  "task_index": 1,
+  "trigger_wave": "wave-1",
+  "wave_id": "wave-2",
+  "result": {
+    "profile_id": "physio-frontend",
+    "goal": "Polish UI tasks from seed scope",
+    "started_at": "2026-05-13T15:12:06",
+    "ended_at": "2026-05-13T15:13:16",
+    "exit_code": 0,
+    "status": "PASS",
+    "output_tail": "       - QA 문서에 task 1, 2 evidence 채움                                      \n       - ORCH 문서에서 UI 관련 stale blocker 정리                               \n                                                                                \n     남은 액션:                                                                 \n     1. 실제 앱 컴포넌트로 옮길지 결정                                          \n     2. 브라우저 캡처로 spacing 근거 추가                                       \n     3. pnpm lint/테스트 실행 로그를 task 3 evidence에 반영                     \n                                                                                \n     주의:                                                                      \n     - 현재는 sandbox evidence 보강 단계                                        \n     - 실제 렌더/실행 로그는 아직 없음                                          \n                                                                                \n ────────────────────────────────────────────────────────────────────────────── \n\nResume this session with:\n  hermes --resume 20260513_151208_862eea\n\nSession:        20260513_151208_862eea\nDuration:       1m 6s\nMessages:       17 (1 user, 15 tool calls)"
+  }
+}
