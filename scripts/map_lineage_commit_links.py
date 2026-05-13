@@ -32,6 +32,11 @@ def recent_commits(limit: int = 200):
 
 
 def pick_commit_for_event(event: dict, commits: list[dict]) -> str | None:
+    run_id = str(event.get("run_id") or "")
+    if run_id.startswith("generation-close-"):
+        # cycle close events are repository-level control events; map to latest commit
+        return commits[0]["sha"] if commits else None
+
     # 1) report filename hint: dispatch_wave-2_task5_... -> commit subject may contain 'wave-2'
     report = ((event.get("links") or {}).get("report") or "")
     wave = str(event.get("wave_id") or "")
@@ -69,7 +74,8 @@ def main():
             continue
         e = json.loads(s)
         links = e.setdefault("links", {"commit": None, "pr": None, "report": None})
-        if links.get("commit"):
+        run_id = str(e.get("run_id") or "")
+        if links.get("commit") and not run_id.startswith("generation-close-"):
             out_lines.append(json.dumps(e, ensure_ascii=False))
             continue
 
