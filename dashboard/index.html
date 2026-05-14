@@ -7,11 +7,20 @@
   <style>
     :root{--bg:#0a0f1c;--panel:#121a2b;--panel2:#0f1726;--line:#23324d;--txt:#e6edf7;--muted:#8fa3c7;--ok:#33d17a;--warn:#f6c453;--bad:#ff6b6b;--acc:#6ea8ff}
     *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2b55 0%,var(--bg) 45%);color:var(--txt);font-family:Inter,system-ui,sans-serif}
-    .top{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid var(--line)}
+    .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+    .sidebar{border-right:1px solid var(--line);background:linear-gradient(180deg,#0c1424,#0a1322);padding:14px 10px;position:sticky;top:0;height:100vh}
+    .side-brand{font-weight:800;font-size:14px;padding:8px 10px;margin-bottom:10px}
+    .side-nav{display:flex;flex-direction:column;gap:6px}
+    .side-nav a{color:var(--muted);text-decoration:none;padding:8px 10px;border:1px solid transparent;border-radius:8px;font-size:12px}
+    .side-nav a:hover{color:var(--txt);border-color:var(--line);background:#132038}
+    .main-col{min-width:0}
+    .top{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,15,28,.88);backdrop-filter:blur(8px);z-index:5}
     .brand{font-weight:800}.badge{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
     .wrap{max-width:1400px;margin:0 auto;padding:20px}
     .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:14px}
+    .kpi-card{position:relative;overflow:hidden}
+    .kpi-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,#2c4572,#6ea8ff)}
     .label{font-size:12px;color:var(--muted)} .value{font-size:28px;font-weight:800;margin-top:6px}
     .layout{display:grid;grid-template-columns:260px 1fr 420px;gap:14px}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
@@ -36,10 +45,24 @@
     pre{margin:0;white-space:pre-wrap;font-size:12px;color:#c8d8f7;max-height:420px;overflow:auto}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .fsm-svg{width:100%;height:170px;border:1px solid var(--line);border-radius:10px;background:#0f1726}
-    @media (max-width:1200px){.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
+    @media (max-width:1200px){.app{grid-template-columns:1fr}.sidebar{display:none}.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
+  <div class="app">
+  <aside class="sidebar">
+    <div class="side-brand">Nautilus Control</div>
+    <nav class="side-nav">
+      <a href="#kpi-section">요약 지표</a>
+      <a href="#timeline-section">라인리지 타임라인</a>
+      <a href="#profile-section">프로필 상태</a>
+      <a href="#detail-section">이벤트 상세</a>
+      <a href="#ops-history">운영 액션 이력</a>
+      <a href="#fsm-section">FSM / 에이전트 그래프</a>
+      <a href="#queue">웨이브 큐</a>
+    </nav>
+  </aside>
+  <div class="main-col">
   <header class="top">
     <div class="brand">Physio Nautilus 운영 대시보드</div>
     <div style="display:flex;gap:8px;align-items:center">
@@ -55,20 +78,20 @@
     </div>
   </header>
   <main class="wrap">
-    <section class="kpis">
-      <div class="card"><div class="label">루프 상태</div><div class="value" id="kpi-status">-</div></div>
-      <div class="card"><div class="label">현재 웨이브</div><div class="value" id="kpi-wave">-</div></div>
-      <div class="card"><div class="label">평균 점수</div><div class="value" id="kpi-score">-</div></div>
-      <div class="card"><div class="label">큐 커서</div><div class="value" id="kpi-cursor">-</div></div>
+    <section class="kpis" id="kpi-section">
+      <div class="card kpi-card"><div class="label">루프 상태</div><div class="value" id="kpi-status">-</div></div>
+      <div class="card kpi-card"><div class="label">현재 웨이브</div><div class="value" id="kpi-wave">-</div></div>
+      <div class="card kpi-card"><div class="label">평균 점수</div><div class="value" id="kpi-score">-</div></div>
+      <div class="card kpi-card"><div class="label">큐 커서</div><div class="value" id="kpi-cursor">-</div></div>
     </section>
 
     <section class="layout">
-      <aside class="card">
+      <aside class="card" id="profile-section">
         <div class="section-title">프로필 상태</div>
         <div id="profiles"></div>
       </aside>
 
-      <section class="card">
+      <section class="card" id="timeline-section">
         <div class="section-title">라인리지 타임라인 (클릭하면 상세)</div>
         <div class="filters">
           <select id="filter-wave"><option value="ALL">웨이브: 전체</option></select>
@@ -105,7 +128,7 @@
         <div id="timeline"></div>
       </section>
 
-      <aside class="card">
+      <aside class="card" id="detail-section">
         <div class="section-title">이벤트 상세</div>
         <div class="two-col" style="margin-bottom:10px">
           <div class="queue-item"><div class="muted">이벤트 ID</div><div id="d-eid">-</div></div>
@@ -135,7 +158,7 @@
         <div id="ops-knowledge-recent"></div>
         <div class="section-title">운영 지식 그래프</div>
         <pre id="ops-knowledge-graph">-</pre>
-        <div class="section-title">FSM 상태머신</div>
+        <div class="section-title" id="fsm-section">FSM 상태머신</div>
         <div id="fsm-current"></div>
         <svg id="fsm-diagram" class="fsm-svg" viewBox="0 0 760 170" preserveAspectRatio="xMidYMid meet"></svg>
         <pre id="fsm-transitions">-</pre>
@@ -146,6 +169,8 @@
       </aside>
     </section>
   </main>
+  </div>
+  </div>
 
   <script>
     const STATUS_CLASS = {"PASS":"ok","PASS*":"ok","CHECK":"warn","FAIL":"bad","PENDING":"warn"};
