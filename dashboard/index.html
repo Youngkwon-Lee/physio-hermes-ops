@@ -726,7 +726,7 @@
       let out = '';
       out += `<circle cx="${cx}" cy="${cy}" r="34" fill="#1b2b46" stroke="${fsmColor[currentState] || fsmColor.UNKNOWN}" stroke-width="3"/>`;
       out += `<text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="11" fill="#ffffff">${currentState}</text>`;
-      out += `<text x="${cx}" y="20" text-anchor="middle" font-size="11" fill="#9fc1f0">FSM ⇄ AGENTS</text>`;
+      out += `<text x="${cx}" y="20" text-anchor="middle" font-size="11" fill="#9fc1f0">FSM ⇄ AGENTS (click profile)</text>`;
 
       const startX = 70, gap = 120, ay = 170;
       profiles.forEach((p, i) => {
@@ -735,12 +735,27 @@
         const col = statusColor[st] || '#8fa3c7';
         const x = startX + i * gap;
         out += `<line x1="${cx}" y1="${cy+34}" x2="${x}" y2="${ay-18}" stroke="#3e5f8f" stroke-width="1.5" stroke-dasharray="3 3"/>`;
-        out += `<circle cx="${x}" cy="${ay}" r="16" fill="#152239" stroke="${col}" stroke-width="2"/>`;
-        out += `<text x="${x}" y="${ay+4}" text-anchor="middle" font-size="9" fill="#e8f0ff">${st.replace('*','')}</text>`;
+        out += `<circle data-profile="${p}" cx="${x}" cy="${ay}" r="16" fill="#152239" stroke="${col}" stroke-width="2" style="cursor:pointer"/>`;
+        out += `<text data-profile="${p}" x="${x}" y="${ay+4}" text-anchor="middle" font-size="9" fill="#e8f0ff" style="cursor:pointer">${st.replace('*','')}</text>`;
         const short = p.replace('physio-','').slice(0,10);
-        out += `<text x="${x}" y="${ay+28}" text-anchor="middle" font-size="9" fill="#9fb4d6">${short}</text>`;
+        out += `<text data-profile="${p}" x="${x}" y="${ay+28}" text-anchor="middle" font-size="9" fill="#9fb4d6" style="cursor:pointer">${short}</text>`;
       });
       svg.innerHTML = out;
+
+      svg.onclick = (ev) => {
+        const profile = ev.target?.getAttribute?.('data-profile');
+        if(!profile) return;
+        focusProfile(profile);
+      };
+    }
+
+    function focusProfile(profile){
+      const sel = document.getElementById('filter-profile');
+      if(!sel) return;
+      const exists = [...sel.options].some(o => o.value === profile);
+      sel.value = exists ? profile : 'ALL';
+      applyFilters();
+      setActionFeedback(`profile filter: ${sel.value}`);
     }
 
     async function boot(){
