@@ -152,6 +152,8 @@
     const ORDERED_PROFILES = ["physio-orchestrator","physio-planner","physio-frontend","physio-backend","physio-qa","physio-ops-reporter"];
     let CURRENT_EVENTS = [];
     let FILTERED_EVENTS = [];
+    let SELECTED_PROFILES = new Set();
+    let URL_HYDRATED = false;
 
     async function getText(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.text(); }
     async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
@@ -248,6 +250,36 @@
 
       waveSel.value = waves.includes(wCur) ? wCur : 'ALL';
       profileSel.value = profiles.includes(pCur) ? pCur : 'ALL';
+
+      SELECTED_PROFILES = new Set([...SELECTED_PROFILES].filter(p => profiles.includes(p)));
+      if(SELECTED_PROFILES.size === 1) profileSel.value = [...SELECTED_PROFILES][0];
+      if(SELECTED_PROFILES.size > 1) profileSel.value = 'ALL';
+    }
+
+    function syncUrlWithFilters(){
+      const q = new URLSearchParams(location.search);
+      const w = document.getElementById('filter-wave').value;
+      const s = document.getElementById('filter-status').value;
+      const sort = document.getElementById('sort-mode').value;
+      const pList = [...SELECTED_PROFILES];
+      if(w !== 'ALL') q.set('wave', w); else q.delete('wave');
+      if(s !== 'ALL') q.set('status', s); else q.delete('status');
+      if(sort !== 'time_desc') q.set('sort', sort); else q.delete('sort');
+      if(pList.length) q.set('profiles', pList.join(',')); else q.delete('profiles');
+      const next = `${location.pathname}${q.toString() ? '?' + q.toString() : ''}`;
+      history.replaceState(null, '', next);
+    }
+
+    function hydrateFiltersFromUrl(){
+      const q = new URLSearchParams(location.search);
+      const profiles = (q.get('profiles') || '').split(',').map(s=>s.trim()).filter(Boolean);
+      SELECTED_PROFILES = new Set(profiles);
+      const wave = q.get('wave');
+      const status = q.get('status');
+      const sort = q.get('sort');
+      if(wave) document.getElementById('filter-wave').value = wave;
+      if(status) document.getElementById('filter-status').value = status;
+      if(sort) document.getElementById('sort-mode').value = sort;
     }
 
     function applyFilters(){
@@ -256,9 +288,13 @@
       const s = document.getElementById('filter-status').value;
       const sortMode = document.getElementById('sort-mode').value;
 
+      const activeProfiles = SELECTED_PROFILES.size
+        ? SELECTED_PROFILES
+        : (p !== 'ALL' ? new Set([p]) : new Set());
+
       FILTERED_EVENTS = CURRENT_EVENTS.filter(e =>
         (w === 'ALL' || e.wave_id === w) &&
-        (p === 'ALL' || e.profile_id === p) &&
+        (activeProfiles.size === 0 || activeProfiles.has(e.profile_id)) &&
         (s === 'ALL' || e.status === s)
       );
 
@@ -278,6 +314,12 @@
       }
 
       renderTimeline(FILTERED_EVENTS);
+      const agSvg = document.getElementById('fsm-agent-graph');
+      if(agSvg){
+        const fsmCurrent = document.querySelector('#fsm-current strong')?.textContent || 'UNKNOWN';
+        renderFsmAgentGraph(agSvg, fsmCurrent);
+      }
+      syncUrlWithFilters();
     }
 
     function renderTimeline(events){
@@ -734,28 +776,43 @@
         const st = e?.status || 'PENDING';
         const col = statusColor[st] || '#8fa3c7';
         const x = startX + i * gap;
+        const selected = SELECTED_PROFILES.has(p);
         out += `<line x1="${cx}" y1="${cy+34}" x2="${x}" y2="${ay-18}" stroke="#3e5f8f" stroke-width="1.5" stroke-dasharray="3 3"/>`;
-        out += `<circle data-profile="${p}" cx="${x}" cy="${ay}" r="16" fill="#152239" stroke="${col}" stroke-width="2" style="cursor:pointer"/>`;
+        out += `<circle data-profile="${p}" cx="${x}" cy="${ay}" r="${selected ? 18 : 16}" fill="#152239" stroke="${selected ? '#ffffff' : col}" stroke-width="${selected ? 3 : 2}" style="cursor:pointer"/>`;
         out += `<text data-profile="${p}" x="${x}" y="${ay+4}" text-anchor="middle" font-size="9" fill="#e8f0ff" style="cursor:pointer">${st.replace('*','')}</text>`;
         const short = p.replace('physio-','').slice(0,10);
-        out += `<text data-profile="${p}" x="${x}" y="${ay+28}" text-anchor="middle" font-size="9" fill="#9fb4d6" style="cursor:pointer">${short}</text>`;
+        out += `<text data-profile="${p}" x="${x}" y="${ay+28}" text-anchor="middle" font-size="9" fill="${selected ? '#ffffff' : '#9fb4d6'}" style="cursor:pointer">${short}</text>`;
       });
       svg.innerHTML = out;
 
       svg.onclick = (ev) => {
         const profile = ev.target?.getAttribute?.('data-profile');
         if(!profile) return;
-        focusProfile(profile);
+        focusProfile(profile, !!ev.shiftKey);
       };
     }
 
-    function focusProfile(profile){
+    function focusProfile(profile, additive=false){
       const sel = document.getElementById('filter-profile');
       if(!sel) return;
       const exists = [...sel.options].some(o => o.value === profile);
-      sel.value = exists ? profile : 'ALL';
+      if(!exists){
+        SELECTED_PROFILES.clear();
+        sel.value = 'ALL';
+        applyFilters();
+        return;
+      }
+      if(additive){
+        if(SELECTED_PROFILES.has(profile)) SELECTED_PROFILES.delete(profile);
+        else SELECTED_PROFILES.add(profile);
+      }else{
+        SELECTED_PROFILES = new Set([profile]);
+      }
+      if(SELECTED_PROFILES.size === 1) sel.value = [...SELECTED_PROFILES][0];
+      else sel.value = 'ALL';
       applyFilters();
-      setActionFeedback(`profile filter: ${sel.value}`);
+      const msg = SELECTED_PROFILES.size ? `profile filter: ${[...SELECTED_PROFILES].join(',')}` : 'profile filter: ALL';
+      setActionFeedback(msg);
     }
 
     async function boot(){
@@ -766,7 +823,9 @@
         const events = parseJsonl(eventsTxt).sort((a,b)=>String(pickTs(a)).localeCompare(String(pickTs(b))));
         const queue = parseJsonl(queueTxt); const state = JSON.parse(stateTxt);
         CURRENT_EVENTS = events;
-        setKpis(events, queue, state); renderProfiles(events); populateFilters(events); applyFilters(); renderQueue(queue, state);
+        setKpis(events, queue, state); renderProfiles(events); populateFilters(events);
+        if(!URL_HYDRATED){ hydrateFiltersFromUrl(); URL_HYDRATED = true; }
+        applyFilters(); renderQueue(queue, state);
         await loadCronStatus();
         await loadHeartbeat();
         await loadRalph();
@@ -860,7 +919,11 @@
     bindActions();
     boot(); setInterval(boot, 10000);
     document.getElementById('filter-wave').addEventListener('change', applyFilters);
-    document.getElementById('filter-profile').addEventListener('change', applyFilters);
+    document.getElementById('filter-profile').addEventListener('change', () => {
+      const v = document.getElementById('filter-profile').value;
+      SELECTED_PROFILES = (v && v !== 'ALL') ? new Set([v]) : new Set();
+      applyFilters();
+    });
     document.getElementById('filter-status').addEventListener('change', applyFilters);
     document.getElementById('sort-mode').addEventListener('change', applyFilters);
   </script>
