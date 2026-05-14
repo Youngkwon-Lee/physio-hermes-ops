@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import subprocess
 import time
 from datetime import datetime
@@ -21,6 +22,8 @@ AUDIT_LOG = Path(os.getenv("OPS_CTL_AUDIT_LOG", str(ROOT / "lineage" / "actions_
 LOCK_PATH = Path(os.getenv("OPS_CTL_LOCK_FILE", str(ROOT / ".runtime" / "ops_control.lock")))
 MAX_RETRIES = max(1, int(os.getenv("OPS_CTL_MAX_RETRIES", "2")))
 RETRY_DELAY = float(os.getenv("OPS_CTL_RETRY_DELAY_SEC", "1.0"))
+KNOWLEDGE_DIR = Path(os.getenv("OPS_KNOWLEDGE_DIR", str(ROOT / "ops_knowledge")))
+KNOWLEDGE_AUTOGIT = os.getenv("OPS_KNOWLEDGE_AUTOGIT", "0") == "1"
 
 COMMANDS = {
     "refresh": [["python3", "scripts/export_cron_status.py"]],
@@ -60,14 +63,172 @@ def now():
     return datetime.now().isoformat(timespec="seconds")
 
 
+def today():
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def slug(s: str):
+    return re.sub(r"[^a-zA-Z0-9._-]+", "-", s).strip("-").lower()[:80] or "note"
+
+
 def _ensure_parent(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def read_json(path: Path, default=None):
+    if default is None:
+        default = {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return default
+
+
+def read_jsonl(path: Path):
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            out.append(json.loads(line))
+        except Exception:
+            continue
+    return out
 
 
 def audit(entry: dict):
     _ensure_parent(AUDIT_LOG)
     with AUDIT_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def append_markdown(path: Path, text: str):
+    _ensure_parent(path)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(text)
+
+
+def save_markdown(path: Path, text: str):
+    _ensure_parent(path)
+    path.write_text(text, encoding="utf-8")
+
+
+def knowledge_note_path(kind: str, title: str):
+    base = KNOWLEDGE_DIR / "00_raw" / today()
+    return base / f"{datetime.now().strftime('%H%M%S')}-{slug(kind)}-{slug(title)}.md"
+
+
+def knowledge_wiki_path(kind: str, title: str):
+    base = KNOWLEDGE_DIR / "10_wiki" / "decisions"
+    return base / f"{today()}-{slug(kind)}-{slug(title)}.md"
+
+
+def latest_events(limit=200):
+    rows = read_jsonl(ROOT / "lineage" / "events.jsonl")
+    return rows[-limit:]
+
+
+def summarize_mode_recommendation():
+    events = latest_events(80)
+    recent = events[-12:]
+    fail_n = sum(1 for e in recent if str(e.get("status", "")).upper() == "FAIL")
+    check_n = sum(1 for e in recent if str(e.get("status", "")).upper() == "CHECK")
+    gen = read_json(ROOT / "lineage" / "generation_cycle_state.json", {})
+    hb = read_json(ROOT / "lineage" / "heartbeat.json", {})
+    decision = str(gen.get("decision", "UNKNOWN")).upper()
+    alive = bool(hb.get("alive", True))
+
+    if (not alive) or fail_n > 0 or decision == "RED":
+        return {"mode": "SAFE", "reason": f"alive={alive}, decision={decision}, fail={fail_n}"}
+    if check_n > 0 or decision == "YELLOW":
+        return {"mode": "NORMAL", "reason": f"decision={decision}, check={check_n}"}
+    return {"mode": "AGGRESSIVE", "reason": f"decision={decision}, fail={fail_n}, check={check_n}"}
+
+
+def harvest_lineage_knowledge(trigger_action: str, role: str):
+    events = latest_events(50)
+    risky = [e for e in events if str(e.get("status", "")).upper() in {"FAIL", "CHECK"}]
+    risky_recent = risky[-5:]
+    gen = read_json(ROOT / "lineage" / "generation_cycle_state.json", {})
+    recommendation = summarize_mode_recommendation()
+
+    title = f"{trigger_action}-{recommendation['mode']}"
+    raw_path = knowledge_note_path("lineage", title)
+    wiki_path = knowledge_wiki_path("lineage", title)
+
+    body_lines = [
+        f"# Ops lineage snapshot",
+        f"- time: {now()}",
+        f"- trigger_action: {trigger_action}",
+        f"- role: {role}",
+        f"- mode_recommendation: {recommendation['mode']}",
+        f"- reason: {recommendation['reason']}",
+        f"- generation_decision: {gen.get('decision', '-')}",
+        "",
+        "## recent FAIL/CHECK",
+    ]
+    if not risky_recent:
+        body_lines.append("- none")
+    else:
+        for e in risky_recent:
+            body_lines.append(
+                f"- {e.get('timestamp') or e.get('ts') or '-'} | {e.get('wave_id','-')} | {e.get('profile_id','-')} | {e.get('status','-')} | {e.get('notes') or e.get('summary') or '-'}"
+            )
+
+    raw_md = "\n".join(body_lines) + "\n"
+    save_markdown(raw_path, raw_md)
+
+    wiki_md = "\n".join([
+        f"# Decision: {recommendation['mode']}",
+        f"- date: {today()}",
+        f"- source: lineage snapshot",
+        f"- trigger_action: {trigger_action}",
+        f"- role: {role}",
+        f"- recommendation: {recommendation['mode']}",
+        f"- reason: {recommendation['reason']}",
+        "",
+        "## Next action guide",
+        "- SAFE: refresh only, pause 유지",
+        "- NORMAL: resume_core 제한 실행",
+        "- AGGRESSIVE: finalize_once 포함 가능",
+        "",
+        f"## Linked raw\n- {raw_path.relative_to(ROOT)}",
+        "",
+    ])
+    save_markdown(wiki_path, wiki_md)
+
+    return {
+        "raw_path": str(raw_path.relative_to(ROOT)),
+        "wiki_path": str(wiki_path.relative_to(ROOT)),
+        "mode": recommendation["mode"],
+    }
+
+
+def safe_autogit(paths, message):
+    if not KNOWLEDGE_AUTOGIT:
+        return {"enabled": False}
+
+    allowed_roots = [ROOT / "ops_knowledge", ROOT / "docs" / "runbook"]
+    abs_paths = [ROOT / p if not Path(p).is_absolute() else Path(p) for p in paths]
+    for p in abs_paths:
+        if not any(str(p.resolve()).startswith(str(r.resolve())) for r in allowed_roots):
+            return {"enabled": True, "ok": False, "error": f"path_not_allowed: {p}"}
+
+    cmds = [
+        ["git", "add", *[str(Path(p).as_posix()) for p in paths]],
+        ["git", "commit", "-m", message],
+        ["git", "push", "origin", "main"],
+    ]
+    results = []
+    for c in cmds:
+        p = subprocess.run(c, cwd=ROOT, text=True, capture_output=True)
+        results.append({"cmd": " ".join(c), "exit_code": p.returncode, "stdout": p.stdout[-2000:], "stderr": p.stderr[-2000:]})
+        if p.returncode != 0 and "nothing to commit" not in (p.stdout + p.stderr).lower():
+            return {"enabled": True, "ok": False, "results": results}
+    return {"enabled": True, "ok": True, "results": results}
 
 
 def run_cmd(cmd, timeout_sec=180):
@@ -109,6 +270,51 @@ def read_recent_audits(limit=20):
     return list(reversed(out))
 
 
+def read_recent_knowledge(limit=20):
+    files = sorted((KNOWLEDGE_DIR / "00_raw").glob("**/*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    out = []
+    for p in files[:limit]:
+        try:
+            lines = p.read_text(encoding="utf-8").splitlines()
+            head = next((ln for ln in lines if ln.startswith("- trigger_action:")), "")
+            out.append({
+                "path": str(p.relative_to(ROOT)),
+                "updated_at": datetime.fromtimestamp(p.stat().st_mtime).isoformat(timespec="seconds"),
+                "trigger": head.replace("- trigger_action:", "").strip() if head else "-",
+            })
+        except Exception:
+            continue
+    return out
+
+
+def build_knowledge_graph(limit=50):
+    nodes, edges = [], []
+    seen = set()
+
+    def add_node(node_id, label, ntype):
+        if node_id in seen:
+            return
+        seen.add(node_id)
+        nodes.append({"id": node_id, "label": label, "type": ntype})
+
+    recent_notes = read_recent_knowledge(limit)
+    for n in recent_notes:
+        note_id = f"note:{n['path']}"
+        add_node(note_id, n["path"].split("/")[-1], "knowledge")
+        trig = f"action:{n.get('trigger','-')}"
+        add_node(trig, n.get("trigger", "-"), "action")
+        edges.append({"from": trig, "to": note_id, "type": "creates"})
+
+    for a in read_recent_audits(40):
+        aid = f"audit:{a.get('time','-')}:{a.get('action','-')}"
+        add_node(aid, f"{a.get('action','-')}@{a.get('time','-')}", "audit")
+        action = f"action:{a.get('action','-')}"
+        add_node(action, a.get("action", "-"), "action")
+        edges.append({"from": action, "to": aid, "type": "logs"})
+
+    return {"ok": True, "nodes": nodes[:200], "edges": edges[:300]}
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -124,7 +330,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _require_auth(self, scope="read"):
         if not REQUIRE_TOKEN:
-            return None
+            return {"scope": scope, "role": "admin"}
 
         auth = self.headers.get("Authorization", "")
         token = auth.replace("Bearer ", "", 1) if auth.startswith("Bearer ") else ""
@@ -139,7 +345,6 @@ class Handler(BaseHTTPRequestHandler):
                 return None
             return {"scope": "read", "role": "viewer"}
 
-        # exec scope: role is inferred by token
         admin = EXEC_ADMIN_TOKEN
         operator = EXEC_OPERATOR_TOKEN
         if not admin and not operator:
@@ -173,23 +378,39 @@ class Handler(BaseHTTPRequestHandler):
                     "operator_enabled": bool(EXEC_OPERATOR_TOKEN),
                     "operator_actions": sorted(ROLE_ACTIONS.get("operator", set())),
                 },
+                "mode_recommendation": summarize_mode_recommendation(),
                 "audit_log": str(AUDIT_LOG),
+                "knowledge_dir": str(KNOWLEDGE_DIR),
+                "knowledge_autogit": KNOWLEDGE_AUTOGIT,
                 "lock_file": str(LOCK_PATH),
             })
+
         if self.path.startswith("/actions/recent"):
             auth_ctx = self._require_auth("read")
             if REQUIRE_TOKEN and not auth_ctx:
                 return
             return self._json(200, {"ok": True, "items": read_recent_audits(20)})
+
+        if self.path.startswith("/knowledge/recent"):
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            return self._json(200, {"ok": True, "items": read_recent_knowledge(20)})
+
+        if self.path.startswith("/knowledge/graph"):
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            return self._json(200, build_knowledge_graph(50))
+
         return self._json(404, {"ok": False, "error": "not_found"})
 
     def do_POST(self):
-        if self.path != "/action":
-            return self._json(404, {"ok": False, "error": "not_found"})
-
-        auth_ctx = self._require_auth("exec")
-        if REQUIRE_TOKEN and not auth_ctx:
-            return
+        auth_ctx = None
+        if self.path in {"/action", "/knowledge/inject"}:
+            auth_ctx = self._require_auth("exec")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
 
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -197,6 +418,54 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(raw.decode("utf-8"))
         except Exception:
             return self._json(400, {"ok": False, "error": "invalid_json"})
+
+        if self.path == "/knowledge/inject":
+            role = (auth_ctx or {}).get("role", "admin")
+            title = str(data.get("title", "")).strip() or "untitled"
+            content = str(data.get("content", "")).strip()
+            tags = data.get("tags") if isinstance(data.get("tags"), list) else []
+            source = str(data.get("source", "manual")).strip()
+            if not content:
+                return self._json(400, {"ok": False, "error": "content_required"})
+
+            raw_path = knowledge_note_path("inject", title)
+            wiki_path = knowledge_wiki_path("inject", title)
+            raw_md = "\n".join([
+                f"# {title}",
+                f"- time: {now()}",
+                f"- source: {source}",
+                f"- role: {role}",
+                f"- tags: {', '.join(map(str, tags)) if tags else '-'}",
+                "",
+                "## content",
+                content,
+                "",
+            ])
+            save_markdown(raw_path, raw_md)
+
+            wiki_md = "\n".join([
+                f"# Decision Note: {title}",
+                f"- date: {today()}",
+                f"- source: {source}",
+                f"- tags: {', '.join(map(str, tags)) if tags else '-'}",
+                f"- linked_raw: {raw_path.relative_to(ROOT)}",
+                "",
+                "## summary",
+                content[:1000],
+                "",
+            ])
+            save_markdown(wiki_path, wiki_md)
+            autogit = safe_autogit([str(raw_path.relative_to(ROOT)), str(wiki_path.relative_to(ROOT))], f"ops-knowledge: inject {slug(title)}")
+            audit({"time": now(), "action": "knowledge_inject", "role": role, "ok": True, "title": title})
+            return self._json(200, {
+                "ok": True,
+                "raw_path": str(raw_path.relative_to(ROOT)),
+                "wiki_path": str(wiki_path.relative_to(ROOT)),
+                "autogit": autogit,
+            })
+
+        if self.path != "/action":
+            return self._json(404, {"ok": False, "error": "not_found"})
 
         action = str(data.get("action", "")).strip()
         dry_run = bool(data.get("dry_run", False))
@@ -241,12 +510,23 @@ class Handler(BaseHTTPRequestHandler):
                     "time": now(),
                     "results": results,
                 }
+                knowledge = None
+                autogit = {"enabled": False}
+                if ok:
+                    knowledge = harvest_lineage_knowledge(action, role)
+                    autogit = safe_autogit(
+                        [knowledge["raw_path"], knowledge["wiki_path"]],
+                        f"ops-knowledge: {action} mode {knowledge['mode'].lower()}"
+                    )
+                    payload["knowledge"] = knowledge
+                    payload["autogit"] = autogit
                 audit({
                     "time": payload["time"],
                     "action": action,
                     "role": role,
                     "ok": ok,
                     "result_count": len(results),
+                    "knowledge": knowledge,
                     "failed_commands": [r["cmd"] for r in results if r["exit_code"] != 0],
                 })
                 return self._json(200 if ok else 500, payload)

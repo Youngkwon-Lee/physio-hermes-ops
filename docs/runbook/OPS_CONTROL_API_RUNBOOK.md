@@ -74,6 +74,16 @@ curl -s -X POST http://127.0.0.1:8788/action \
 - 실행락: `.runtime/ops_control.lock`
 - 동시 실행 요청 시 HTTP `409 busy` 반환
 
+## 6-1) Ops Knowledge (신규)
+- 자동 지식화 저장 경로: `ops_knowledge/`
+  - raw: `ops_knowledge/00_raw/YYYY-MM-DD/*.md`
+  - wiki: `ops_knowledge/10_wiki/decisions/*.md`
+- 액션 성공 시 lineage 스냅샷 자동 저장
+- 수동 주입 API: `POST /knowledge/inject`
+- 조회 API:
+  - `GET /knowledge/recent`
+  - `GET /knowledge/graph`
+
 ## 7) 토큰 회전(rotate)
 ```bash
 # 1) 새 토큰 생성
