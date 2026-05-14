@@ -46,11 +46,16 @@
     .timeline-item::before{content:'';position:absolute;left:-6px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
     .timeline-item.gen-close{border-left-color:#b889ff;background:rgba(115,86,173,0.18)}
     .timeline-item.gen-close::before{background:#c89bff}
+    .timeline-split{display:grid;grid-template-columns:1fr 320px;gap:10px}
+    .mini-detail{border:1px solid var(--line);border-radius:10px;padding:10px;background:#0f1726;position:sticky;top:78px;height:fit-content}
+    .skeleton{position:relative;overflow:hidden;background:#14213a;border-radius:8px;height:14px;margin-bottom:8px}
+    .skeleton::after{content:'';position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);animation:sh 1.2s infinite}
+    @keyframes sh{100%{transform:translateX(100%)}}
     .muted{color:var(--muted);font-size:12px}
     pre{margin:0;white-space:pre-wrap;font-size:12px;color:#c8d8f7;max-height:420px;overflow:auto}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .fsm-svg{width:100%;height:170px;border:1px solid var(--line);border-radius:10px;background:#0f1726}
-    @media (max-width:1200px){.app{grid-template-columns:1fr}.sidebar{display:none}.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
+    @media (max-width:1200px){.app{grid-template-columns:1fr}.sidebar{display:none}.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}.timeline-split{grid-template-columns:1fr}.mini-detail{position:static}}
   </style>
 </head>
 <body>
@@ -120,7 +125,15 @@
               <option value="score_asc">정렬: 점수 낮은순</option>
             </select>
           </div>
-          <div id="timeline"></div>
+          <div class="timeline-split">
+            <div id="timeline"></div>
+            <div class="mini-detail" id="lineage-mini-detail">
+              <div class="muted" style="margin-bottom:6px">선택 이벤트 요약</div>
+              <div id="ld-wave"><strong>-</strong></div>
+              <div class="muted" id="ld-meta">상세를 보려면 타임라인을 클릭하세요</div>
+              <pre id="ld-summary" style="margin-top:8px;max-height:220px">-</pre>
+            </div>
+          </div>
         </div>
         <div class="tab-pane" data-tab-pane="center-actions">
           <div class="actions">
@@ -202,6 +215,7 @@
     let CURRENT_EVENTS = [];
     let FILTERED_EVENTS = [];
     let SELECTED_PROFILES = new Set();
+    let SELECTED_EVENT_INDEX = -1;
     let URL_HYDRATED = false;
 
     async function getText(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.text(); }
@@ -390,13 +404,22 @@
         div.onclick = () => selectEvent(Number(div.dataset.index));
         box.appendChild(div);
       });
-      if(events.length) selectEvent(events.length - 1);
-      else {
+      if(events.length) {
+        const next = (SELECTED_EVENT_INDEX >= 0 && SELECTED_EVENT_INDEX < events.length) ? SELECTED_EVENT_INDEX : (events.length - 1);
+        selectEvent(next);
+      } else {
+        SELECTED_EVENT_INDEX = -1;
         document.getElementById('d-eid').textContent = '-';
         document.getElementById('d-status').textContent = '-';
         document.getElementById('d-summary').textContent = '조건에 맞는 이벤트 없음';
         document.getElementById('d-gen-close').textContent = '-';
         document.getElementById('d-report').textContent = '-';
+        const waveEl = document.getElementById('ld-wave');
+        const metaEl = document.getElementById('ld-meta');
+        const sumEl = document.getElementById('ld-summary');
+        if(waveEl) waveEl.innerHTML = '<strong>-</strong>';
+        if(metaEl) metaEl.textContent = '조건에 맞는 이벤트 없음';
+        if(sumEl) sumEl.textContent = '-';
       }
     }
 
@@ -421,9 +444,17 @@
     async function selectEvent(i){
       const e = FILTERED_EVENTS[i];
       if(!e) return;
+      SELECTED_EVENT_INDEX = i;
       document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('active'));
       const target = [...document.querySelectorAll('.timeline-item')].find(el => Number(el.dataset.index) === i);
       if(target) target.classList.add('active');
+
+      const waveEl = document.getElementById('ld-wave');
+      const metaEl = document.getElementById('ld-meta');
+      const sumEl = document.getElementById('ld-summary');
+      if(waveEl) waveEl.innerHTML = `<strong>${e.wave_id || '-'} / ${e.profile_id || '-'}</strong>`;
+      if(metaEl) metaEl.textContent = `${pickTs(e)} · ${e.status || '-'} · 점수 ${e.score ?? '-'}`;
+      if(sumEl) sumEl.textContent = e.notes || e.summary || '-';
 
       document.getElementById('d-eid').textContent = e.event_id || '-';
       document.getElementById('d-status').textContent = e.status || '-';
@@ -903,6 +934,12 @@
     }
 
     async function boot(){
+      const timelineEl = document.getElementById('timeline');
+      if(timelineEl){
+        timelineEl.innerHTML = '<div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>';
+      }
+      const ldMeta = document.getElementById('ld-meta');
+      if(ldMeta) ldMeta.textContent = '불러오는 중...';
       try{
         const [eventsTxt, queueTxt, stateTxt] = await Promise.all([
           getText('../lineage/events.jsonl'), getText('../lineage/wave_queue.jsonl'), getText('../lineage/dispatch_state.json')
