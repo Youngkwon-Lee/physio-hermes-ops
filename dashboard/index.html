@@ -282,15 +282,19 @@
       if(sort) document.getElementById('sort-mode').value = sort;
     }
 
+    function getActiveProfiles(){
+      if(SELECTED_PROFILES.size) return new Set(SELECTED_PROFILES);
+      const p = document.getElementById('filter-profile')?.value || 'ALL';
+      return (p !== 'ALL') ? new Set([p]) : new Set();
+    }
+
     function applyFilters(){
       const w = document.getElementById('filter-wave').value;
       const p = document.getElementById('filter-profile').value;
       const s = document.getElementById('filter-status').value;
       const sortMode = document.getElementById('sort-mode').value;
 
-      const activeProfiles = SELECTED_PROFILES.size
-        ? SELECTED_PROFILES
-        : (p !== 'ALL' ? new Set([p]) : new Set());
+      const activeProfiles = getActiveProfiles();
 
       FILTERED_EVENTS = CURRENT_EVENTS.filter(e =>
         (w === 'ALL' || e.wave_id === w) &&
@@ -320,6 +324,8 @@
         renderFsmAgentGraph(agSvg, fsmCurrent);
       }
       syncUrlWithFilters();
+      loadGenerationHistory();
+      loadOpsHistory();
     }
 
     function renderTimeline(events){
@@ -581,10 +587,18 @@
       try{
         const txt = await getText('../lineage/generation_history.jsonl');
         const rows = parseJsonl(txt);
-        const recent = rows.slice(-8).reverse();
+        const activeProfiles = getActiveProfiles();
+        const filtered = activeProfiles.size ? rows.filter(r => activeProfiles.has(r.profile_id)) : rows;
+        const recent = filtered.slice(-8).reverse();
         box.innerHTML = '';
+        if(activeProfiles.size){
+          const hint = document.createElement('div');
+          hint.className = 'muted';
+          hint.textContent = `profile filter: ${[...activeProfiles].join(',')}`;
+          box.appendChild(hint);
+        }
         if(!recent.length){
-          box.innerHTML = '<div class="muted">history empty</div>';
+          box.innerHTML += '<div class="muted">history empty</div>';
           return;
         }
         recent.forEach(r => {
@@ -608,9 +622,16 @@
         const payload = await res.json().catch(()=>({}));
         if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
         const rows = payload.items || [];
+        const activeProfiles = getActiveProfiles();
         box.innerHTML = '';
+        if(activeProfiles.size){
+          const hint = document.createElement('div');
+          hint.className = 'muted';
+          hint.textContent = `profile filter active: ${[...activeProfiles].join(',')} (ops history는 프로필 직접 매핑 없음)`;
+          box.appendChild(hint);
+        }
         if(!rows.length){
-          box.innerHTML = '<div class="muted">ops history empty</div>';
+          box.innerHTML += '<div class="muted">ops history empty</div>';
           return;
         }
         rows.slice(0,8).forEach(r => {
