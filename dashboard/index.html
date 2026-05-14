@@ -139,6 +139,8 @@
         <div id="fsm-current"></div>
         <svg id="fsm-diagram" class="fsm-svg" viewBox="0 0 760 170" preserveAspectRatio="xMidYMid meet"></svg>
         <pre id="fsm-transitions">-</pre>
+        <div class="section-title">FSM + Agent Graph</div>
+        <svg id="fsm-agent-graph" class="fsm-svg" viewBox="0 0 760 220" preserveAspectRatio="xMidYMid meet"></svg>
         <div class="section-title">Wave Queue (next)</div>
         <div id="queue"></div>
       </aside>
@@ -629,6 +631,7 @@
       const curEl = document.getElementById('fsm-current');
       const trEl = document.getElementById('fsm-transitions');
       const svg = document.getElementById('fsm-diagram');
+      const agSvg = document.getElementById('fsm-agent-graph');
       if(!curEl || !trEl) return;
       try{
         const headers = {};
@@ -645,6 +648,7 @@
         curEl.appendChild(div);
 
         renderFsmDiagram(svg, payload.definition || {}, c.state || '', payload.recent_transitions || []);
+        renderFsmAgentGraph(agSvg, c.state || 'UNKNOWN');
 
         const compact = {
           current: payload.current || {},
@@ -656,6 +660,7 @@
         curEl.innerHTML = `<div class="muted">fsm load 실패: ${err.message}</div>`;
         trEl.textContent = `fsm load 실패: ${err.message}`;
         if(svg) svg.innerHTML = '';
+        if(agSvg) agSvg.innerHTML = '';
       }
     }
 
@@ -702,6 +707,39 @@
       if(latest){
         out += `<text x="380" y="22" text-anchor="middle" font-size="11" fill="#ffd98d">latest: ${latest.from} → ${latest.to} (${latest.event || '-'})</text>`;
       }
+      svg.innerHTML = out;
+    }
+
+    function renderFsmAgentGraph(svg, currentState){
+      if(!svg) return;
+      const fsmColor = {
+        HALTED:'#ff8b8b', DEGRADED:'#ffb07a', CAUTION:'#f6c453', RUNNING:'#7de0a8', IDLE:'#7ea9de', UNKNOWN:'#8fa3c7'
+      };
+      const statusColor = {
+        'PASS':'#33d17a','PASS*':'#8de6b3','CHECK':'#f6c453','FAIL':'#ff6b6b','PENDING':'#8fa3c7'
+      };
+      const latestByProfile = new Map();
+      CURRENT_EVENTS.forEach(e => latestByProfile.set(e.profile_id, e));
+      const profiles = ORDERED_PROFILES.filter(Boolean);
+
+      const cx = 380, cy = 70;
+      let out = '';
+      out += `<circle cx="${cx}" cy="${cy}" r="34" fill="#1b2b46" stroke="${fsmColor[currentState] || fsmColor.UNKNOWN}" stroke-width="3"/>`;
+      out += `<text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="11" fill="#ffffff">${currentState}</text>`;
+      out += `<text x="${cx}" y="20" text-anchor="middle" font-size="11" fill="#9fc1f0">FSM ⇄ AGENTS</text>`;
+
+      const startX = 70, gap = 120, ay = 170;
+      profiles.forEach((p, i) => {
+        const e = latestByProfile.get(p);
+        const st = e?.status || 'PENDING';
+        const col = statusColor[st] || '#8fa3c7';
+        const x = startX + i * gap;
+        out += `<line x1="${cx}" y1="${cy+34}" x2="${x}" y2="${ay-18}" stroke="#3e5f8f" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+        out += `<circle cx="${x}" cy="${ay}" r="16" fill="#152239" stroke="${col}" stroke-width="2"/>`;
+        out += `<text x="${x}" y="${ay+4}" text-anchor="middle" font-size="9" fill="#e8f0ff">${st.replace('*','')}</text>`;
+        const short = p.replace('physio-','').slice(0,10);
+        out += `<text x="${x}" y="${ay+28}" text-anchor="middle" font-size="9" fill="#9fb4d6">${short}</text>`;
+      });
       svg.innerHTML = out;
     }
 
