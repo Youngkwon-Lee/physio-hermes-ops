@@ -644,7 +644,7 @@
         curEl.innerHTML = '';
         curEl.appendChild(div);
 
-        renderFsmDiagram(svg, payload.definition || {}, c.state || '');
+        renderFsmDiagram(svg, payload.definition || {}, c.state || '', payload.recent_transitions || []);
 
         const compact = {
           current: payload.current || {},
@@ -659,22 +659,49 @@
       }
     }
 
-    function renderFsmDiagram(svg, def, currentState){
+    function renderFsmDiagram(svg, def, currentState, recentTransitions){
       if(!svg) return;
       const states = (def.states || []).slice(0, 5);
-      const width = 760, y = 86, r = 28;
+      const y = 86, r = 28;
       const xs = [70, 220, 370, 520, 670];
-      const color = s => s === currentState ? '#6ea8ff' : '#304567';
-      const text = s => s === currentState ? '#ffffff' : '#b6c8e9';
+      const fillByState = {
+        HALTED: '#5a2a2a',
+        DEGRADED: '#6e3a2b',
+        CAUTION: '#6b5a2a',
+        RUNNING: '#1f5a3a',
+        IDLE: '#304567'
+      };
+      const strokeByState = {
+        HALTED: '#ff8b8b',
+        DEGRADED: '#ffb07a',
+        CAUTION: '#f6c453',
+        RUNNING: '#7de0a8',
+        IDLE: '#7ea9de'
+      };
 
-      let out = `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5878aa"/></marker></defs>`;
+      const latest = Array.isArray(recentTransitions) && recentTransitions.length ? recentTransitions[0] : null;
+      const hiFrom = latest?.from || '';
+      const hiTo = latest?.to || '';
+
+      let out = `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5878aa"/></marker><marker id="arrow-hi" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#ffd166"/></marker></defs>`;
+
       for(let i=0;i<states.length-1;i++){
-        out += `<line x1="${xs[i]+r}" y1="${y}" x2="${xs[i+1]-r}" y2="${y}" stroke="#5878aa" stroke-width="2" marker-end="url(#arrow)" />`;
+        const a = states[i], b = states[i+1];
+        const isHi = (a === hiFrom && b === hiTo);
+        out += `<line x1="${xs[i]+r}" y1="${y}" x2="${xs[i+1]-r}" y2="${y}" stroke="${isHi ? '#ffd166' : '#5878aa'}" stroke-width="${isHi ? 4 : 2}" marker-end="url(${isHi ? '#arrow-hi' : '#arrow'})" />`;
       }
+
       states.forEach((s, i) => {
-        out += `<circle cx="${xs[i]}" cy="${y}" r="${r}" fill="${color(s)}" stroke="#7ea9de" stroke-width="1.5"/>`;
-        out += `<text x="${xs[i]}" y="${y+4}" text-anchor="middle" font-size="10" fill="${text(s)}">${s}</text>`;
+        const active = s === currentState;
+        const fill = fillByState[s] || '#304567';
+        const stroke = strokeByState[s] || '#7ea9de';
+        out += `<circle cx="${xs[i]}" cy="${y}" r="${active ? r+2 : r}" fill="${fill}" stroke="${stroke}" stroke-width="${active ? 3 : 1.5}"/>`;
+        out += `<text x="${xs[i]}" y="${y+4}" text-anchor="middle" font-size="10" fill="#ffffff">${s}</text>`;
       });
+
+      if(latest){
+        out += `<text x="380" y="22" text-anchor="middle" font-size="11" fill="#ffd98d">latest: ${latest.from} → ${latest.to} (${latest.event || '-'})</text>`;
+      }
       svg.innerHTML = out;
     }
 
