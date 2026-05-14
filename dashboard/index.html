@@ -559,10 +559,11 @@
       const headers = {'Content-Type':'application/json'};
       const execToken = getExecToken();
       if(execToken) headers['Authorization'] = `Bearer ${execToken}`;
+      const activeProfiles = [...getActiveProfiles()];
       const res = await fetch(`${OPS_API.baseUrl}/action`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({action})
+        body: JSON.stringify({action, profile_ids: activeProfiles})
       });
       const payload = await res.json().catch(() => ({}));
       if(!res.ok || !payload.ok){
@@ -623,21 +624,28 @@
         if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
         const rows = payload.items || [];
         const activeProfiles = getActiveProfiles();
+        const filtered = activeProfiles.size
+          ? rows.filter(r => {
+              const pids = Array.isArray(r.profile_ids) ? r.profile_ids : [];
+              return pids.some(p => activeProfiles.has(String(p)));
+            })
+          : rows;
         box.innerHTML = '';
         if(activeProfiles.size){
           const hint = document.createElement('div');
           hint.className = 'muted';
-          hint.textContent = `profile filter active: ${[...activeProfiles].join(',')} (ops history는 프로필 직접 매핑 없음)`;
+          hint.textContent = `profile filter: ${[...activeProfiles].join(',')}`;
           box.appendChild(hint);
         }
-        if(!rows.length){
+        if(!filtered.length){
           box.innerHTML += '<div class="muted">ops history empty</div>';
           return;
         }
-        rows.slice(0,8).forEach(r => {
+        filtered.slice(0,8).forEach(r => {
           const div = document.createElement('div');
           div.className = 'queue-item';
-          div.innerHTML = `<div><strong>${r.action || '-'}</strong></div><div class="muted">${r.time || '-'} · ${r.ok ? 'ok' : 'fail'}${r.dry_run ? ' · dry_run' : ''}</div>`;
+          const ptxt = Array.isArray(r.profile_ids) && r.profile_ids.length ? ` · profiles ${r.profile_ids.join(',')}` : '';
+          div.innerHTML = `<div><strong>${r.action || '-'}</strong></div><div class="muted">${r.time || '-'} · ${r.ok ? 'ok' : 'fail'}${r.dry_run ? ' · dry_run' : ''}${ptxt}</div>`;
           box.appendChild(div);
         });
       }catch(err){

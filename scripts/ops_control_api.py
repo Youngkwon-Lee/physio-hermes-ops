@@ -558,6 +558,10 @@ class Handler(BaseHTTPRequestHandler):
 
         action = str(data.get("action", "")).strip()
         dry_run = bool(data.get("dry_run", False))
+        raw_profiles = data.get("profile_ids", [])
+        if isinstance(raw_profiles, str):
+            raw_profiles = [raw_profiles]
+        profile_ids = [str(p).strip() for p in raw_profiles if str(p).strip()][:20]
         seq = COMMANDS.get(action)
         if not seq:
             return self._json(400, {"ok": False, "error": "unknown_action", "allowed": sorted(COMMANDS)})
@@ -578,9 +582,10 @@ class Handler(BaseHTTPRequestHandler):
                 "dry_run": True,
                 "action": action,
                 "role": role,
+                "profile_ids": profile_ids,
                 "commands": [" ".join(c) for c in seq],
             }
-            audit({"time": now(), "action": action, "role": role, "dry_run": True, "ok": True})
+            audit({"time": now(), "action": action, "role": role, "profile_ids": profile_ids, "dry_run": True, "ok": True})
             return self._json(200, payload)
 
         with RUNTIME_LOCK:
@@ -596,6 +601,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": ok,
                     "action": action,
                     "role": role,
+                    "profile_ids": profile_ids,
                     "time": now(),
                     "results": results,
                 }
@@ -613,6 +619,7 @@ class Handler(BaseHTTPRequestHandler):
                     "time": payload["time"],
                     "action": action,
                     "role": role,
+                    "profile_ids": profile_ids,
                     "ok": ok,
                     "result_count": len(results),
                     "knowledge": knowledge,
