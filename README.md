@@ -20,6 +20,11 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 - `scripts/` : 집계/리포트 스크립트
 - `dashboard/` : 정적 대시보드
 
+## Vercel 배포 (대시보드)
+- `vercel.json` 기준으로 `/` → `dashboard/index.html` 라우팅
+- API endpoint는 `dashboard/config.js`의 `window.NAUTILUS_CONFIG.opsApiBaseUrl`로 오버라이드 가능
+- 미설정 시 로컬 기본값(`http://127.0.0.1:8788`) 사용
+
 ## 보안 원칙
 - 토큰/키/개인정보는 커밋 금지
 - `.env`, `*.key`, `*.pem`, `*.p12`, `*.gpg` 등은 기본 ignore
