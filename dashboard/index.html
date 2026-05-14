@@ -54,6 +54,13 @@
     .muted{color:var(--muted);font-size:12px}
     pre{margin:0;white-space:pre-wrap;font-size:12px;color:#c8d8f7;max-height:420px;overflow:auto}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .pin{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:8px 10px;background:#1b2436;margin-bottom:10px}
+    .pin.bad{border-left-color:var(--bad);background:#2a1c2a}
+    .pin.ok{border-left-color:var(--ok);background:#172a23}
+    .collapsible{border:1px solid var(--line);border-radius:10px;background:#10182a;margin-bottom:10px}
+    .collapsible summary{cursor:pointer;padding:8px 10px;color:var(--muted);font-size:12px;list-style:none}
+    .collapsible summary::-webkit-details-marker{display:none}
+    .collapsible .content{padding:0 10px 10px 10px}
     .fsm-svg{width:100%;height:170px;border:1px solid var(--line);border-radius:10px;background:#0f1726}
     @media (max-width:1200px){.app{grid-template-columns:1fr}.sidebar{display:none}.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}.timeline-split{grid-template-columns:1fr}.mini-detail{position:static}}
   </style>
@@ -162,26 +169,27 @@
         </div>
         <div class="tab-pane active" data-tab-pane="right-detail">
           <div class="section-title">이벤트 상세</div>
+          <div id="detail-pin" class="pin"><strong>상태 핀</strong><div class="muted" id="detail-pin-msg">타임라인을 선택하면 원인이 표시됩니다</div></div>
           <div class="two-col" style="margin-bottom:10px">
             <div class="queue-item"><div class="muted">이벤트 ID</div><div id="d-eid">-</div></div>
             <div class="queue-item"><div class="muted">status</div><div id="d-status">-</div></div>
           </div>
-          <div class="queue-item" style="margin-bottom:10px">
-            <div class="muted">요약</div>
-            <div id="d-summary">타임라인 항목을 선택하세요</div>
-          </div>
-          <div class="queue-item" style="margin-bottom:10px">
-            <div class="muted">세대사이클 종료 요약</div>
-            <pre id="d-gen-close">-</pre>
-          </div>
-          <div class="queue-item" style="margin-bottom:10px">
-            <div class="muted">연결된 리포트 (json)</div>
-            <pre id="d-report">-</pre>
-          </div>
-          <div class="queue-item" style="margin-bottom:10px">
-            <div class="muted">ralph 상세</div>
-            <pre id="d-ralph">-</pre>
-          </div>
+          <details class="collapsible" open>
+            <summary>요약</summary>
+            <div class="content"><div id="d-summary">타임라인 항목을 선택하세요</div></div>
+          </details>
+          <details class="collapsible">
+            <summary>세대사이클 종료 요약</summary>
+            <div class="content"><pre id="d-gen-close">-</pre></div>
+          </details>
+          <details class="collapsible" open>
+            <summary>연결된 리포트 (json)</summary>
+            <div class="content"><pre id="d-report">-</pre></div>
+          </details>
+          <details class="collapsible">
+            <summary>ralph 상세</summary>
+            <div class="content"><pre id="d-ralph">-</pre></div>
+          </details>
         </div>
         <div class="tab-pane" data-tab-pane="right-history">
           <div class="section-title">세대사이클 이력</div>
@@ -414,6 +422,10 @@
         document.getElementById('d-summary').textContent = '조건에 맞는 이벤트 없음';
         document.getElementById('d-gen-close').textContent = '-';
         document.getElementById('d-report').textContent = '-';
+        const pin = document.getElementById('detail-pin');
+        const pinMsg = document.getElementById('detail-pin-msg');
+        if(pin){ pin.className = 'pin'; }
+        if(pinMsg){ pinMsg.textContent = '조건에 맞는 이벤트 없음'; }
         const waveEl = document.getElementById('ld-wave');
         const metaEl = document.getElementById('ld-meta');
         const sumEl = document.getElementById('ld-summary');
@@ -460,6 +472,24 @@
       document.getElementById('d-status').textContent = e.status || '-';
       document.getElementById('d-summary').textContent = `${e.wave_id || '-'} / ${e.profile_id || '-'} / ${e.notes || e.summary || '-'}`;
       document.getElementById('d-gen-close').textContent = '-';
+
+      const pin = document.getElementById('detail-pin');
+      const pinMsg = document.getElementById('detail-pin-msg');
+      const st = String(e.status || '').toUpperCase();
+      if(pin && pinMsg){
+        pin.className = 'pin';
+        if(st === 'FAIL'){
+          pin.classList.add('bad');
+          pinMsg.textContent = `FAIL 원인 우선 확인: ${e.notes || e.summary || '상세 리포트 확인 필요'}`;
+        }else if(st === 'CHECK' || st === 'PASS*'){
+          pinMsg.textContent = `주의 상태(${st}): ${e.notes || e.summary || '검토 필요'}`;
+        }else if(st === 'PASS'){
+          pin.classList.add('ok');
+          pinMsg.textContent = `정상 상태(PASS): ${e.notes || e.summary || '문제 신호 없음'}`;
+        }else{
+          pinMsg.textContent = `${st || '-'}: ${e.notes || e.summary || '-'}`;
+        }
+      }
 
       const reportPath = e.links?.report || (Array.isArray(e.artifact_paths) ? e.artifact_paths[0] : null);
       if(!reportPath){ document.getElementById('d-report').textContent = '연결된 리포트 없음'; return; }
