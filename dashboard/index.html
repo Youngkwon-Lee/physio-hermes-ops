@@ -630,12 +630,19 @@
               return pids.some(p => activeProfiles.has(String(p)));
             })
           : rows;
+        const legacyCount = rows.filter(r => !Array.isArray(r.profile_ids) || r.profile_ids.length === 0).length;
         box.innerHTML = '';
         if(activeProfiles.size){
           const hint = document.createElement('div');
           hint.className = 'muted';
           hint.textContent = `profile filter: ${[...activeProfiles].join(',')}`;
           box.appendChild(hint);
+        }
+        if(legacyCount > 0){
+          const legacy = document.createElement('div');
+          legacy.className = 'muted';
+          legacy.textContent = `legacy logs without profile_ids: ${legacyCount}`;
+          box.appendChild(legacy);
         }
         if(!filtered.length){
           box.innerHTML += '<div class="muted">ops history empty</div>';
@@ -644,8 +651,10 @@
         filtered.slice(0,8).forEach(r => {
           const div = document.createElement('div');
           div.className = 'queue-item';
-          const ptxt = Array.isArray(r.profile_ids) && r.profile_ids.length ? ` · profiles ${r.profile_ids.join(',')}` : '';
+          const hasProfiles = Array.isArray(r.profile_ids) && r.profile_ids.length;
+          const ptxt = hasProfiles ? ` · profiles ${r.profile_ids.join(',')}` : ' · legacy(no profile_ids)';
           div.innerHTML = `<div><strong>${r.action || '-'}</strong></div><div class="muted">${r.time || '-'} · ${r.ok ? 'ok' : 'fail'}${r.dry_run ? ' · dry_run' : ''}${ptxt}</div>`;
+          if(!hasProfiles) div.style.opacity = '0.72';
           box.appendChild(div);
         });
       }catch(err){
