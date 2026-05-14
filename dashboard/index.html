@@ -35,6 +35,7 @@
     .muted{color:var(--muted);font-size:12px}
     pre{margin:0;white-space:pre-wrap;font-size:12px;color:#c8d8f7;max-height:420px;overflow:auto}
     .two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .fsm-svg{width:100%;height:170px;border:1px solid var(--line);border-radius:10px;background:#0f1726}
     @media (max-width:1200px){.layout{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.two-col{grid-template-columns:1fr}}
   </style>
 </head>
@@ -136,6 +137,7 @@
         <pre id="ops-knowledge-graph">-</pre>
         <div class="section-title">FSM State Machine</div>
         <div id="fsm-current"></div>
+        <svg id="fsm-diagram" class="fsm-svg" viewBox="0 0 760 170" preserveAspectRatio="xMidYMid meet"></svg>
         <pre id="fsm-transitions">-</pre>
         <div class="section-title">Wave Queue (next)</div>
         <div id="queue"></div>
@@ -626,6 +628,7 @@
     async function loadFsmState(){
       const curEl = document.getElementById('fsm-current');
       const trEl = document.getElementById('fsm-transitions');
+      const svg = document.getElementById('fsm-diagram');
       if(!curEl || !trEl) return;
       try{
         const headers = {};
@@ -641,6 +644,8 @@
         curEl.innerHTML = '';
         curEl.appendChild(div);
 
+        renderFsmDiagram(svg, payload.definition || {}, c.state || '');
+
         const compact = {
           current: payload.current || {},
           recent_transitions: (payload.recent_transitions || []).slice(0,10),
@@ -650,7 +655,27 @@
       }catch(err){
         curEl.innerHTML = `<div class="muted">fsm load 실패: ${err.message}</div>`;
         trEl.textContent = `fsm load 실패: ${err.message}`;
+        if(svg) svg.innerHTML = '';
       }
+    }
+
+    function renderFsmDiagram(svg, def, currentState){
+      if(!svg) return;
+      const states = (def.states || []).slice(0, 5);
+      const width = 760, y = 86, r = 28;
+      const xs = [70, 220, 370, 520, 670];
+      const color = s => s === currentState ? '#6ea8ff' : '#304567';
+      const text = s => s === currentState ? '#ffffff' : '#b6c8e9';
+
+      let out = `<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5878aa"/></marker></defs>`;
+      for(let i=0;i<states.length-1;i++){
+        out += `<line x1="${xs[i]+r}" y1="${y}" x2="${xs[i+1]-r}" y2="${y}" stroke="#5878aa" stroke-width="2" marker-end="url(#arrow)" />`;
+      }
+      states.forEach((s, i) => {
+        out += `<circle cx="${xs[i]}" cy="${y}" r="${r}" fill="${color(s)}" stroke="#7ea9de" stroke-width="1.5"/>`;
+        out += `<text x="${xs[i]}" y="${y+4}" text-anchor="middle" font-size="10" fill="${text(s)}">${s}</text>`;
+      });
+      svg.innerHTML = out;
     }
 
     async function boot(){
