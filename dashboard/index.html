@@ -263,6 +263,37 @@
     async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
     function parseJsonl(txt){ return txt.split('\n').map(s=>s.trim()).filter(Boolean).map(JSON.parse); }
     function pickTs(e){ return e.timestamp || e.ts || ''; }
+    function statusKo(st){
+      const k = String(st || '').toUpperCase();
+      const map = { PASS: '통과', 'PASS*': '주의통과', CHECK: '검토필요', FAIL: '실패', PENDING: '대기' };
+      return map[k] || (k || '-');
+    }
+    function decisionKo(d){
+      const k = String(d || '').toUpperCase();
+      const map = { GREEN: '정상', YELLOW: '주의', RED: '중단권고', UNKNOWN: '미확인', PENDING: '대기' };
+      return map[k] || (k || '-');
+    }
+    function recommendationKo(v){
+      const k = String(v || '').toUpperCase();
+      const map = { RESUME: '재개', LIMITED_RESUME: '제한적 재개', HOLD: '보류', CHECK_REQUIRED: '검토 필요' };
+      return map[k] || (k || '-');
+    }
+    function classifyIssue(event){
+      const st = String(event?.status || '').toUpperCase();
+      const text = `${event?.notes || ''} ${event?.summary || ''}`.toLowerCase();
+      if(st === 'FAIL'){
+        if(/auth|token|권한|unauthor|forbidden/.test(text)) return {level:'bad', title:'인증/권한 실패', hint:'토큰·역할·권한 정책 확인 필요'};
+        if(/timeout|지연|hung|stall/.test(text)) return {level:'bad', title:'타임아웃/정지', hint:'워커 상태·큐 병목·외부 의존성 점검'};
+        if(/schema|json|parse|format/.test(text)) return {level:'bad', title:'데이터/스키마 오류', hint:'입출력 형식·파서·필수 필드 점검'};
+        return {level:'bad', title:'실패', hint:'상세 리포트 우선 확인'};
+      }
+      if(st === 'CHECK' || st === 'PASS*'){
+        if(/yellow|degraded|risk|주의|불안정/.test(text)) return {level:'warn', title:'주의 신호', hint:'제한적 재개 또는 추가 검토 권장'};
+        return {level:'warn', title:'검토 필요', hint:'치명적 실패는 아니나 후속 확인 필요'};
+      }
+      if(st === 'PASS') return {level:'ok', title:'정상', hint:'문제 신호 없음'};
+      return {level:'warn', title: statusKo(st), hint:'상태 정보 확인 필요'};
+    }
     const OPS_API = {
       baseUrl: (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
         ? `${location.protocol}//${location.hostname}:8788`
@@ -335,7 +366,7 @@
         const e = latest.get(p); const status = e ? e.status : 'PENDING'; const cls = STATUS_CLASS[status] || 'warn';
         const note = e ? `${e.wave_id || '-'} / ${pickTs(e)}` : '이벤트 없음';
         const div = document.createElement('div'); div.className = 'agent';
-        div.innerHTML = `<div class="agent-row"><span>${p}</span><span class="tag"><span class="dot ${cls}"></span>${status}</span></div><div class="muted">${note}</div>`;
+        div.innerHTML = `<div class="agent-row"><span>${p}</span><span class="tag"><span class="dot ${cls}"></span>${statusKo(status)} (${status})</span></div><div class="muted">${note}</div>`;
         box.appendChild(div);
       });
     }
@@ -441,7 +472,7 @@
         if (isGenClose) div.classList.add('gen-close');
         const label = isGenClose ? '♻️ GEN-CLOSE · ' : '';
         div.dataset.index = String(events.length - recent.length + idx);
-        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${e.status} · 점수 ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
+        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${statusKo(e.status)}(${e.status || '-'}) · 점수 ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
         div.onclick = () => selectEvent(Number(div.dataset.index));
         box.appendChild(div);
       });
@@ -498,30 +529,22 @@
       const metaEl = document.getElementById('ld-meta');
       const sumEl = document.getElementById('ld-summary');
       if(waveEl) waveEl.innerHTML = `<strong>${e.wave_id || '-'} / ${e.profile_id || '-'}</strong>`;
-      if(metaEl) metaEl.textContent = `${pickTs(e)} · ${e.status || '-'} · 점수 ${e.score ?? '-'}`;
+      if(metaEl) metaEl.textContent = `${pickTs(e)} · ${statusKo(e.status)}(${e.status || '-'}) · 점수 ${e.score ?? '-'}`;
       if(sumEl) sumEl.textContent = e.notes || e.summary || '-';
 
       document.getElementById('d-eid').textContent = e.event_id || '-';
-      document.getElementById('d-status').textContent = e.status || '-';
+      document.getElementById('d-status').textContent = `${statusKo(e.status)} (${e.status || '-'})`;
       document.getElementById('d-summary').textContent = `${e.wave_id || '-'} / ${e.profile_id || '-'} / ${e.notes || e.summary || '-'}`;
       document.getElementById('d-gen-close').textContent = '-';
 
       const pin = document.getElementById('detail-pin');
       const pinMsg = document.getElementById('detail-pin-msg');
-      const st = String(e.status || '').toUpperCase();
+      const issue = classifyIssue(e);
       if(pin && pinMsg){
         pin.className = 'pin';
-        if(st === 'FAIL'){
-          pin.classList.add('bad');
-          pinMsg.textContent = `FAIL 원인 우선 확인: ${e.notes || e.summary || '상세 리포트 확인 필요'}`;
-        }else if(st === 'CHECK' || st === 'PASS*'){
-          pinMsg.textContent = `주의 상태(${st}): ${e.notes || e.summary || '검토 필요'}`;
-        }else if(st === 'PASS'){
-          pin.classList.add('ok');
-          pinMsg.textContent = `정상 상태(PASS): ${e.notes || e.summary || '문제 신호 없음'}`;
-        }else{
-          pinMsg.textContent = `${st || '-'}: ${e.notes || e.summary || '-'}`;
-        }
+        if(issue.level === 'bad') pin.classList.add('bad');
+        if(issue.level === 'ok') pin.classList.add('ok');
+        pinMsg.textContent = `${issue.title}: ${e.notes || e.summary || issue.hint}`;
       }
 
       const reportPath = e.links?.report || (Array.isArray(e.artifact_paths) ? e.artifact_paths[0] : null);
@@ -542,32 +565,32 @@
             const decision = String(report.decision || '').toUpperCase();
 
             let recommendation = 'CHECK_REQUIRED';
-            let reason = 'insufficient generation decision context';
+            let reason = '세대사이클 의사결정 컨텍스트 부족';
 
             if (decision === 'RED' || failN > 0) {
               recommendation = 'HOLD';
-              reason = (decision === 'RED') ? 'decision RED' : `FAIL detected (${failN})`;
+              reason = (decision === 'RED') ? '의사결정 RED' : `실패(FAIL) 감지 ${failN}건`;
             } else if (decision === 'YELLOW' || checkN > 0) {
               recommendation = 'LIMITED_RESUME';
-              reason = (decision === 'YELLOW') ? 'decision YELLOW' : `CHECK detected (${checkN})`;
+              reason = (decision === 'YELLOW') ? '의사결정 YELLOW' : `검토(CHECK) 감지 ${checkN}건`;
             } else if (decision === 'GREEN' && failN === 0 && checkN === 0) {
               recommendation = 'RESUME';
-              reason = 'decision GREEN and no FAIL/CHECK';
+              reason = '의사결정 GREEN + FAIL/CHECK 없음';
             }
 
             document.getElementById('d-gen-close').textContent = JSON.stringify({
-              decision: report.decision || '-',
-              wave_id: report.wave_id || e.wave_id || '-',
-              event_count: report.event_count ?? '-',
-              status_breakdown: {
-                PASS: breakdown.PASS ?? 0,
-                'PASS*': breakdown['PASS*'] ?? 0,
-                CHECK: breakdown.CHECK ?? 0,
-                FAIL: breakdown.FAIL ?? 0
+              의사결정: `${decisionKo(report.decision || '-')} (${report.decision || '-'})`,
+              웨이브: report.wave_id || e.wave_id || '-',
+              이벤트수: report.event_count ?? '-',
+              상태집계: {
+                통과: breakdown.PASS ?? 0,
+                주의통과: breakdown['PASS*'] ?? 0,
+                검토필요: breakdown.CHECK ?? 0,
+                실패: breakdown.FAIL ?? 0
               },
-              resume_recommendation: recommendation,
-              recommendation_reason: reason,
-              closed_at: report.closed_at || '-'
+              재개권고: `${recommendationKo(recommendation)} (${recommendation})`,
+              권고사유: reason,
+              종료시각: report.closed_at || '-'
             }, null, 2);
           }
         }
@@ -654,7 +677,7 @@
         const g = await getJson('../lineage/generation_cycle_state.json');
         const d = String(g.decision || 'unknown').toUpperCase();
         const emoji = d === 'GREEN' ? '🟢' : (d === 'YELLOW' ? '🟡' : (d === 'RED' ? '🔴' : '•'));
-        el.textContent = `세대사이클: ${emoji} ${d}`;
+        el.textContent = `세대사이클: ${emoji} ${decisionKo(d)} (${d})`;
         el.style.borderColor = d === 'GREEN' ? '#2a5f44' : (d === 'RED' ? '#8a2f2f' : '#8a6d3b');
         el.style.color = d === 'GREEN' ? '#8fe3b3' : (d === 'RED' ? '#ff9b9b' : '#f6c453');
       }catch(_){
@@ -680,7 +703,7 @@
           const rec = payload.mode_recommendation || {};
           const m = String(rec.mode || 'UNKNOWN').toUpperCase();
           const emoji = m === 'SAFE' ? '🛡️' : (m === 'NORMAL' ? '🟡' : (m === 'AGGRESSIVE' ? '🚀' : '•'));
-          modeEl.textContent = `운영모드: ${emoji} ${m}`;
+          modeEl.textContent = `운영모드: ${emoji} ${m === 'SAFE' ? '안전' : (m === 'NORMAL' ? '표준' : (m === 'AGGRESSIVE' ? '공격적' : '미확인'))} (${m})`;
           modeEl.title = rec.reason || '';
           modeEl.style.borderColor = m === 'SAFE' ? '#8a2f2f' : (m === 'NORMAL' ? '#8a6d3b' : '#2a5f44');
           modeEl.style.color = m === 'SAFE' ? '#ff9b9b' : (m === 'NORMAL' ? '#f6c453' : '#8fe3b3');
@@ -1067,7 +1090,7 @@
         roleSel.addEventListener('change', () => {
           OPS_API.execRoleMode = roleSel.value;
           localStorage.setItem('opsCtlExecRoleMode', OPS_API.execRoleMode);
-          setActionFeedback(`exec role mode: ${OPS_API.execRoleMode}`);
+          setActionFeedback(`실행 권한 모드: ${OPS_API.execRoleMode === 'admin' ? '관리자' : '운영자'} (${OPS_API.execRoleMode})`);
         });
       }
       document.getElementById('act-set-read-token')?.addEventListener('click', () => setToken('read'));
