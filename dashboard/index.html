@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Physio Nautilus Ops UI</title>
+  <title>Physio Nautilus 운영 대시보드</title>
   <style>
     :root{--bg:#0a0f1c;--panel:#121a2b;--panel2:#0f1726;--line:#23324d;--txt:#e6edf7;--muted:#8fa3c7;--ok:#33d17a;--warn:#f6c453;--bad:#ff6b6b;--acc:#6ea8ff}
     *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2b55 0%,var(--bg) 45%);color:var(--txt);font-family:Inter,system-ui,sans-serif}
@@ -41,35 +41,35 @@
 </head>
 <body>
   <header class="top">
-    <div class="brand">Physio Nautilus Ops UI</div>
+    <div class="brand">Physio Nautilus 운영 대시보드</div>
     <div style="display:flex;gap:8px;align-items:center">
-      <span class="badge">LIVE / JSONL</span>
-      <span class="badge" id="ctl-spawn">spawn: -</span>
-      <span class="badge" id="ctl-dispatch">dispatch: -</span>
-      <span class="badge" id="ctl-watchdog">watchdog: -</span>
-      <span class="badge" id="ctl-heartbeat">heartbeat: -</span>
+      <span class="badge">실시간 / JSONL</span>
+      <span class="badge" id="ctl-spawn">스폰: -</span>
+      <span class="badge" id="ctl-dispatch">디스패치: -</span>
+      <span class="badge" id="ctl-watchdog">워치독: -</span>
+      <span class="badge" id="ctl-heartbeat">하트비트: -</span>
       <span class="badge" id="ctl-ralph">ralph: -</span>
-      <span class="badge" id="ctl-generation">generation: -</span>
-      <span class="badge" id="ctl-api">api: -</span>
-      <span class="badge" id="ctl-mode">ops-mode: -</span>
+      <span class="badge" id="ctl-generation">세대사이클: -</span>
+      <span class="badge" id="ctl-api">API: -</span>
+      <span class="badge" id="ctl-mode">운영모드: -</span>
     </div>
   </header>
   <main class="wrap">
     <section class="kpis">
-      <div class="card"><div class="label">Loop Status</div><div class="value" id="kpi-status">-</div></div>
-      <div class="card"><div class="label">Current Wave</div><div class="value" id="kpi-wave">-</div></div>
-      <div class="card"><div class="label">Avg Score</div><div class="value" id="kpi-score">-</div></div>
-      <div class="card"><div class="label">Queue Cursor</div><div class="value" id="kpi-cursor">-</div></div>
+      <div class="card"><div class="label">루프 상태</div><div class="value" id="kpi-status">-</div></div>
+      <div class="card"><div class="label">현재 웨이브</div><div class="value" id="kpi-wave">-</div></div>
+      <div class="card"><div class="label">평균 점수</div><div class="value" id="kpi-score">-</div></div>
+      <div class="card"><div class="label">큐 커서</div><div class="value" id="kpi-cursor">-</div></div>
     </section>
 
     <section class="layout">
       <aside class="card">
-        <div class="section-title">Profiles</div>
+        <div class="section-title">프로필 상태</div>
         <div id="profiles"></div>
       </aside>
 
       <section class="card">
-        <div class="section-title">Lineage Timeline (클릭하면 상세)</div>
+        <div class="section-title">라인리지 타임라인 (클릭하면 상세)</div>
         <div class="filters">
           <select id="filter-wave"><option value="ALL">wave: ALL</option></select>
           <select id="filter-profile"><option value="ALL">profile: ALL</option></select>
@@ -101,12 +101,12 @@
           </select>
         </div>
         <div class="mini">보안모드: API 토큰 필수(브라우저 localStorage 사용)</div>
-        <div class="cmdbox" id="action-feedback">action: 준비됨</div>
+        <div class="cmdbox" id="action-feedback">작업: 준비됨</div>
         <div id="timeline"></div>
       </section>
 
       <aside class="card">
-        <div class="section-title">Event Detail</div>
+        <div class="section-title">이벤트 상세</div>
         <div class="two-col" style="margin-bottom:10px">
           <div class="queue-item"><div class="muted">event_id</div><div id="d-eid">-</div></div>
           <div class="queue-item"><div class="muted">status</div><div id="d-status">-</div></div>
@@ -127,21 +127,21 @@
           <div class="muted">ralph detail</div>
           <pre id="d-ralph">-</pre>
         </div>
-        <div class="section-title">Generation History</div>
+        <div class="section-title">세대사이클 이력</div>
         <div id="gen-history"></div>
-        <div class="section-title">Ops Action History</div>
+        <div class="section-title">운영 액션 이력</div>
         <div id="ops-history"></div>
-        <div class="section-title">Ops Knowledge Recent</div>
+        <div class="section-title">운영 지식 최신</div>
         <div id="ops-knowledge-recent"></div>
-        <div class="section-title">Ops Knowledge Graph</div>
+        <div class="section-title">운영 지식 그래프</div>
         <pre id="ops-knowledge-graph">-</pre>
-        <div class="section-title">FSM State Machine</div>
+        <div class="section-title">FSM 상태머신</div>
         <div id="fsm-current"></div>
         <svg id="fsm-diagram" class="fsm-svg" viewBox="0 0 760 170" preserveAspectRatio="xMidYMid meet"></svg>
         <pre id="fsm-transitions">-</pre>
-        <div class="section-title">FSM + Agent Graph</div>
+        <div class="section-title">FSM + 에이전트 그래프</div>
         <svg id="fsm-agent-graph" class="fsm-svg" viewBox="0 0 760 220" preserveAspectRatio="xMidYMid meet"></svg>
-        <div class="section-title">Wave Queue (next)</div>
+        <div class="section-title">웨이브 큐 (다음)</div>
         <div id="queue"></div>
       </aside>
     </section>
@@ -482,11 +482,11 @@
       try{
         const hb = await getJson('../lineage/heartbeat.json');
         const ok = !!hb.alive;
-        el.textContent = `heartbeat: ${ok ? '💓 alive' : '💔 down'}`;
+        el.textContent = `하트비트: ${ok ? '💓 정상' : '💔 다운'}`;
         el.style.borderColor = ok ? '#2a5f44' : '#8a2f2f';
         el.style.color = ok ? '#8fe3b3' : '#ff9b9b';
       }catch(_){
-        el.textContent = 'heartbeat: ?';
+        el.textContent = '하트비트: ?';
       }
     }
 
@@ -511,11 +511,11 @@
         const g = await getJson('../lineage/generation_cycle_state.json');
         const d = String(g.decision || 'unknown').toUpperCase();
         const emoji = d === 'GREEN' ? '🟢' : (d === 'YELLOW' ? '🟡' : (d === 'RED' ? '🔴' : '•'));
-        el.textContent = `generation: ${emoji} ${d}`;
+        el.textContent = `세대사이클: ${emoji} ${d}`;
         el.style.borderColor = d === 'GREEN' ? '#2a5f44' : (d === 'RED' ? '#8a2f2f' : '#8a6d3b');
         el.style.color = d === 'GREEN' ? '#8fe3b3' : (d === 'RED' ? '#ff9b9b' : '#f6c453');
       }catch(_){
-        el.textContent = 'generation: ?';
+        el.textContent = '세대사이클: ?';
       }
     }
 
@@ -528,7 +528,7 @@
         const payload = await r.json();
         const auth = payload.auth_required ? '🔐' : '🟢';
         const mode = payload.auth_mode || '-';
-        el.textContent = `api: ${auth} ready (${mode})`;
+        el.textContent = `API: ${auth} 준비됨 (${mode})`;
         el.style.borderColor = '#2a5f44';
         el.style.color = '#8fe3b3';
 
@@ -537,18 +537,18 @@
           const rec = payload.mode_recommendation || {};
           const m = String(rec.mode || 'UNKNOWN').toUpperCase();
           const emoji = m === 'SAFE' ? '🛡️' : (m === 'NORMAL' ? '🟡' : (m === 'AGGRESSIVE' ? '🚀' : '•'));
-          modeEl.textContent = `ops-mode: ${emoji} ${m}`;
+          modeEl.textContent = `운영모드: ${emoji} ${m}`;
           modeEl.title = rec.reason || '';
           modeEl.style.borderColor = m === 'SAFE' ? '#8a2f2f' : (m === 'NORMAL' ? '#8a6d3b' : '#2a5f44');
           modeEl.style.color = m === 'SAFE' ? '#ff9b9b' : (m === 'NORMAL' ? '#f6c453' : '#8fe3b3');
         }
       }catch(_){
-        el.textContent = 'api: 🔴 down';
+        el.textContent = 'API: 🔴 다운';
         el.style.borderColor = '#8a2f2f';
         el.style.color = '#ff9b9b';
         const modeEl = document.getElementById('ctl-mode');
         if(modeEl){
-          modeEl.textContent = 'ops-mode: ?';
+          modeEl.textContent = '운영모드: ?';
           modeEl.style.borderColor = '#8a6d3b';
           modeEl.style.color = '#f6c453';
         }
