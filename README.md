@@ -23,6 +23,7 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 ## Vercel 배포 (대시보드)
 - `vercel.json` 기준으로 `/` → `dashboard/index.html` 라우팅
 - API endpoint는 `dashboard/config.js`의 `window.NAUTILUS_CONFIG.opsApiBaseUrl`로 오버라이드 가능
+- URL 파라미터 오버라이드도 지원: `?api=https://ops-api.example.com`
 - 미설정 시 로컬 기본값(`http://127.0.0.1:8788`) 사용
 - 외부 배포용 샘플은 `dashboard/config.example.js` 참고
 
