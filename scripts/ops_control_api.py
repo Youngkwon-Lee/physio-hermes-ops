@@ -148,6 +148,89 @@ def summarize_mode_recommendation():
     return {"mode": "AGGRESSIVE", "reason": f"decision={decision}, fail={fail_n}, check={check_n}"}
 
 
+def compute_fsm_state():
+    hb = read_json(ROOT / "lineage" / "heartbeat.json", {})
+    gen = read_json(ROOT / "lineage" / "generation_cycle_state.json", {})
+    spawn = read_json(ROOT / "lineage" / "spawn_state.json", {})
+    dispatch = read_json(ROOT / "lineage" / "dispatch_state.json", {})
+    events = latest_events(50)
+    recent = events[-12:]
+
+    fail_n = sum(1 for e in recent if str(e.get("status", "")).upper() == "FAIL")
+    check_n = sum(1 for e in recent if str(e.get("status", "")).upper() == "CHECK")
+    alive = bool(hb.get("alive", True))
+    decision = str(gen.get("decision", "UNKNOWN")).upper()
+    sp = str(spawn.get("state", "unknown")).lower()
+    dp = str(dispatch.get("state", "unknown")).lower()
+
+    if not alive:
+        state = "HALTED"
+        reason = "heartbeat down"
+    elif fail_n > 0 or decision == "RED":
+        state = "DEGRADED"
+        reason = f"decision={decision}, fail={fail_n}"
+    elif check_n > 0 or decision == "YELLOW":
+        state = "CAUTION"
+        reason = f"decision={decision}, check={check_n}"
+    elif sp == "scheduled" and dp == "scheduled":
+        state = "RUNNING"
+        reason = "spawn/dispatch scheduled"
+    else:
+        state = "IDLE"
+        reason = f"spawn={sp}, dispatch={dp}"
+
+    return {
+        "state": state,
+        "reason": reason,
+        "signals": {
+            "heartbeat_alive": alive,
+            "generation_decision": decision,
+            "recent_fail": fail_n,
+            "recent_check": check_n,
+            "spawn_state": sp,
+            "dispatch_state": dp,
+        },
+    }
+
+
+def build_fsm_snapshot(limit=30):
+    rows = read_recent_audits(max(80, limit * 3))
+    transitions = []
+    prev = None
+    for r in sorted(rows, key=lambda x: x.get("time", "")):
+        action = str(r.get("action", ""))
+        ok = bool(r.get("ok", False))
+        if action == "pause_all" and ok:
+            nxt, evt = "IDLE", "pause_all_ok"
+        elif action == "resume_core" and ok:
+            nxt, evt = "RUNNING", "resume_core_ok"
+        elif action == "finalize_once" and ok:
+            nxt, evt = "CAUTION", "finalize_once_ok"
+        elif action == "refresh" and ok:
+            nxt, evt = None, "refresh_ok"
+        else:
+            continue
+
+        if nxt is None:
+            continue
+        frm = prev or "UNKNOWN"
+        transitions.append({"time": r.get("time", "-"), "event": evt, "from": frm, "to": nxt})
+        prev = nxt
+
+    current = compute_fsm_state()
+    fsm_def = {
+        "states": ["HALTED", "DEGRADED", "CAUTION", "RUNNING", "IDLE"],
+        "transitions": [
+            {"event": "heartbeat_down", "from": "*", "to": "HALTED"},
+            {"event": "decision_red_or_fail", "from": "*", "to": "DEGRADED"},
+            {"event": "decision_yellow_or_check", "from": "*", "to": "CAUTION"},
+            {"event": "resume_core_ok", "from": "IDLE|CAUTION", "to": "RUNNING"},
+            {"event": "pause_all_ok", "from": "RUNNING|CAUTION", "to": "IDLE"},
+        ],
+    }
+    return {"ok": True, "current": current, "recent_transitions": list(reversed(transitions[-limit:])), "definition": fsm_def}
+
+
 def harvest_lineage_knowledge(trigger_action: str, role: str):
     events = latest_events(50)
     risky = [e for e in events if str(e.get("status", "")).upper() in {"FAIL", "CHECK"}]
@@ -402,6 +485,12 @@ class Handler(BaseHTTPRequestHandler):
             if REQUIRE_TOKEN and not auth_ctx:
                 return
             return self._json(200, build_knowledge_graph(50))
+
+        if self.path.startswith("/fsm/state"):
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            return self._json(200, build_fsm_snapshot(20))
 
         return self._json(404, {"ok": False, "error": "not_found"})
 

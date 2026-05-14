@@ -134,6 +134,9 @@
         <div id="ops-knowledge-recent"></div>
         <div class="section-title">Ops Knowledge Graph</div>
         <pre id="ops-knowledge-graph">-</pre>
+        <div class="section-title">FSM State Machine</div>
+        <div id="fsm-current"></div>
+        <pre id="fsm-transitions">-</pre>
         <div class="section-title">Wave Queue (next)</div>
         <div id="queue"></div>
       </aside>
@@ -620,6 +623,36 @@
       }
     }
 
+    async function loadFsmState(){
+      const curEl = document.getElementById('fsm-current');
+      const trEl = document.getElementById('fsm-transitions');
+      if(!curEl || !trEl) return;
+      try{
+        const headers = {};
+        if(OPS_API.readToken) headers['Authorization'] = `Bearer ${OPS_API.readToken}`;
+        const res = await fetch(`${OPS_API.baseUrl}/fsm/state`, {cache:'no-store', headers});
+        const payload = await res.json().catch(()=>({}));
+        if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
+
+        const c = payload.current || {};
+        const div = document.createElement('div');
+        div.className = 'queue-item';
+        div.innerHTML = `<div><strong>${c.state || '-'}</strong></div><div class="muted">${c.reason || '-'}</div>`;
+        curEl.innerHTML = '';
+        curEl.appendChild(div);
+
+        const compact = {
+          current: payload.current || {},
+          recent_transitions: (payload.recent_transitions || []).slice(0,10),
+          definition: payload.definition || {}
+        };
+        trEl.textContent = JSON.stringify(compact, null, 2);
+      }catch(err){
+        curEl.innerHTML = `<div class="muted">fsm load 실패: ${err.message}</div>`;
+        trEl.textContent = `fsm load 실패: ${err.message}`;
+      }
+    }
+
     async function boot(){
       try{
         const [eventsTxt, queueTxt, stateTxt] = await Promise.all([
@@ -639,6 +672,7 @@
         await loadOpsHistory();
         await loadKnowledgeRecent();
         await loadKnowledgeGraph();
+        await loadFsmState();
       }catch(err){
         document.getElementById('timeline').innerHTML = `<div class="muted">load error: ${err.message}<br/>repo root에서 <code>python -m http.server 8787</code> 후 접속</div>`;
       }
