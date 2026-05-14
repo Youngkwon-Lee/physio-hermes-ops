@@ -14,6 +14,8 @@ PORT = int(os.getenv("OPS_CTL_PORT", "8788"))
 TOKEN = os.getenv("OPS_CTL_TOKEN", "")
 READ_TOKEN = os.getenv("OPS_CTL_READ_TOKEN", TOKEN)
 EXEC_TOKEN = os.getenv("OPS_CTL_EXEC_TOKEN", TOKEN)
+EXEC_ADMIN_TOKEN = os.getenv("OPS_CTL_EXEC_ADMIN_TOKEN", EXEC_TOKEN)
+EXEC_OPERATOR_TOKEN = os.getenv("OPS_CTL_EXEC_OPERATOR_TOKEN", "")
 REQUIRE_TOKEN = os.getenv("OPS_CTL_REQUIRE_TOKEN", "1") == "1"
 AUDIT_LOG = Path(os.getenv("OPS_CTL_AUDIT_LOG", str(ROOT / "lineage" / "actions_audit.jsonl")))
 LOCK_PATH = Path(os.getenv("OPS_CTL_LOCK_FILE", str(ROOT / ".runtime" / "ops_control.lock")))
@@ -48,6 +50,10 @@ COMMANDS = {
 }
 
 RUNTIME_LOCK = Lock()
+ROLE_ACTIONS = {
+    "admin": set(COMMANDS.keys()),
+    "operator": {"refresh"},
+}
 
 
 def now():
@@ -120,13 +126,32 @@ class Handler(BaseHTTPRequestHandler):
         if not REQUIRE_TOKEN:
             return None
 
-        expected = READ_TOKEN if scope == "read" else EXEC_TOKEN
-        if not expected:
-            return self._json(500, {"ok": False, "error": f"server_{scope}_token_not_configured"})
-
         auth = self.headers.get("Authorization", "")
-        if auth != f"Bearer {expected}":
-            return self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
+        token = auth.replace("Bearer ", "", 1) if auth.startswith("Bearer ") else ""
+
+        if scope == "read":
+            expected = READ_TOKEN
+            if not expected:
+                self._json(500, {"ok": False, "error": "server_read_token_not_configured"})
+                return None
+            if token != expected:
+                self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
+                return None
+            return {"scope": "read", "role": "viewer"}
+
+        # exec scope: role is inferred by token
+        admin = EXEC_ADMIN_TOKEN
+        operator = EXEC_OPERATOR_TOKEN
+        if not admin and not operator:
+            self._json(500, {"ok": False, "error": "server_exec_token_not_configured"})
+            return None
+
+        if admin and token == admin:
+            return {"scope": "exec", "role": "admin"}
+        if operator and token == operator:
+            return {"scope": "exec", "role": "operator"}
+
+        self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
         return None
 
     def do_OPTIONS(self):
@@ -143,11 +168,17 @@ class Handler(BaseHTTPRequestHandler):
                 "time": now(),
                 "auth_required": REQUIRE_TOKEN,
                 "auth_mode": "split" if (READ_TOKEN != EXEC_TOKEN) else "single",
+                "exec_roles": {
+                    "admin_enabled": bool(EXEC_ADMIN_TOKEN),
+                    "operator_enabled": bool(EXEC_OPERATOR_TOKEN),
+                    "operator_actions": sorted(ROLE_ACTIONS.get("operator", set())),
+                },
                 "audit_log": str(AUDIT_LOG),
                 "lock_file": str(LOCK_PATH),
             })
         if self.path.startswith("/actions/recent"):
-            if self._require_auth("read") is not None:
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
                 return
             return self._json(200, {"ok": True, "items": read_recent_audits(20)})
         return self._json(404, {"ok": False, "error": "not_found"})
@@ -156,7 +187,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/action":
             return self._json(404, {"ok": False, "error": "not_found"})
 
-        if self._require_auth("exec") is not None:
+        auth_ctx = self._require_auth("exec")
+        if REQUIRE_TOKEN and not auth_ctx:
             return
 
         try:
@@ -172,14 +204,25 @@ class Handler(BaseHTTPRequestHandler):
         if not seq:
             return self._json(400, {"ok": False, "error": "unknown_action", "allowed": sorted(COMMANDS)})
 
+        role = (auth_ctx or {}).get("role", "admin")
+        allowed_actions = ROLE_ACTIONS.get(role, set())
+        if action not in allowed_actions:
+            return self._json(403, {
+                "ok": False,
+                "error": "forbidden_action",
+                "role": role,
+                "allowed_actions": sorted(allowed_actions),
+            })
+
         if dry_run:
             payload = {
                 "ok": True,
                 "dry_run": True,
                 "action": action,
+                "role": role,
                 "commands": [" ".join(c) for c in seq],
             }
-            audit({"time": now(), "action": action, "dry_run": True, "ok": True})
+            audit({"time": now(), "action": action, "role": role, "dry_run": True, "ok": True})
             return self._json(200, payload)
 
         with RUNTIME_LOCK:
@@ -194,12 +237,14 @@ class Handler(BaseHTTPRequestHandler):
                 payload = {
                     "ok": ok,
                     "action": action,
+                    "role": role,
                     "time": now(),
                     "results": results,
                 }
                 audit({
                     "time": payload["time"],
                     "action": action,
+                    "role": role,
                     "ok": ok,
                     "result_count": len(results),
                     "failed_commands": [r["cmd"] for r in results if r["exit_code"] != 0],
