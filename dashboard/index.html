@@ -71,20 +71,20 @@
       <section class="card">
         <div class="section-title">라인리지 타임라인 (클릭하면 상세)</div>
         <div class="filters">
-          <select id="filter-wave"><option value="ALL">wave: ALL</option></select>
-          <select id="filter-profile"><option value="ALL">profile: ALL</option></select>
+          <select id="filter-wave"><option value="ALL">웨이브: 전체</option></select>
+          <select id="filter-profile"><option value="ALL">프로필: 전체</option></select>
           <select id="filter-status">
-            <option value="ALL">status: ALL</option>
+            <option value="ALL">상태: 전체</option>
             <option value="PASS">PASS</option>
             <option value="PASS*">PASS*</option>
             <option value="CHECK">CHECK</option>
             <option value="FAIL">FAIL</option>
           </select>
           <select id="sort-mode">
-            <option value="time_desc">sort: 최신순</option>
-            <option value="time_asc">sort: 오래된순</option>
-            <option value="score_desc">sort: score 높은순</option>
-            <option value="score_asc">sort: score 낮은순</option>
+            <option value="time_desc">정렬: 최신순</option>
+            <option value="time_asc">정렬: 오래된순</option>
+            <option value="score_desc">정렬: 점수 높은순</option>
+            <option value="score_asc">정렬: 점수 낮은순</option>
           </select>
         </div>
         <div class="actions">
@@ -96,8 +96,8 @@
           <button class="btn" id="act-set-exec-admin-token">EXEC ADMIN 토큰 설정</button>
           <button class="btn" id="act-set-exec-operator-token">EXEC OPERATOR 토큰 설정</button>
           <select id="exec-role-mode">
-            <option value="operator">exec role: operator</option>
-            <option value="admin">exec role: admin</option>
+            <option value="operator">실행 권한: 운영자</option>
+            <option value="admin">실행 권한: 관리자</option>
           </select>
         </div>
         <div class="mini">보안모드: API 토큰 필수(브라우저 localStorage 사용)</div>
@@ -108,23 +108,23 @@
       <aside class="card">
         <div class="section-title">이벤트 상세</div>
         <div class="two-col" style="margin-bottom:10px">
-          <div class="queue-item"><div class="muted">event_id</div><div id="d-eid">-</div></div>
+          <div class="queue-item"><div class="muted">이벤트 ID</div><div id="d-eid">-</div></div>
           <div class="queue-item"><div class="muted">status</div><div id="d-status">-</div></div>
         </div>
         <div class="queue-item" style="margin-bottom:10px">
-          <div class="muted">summary</div>
-          <div id="d-summary">timeline 항목을 선택하세요</div>
+          <div class="muted">요약</div>
+          <div id="d-summary">타임라인 항목을 선택하세요</div>
         </div>
         <div class="queue-item" style="margin-bottom:10px">
-          <div class="muted">generation close summary</div>
+          <div class="muted">세대사이클 종료 요약</div>
           <pre id="d-gen-close">-</pre>
         </div>
         <div class="queue-item" style="margin-bottom:10px">
-          <div class="muted">linked report (json)</div>
+          <div class="muted">연결된 리포트 (json)</div>
           <pre id="d-report">-</pre>
         </div>
         <div class="queue-item" style="margin-bottom:10px">
-          <div class="muted">ralph detail</div>
+          <div class="muted">ralph 상세</div>
           <pre id="d-ralph">-</pre>
         </div>
         <div class="section-title">세대사이클 이력</div>
@@ -229,7 +229,7 @@
       const box = document.getElementById('profiles'); box.innerHTML = '';
       ORDERED_PROFILES.forEach(p => {
         const e = latest.get(p); const status = e ? e.status : 'PENDING'; const cls = STATUS_CLASS[status] || 'warn';
-        const note = e ? `${e.wave_id || '-'} / ${pickTs(e)}` : 'no event';
+        const note = e ? `${e.wave_id || '-'} / ${pickTs(e)}` : '이벤트 없음';
         const div = document.createElement('div'); div.className = 'agent';
         div.innerHTML = `<div class="agent-row"><span>${p}</span><span class="tag"><span class="dot ${cls}"></span>${status}</span></div><div class="muted">${note}</div>`;
         box.appendChild(div);
@@ -245,8 +245,8 @@
       const waves = [...new Set(events.map(e => e.wave_id).filter(Boolean))].sort();
       const profiles = [...new Set(events.map(e => e.profile_id).filter(Boolean))].sort();
 
-      waveSel.innerHTML = '<option value="ALL">wave: ALL</option>' + waves.map(w => `<option value="${w}">${w}</option>`).join('');
-      profileSel.innerHTML = '<option value="ALL">profile: ALL</option>' + profiles.map(p => `<option value="${p}">${p}</option>`).join('');
+      waveSel.innerHTML = '<option value="ALL">웨이브: 전체</option>' + waves.map(w => `<option value="${w}">${w}</option>`).join('');
+      profileSel.innerHTML = '<option value="ALL">프로필: 전체</option>' + profiles.map(p => `<option value="${p}">${p}</option>`).join('');
 
       waveSel.value = waves.includes(wCur) ? wCur : 'ALL';
       profileSel.value = profiles.includes(pCur) ? pCur : 'ALL';
@@ -337,7 +337,7 @@
         if (isGenClose) div.classList.add('gen-close');
         const label = isGenClose ? '♻️ GEN-CLOSE · ' : '';
         div.dataset.index = String(events.length - recent.length + idx);
-        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${e.status} · score ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
+        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${e.status} · 점수 ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
         div.onclick = () => selectEvent(Number(div.dataset.index));
         box.appendChild(div);
       });
@@ -382,7 +382,7 @@
       document.getElementById('d-gen-close').textContent = '-';
 
       const reportPath = e.links?.report || (Array.isArray(e.artifact_paths) ? e.artifact_paths[0] : null);
-      if(!reportPath){ document.getElementById('d-report').textContent = 'linked report 없음'; return; }
+      if(!reportPath){ document.getElementById('d-report').textContent = '연결된 리포트 없음'; return; }
       try{
         if (String(reportPath).endsWith('.md')) {
           const md = await getText(`../${reportPath}`);
@@ -429,20 +429,20 @@
           }
         }
       }catch(_){
-        document.getElementById('d-report').textContent = `report load 실패: ${reportPath}`;
+        document.getElementById('d-report').textContent = `리포트 로드 실패: ${reportPath}`;
       }
     }
 
     function renderQueue(queue, state){
       const box = document.getElementById('queue'); box.innerHTML = '';
-      if(!queue.length){ box.innerHTML = '<div class="muted">queue empty</div>'; return; }
+      if(!queue.length){ box.innerHTML = '<div class="muted">큐가 비어있음</div>'; return; }
       const qidx = Number(state.queue_index || 0); const tidx = Number(state.task_index || 0); const item = queue[qidx];
-      if(!item){ box.innerHTML = '<div class="muted">all queue consumed</div>'; return; }
+      if(!item){ box.innerHTML = '<div class="muted">큐 작업 소진 완료</div>'; return; }
       const tasks = item.tasks || [];
       tasks.slice(tidx, tidx + 4).forEach((t, i) => {
         const n = tidx + i + 1;
         const div = document.createElement('div'); div.className = 'queue-item';
-        div.innerHTML = `<div><strong>${item.next_wave} / task ${n}</strong></div><div class="muted">profile: ${t.profile_id}</div><pre>goal: ${t.goal}</pre>`;
+        div.innerHTML = `<div><strong>${item.next_wave} / 작업 ${n}</strong></div><div class="muted">프로필: ${t.profile_id}</div><pre>목표: ${t.goal}</pre>`;
         box.appendChild(div);
       });
     }
