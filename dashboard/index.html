@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Nautilus 운영 대시보드</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#08090a;--panel:#0f1011;--panel2:#141516;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.05);--txt:#f7f8f8;--muted:#9ea4af;--ok:#27a644;--warn:#f6c453;--bad:#ff6b6b;--acc:#7170ff}
@@ -17,9 +18,11 @@
     .side-nav a:hover{color:var(--txt);border-color:var(--line2);background:rgba(255,255,255,.03)}
     .main-col{min-width:0}
     .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:rgba(8,9,10,.86);backdrop-filter:blur(8px);z-index:5}
-    .brand{font-weight:600;letter-spacing:-.015em}
+    .brand{font-weight:600;letter-spacing:-.015em;font-size:15px}
     .top-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
     .badge{font-size:12px;padding:4px 8px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.02)}
+    .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:#d4d7de}
+    .pill-dot{width:6px;height:6px;border-radius:50%;background:#7170ff;display:inline-block}
     .wrap{max-width:1400px;margin:0 auto;padding:20px}
     .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line2);border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.22)}
@@ -166,8 +169,8 @@
     }
   </style>
 </head>
-<body>
-  <div class="app">
+<body class="theme-dark">
+  <div class="page app">
   <aside class="sidebar">
     <div class="side-brand">Agent Control</div>
     <nav class="side-nav">
@@ -182,9 +185,9 @@
   </aside>
   <div class="main-col">
   <header class="top">
-    <div class="brand">Nautilus 운영 대시보드</div>
+    <div class="brand">Nautilus Agent Console</div>
     <div class="top-badges">
-      <span class="badge">실시간 / JSONL</span>
+      <span class="pill"><span class="pill-dot"></span>LIVE / JSONL</span>
       <span class="badge" id="ctl-spawn">스폰: -</span>
       <span class="badge" id="ctl-dispatch">디스패치: -</span>
       <span class="badge" id="ctl-watchdog">워치독: -</span>
