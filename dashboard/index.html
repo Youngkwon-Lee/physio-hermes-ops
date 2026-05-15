@@ -58,6 +58,10 @@
     .zone-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
     .zone-title{font-size:12px;font-weight:700}
     .zone-meta{font-size:11px;color:var(--muted)}
+    .stream-feed{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+    .feed-col{border:1px solid var(--line);border-radius:12px;background:#101a2d;padding:10px}
+    .feed-item{border:1px solid #23324d;border-radius:8px;padding:7px;margin-bottom:6px;background:#0f1726;font-size:12px}
+    .feed-item .muted{font-size:11px}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
@@ -117,6 +121,7 @@
       .hero-grid{grid-template-columns:1fr}
       .team-grid{grid-template-columns:1fr 1fr}
       .workspace-map{grid-template-columns:1fr 1fr}
+      .stream-feed{grid-template-columns:1fr}
       .layout{grid-template-columns:1fr}
       .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
       .two-col{grid-template-columns:1fr}
@@ -181,10 +186,9 @@
   </header>
   <main class="wrap">
     <section class="kpis" id="kpi-section">
-      <div class="card kpi-card"><div class="label">루프 상태</div><div class="value" id="kpi-status">-</div></div>
-      <div class="card kpi-card"><div class="label">현재 웨이브</div><div class="value" id="kpi-wave">-</div></div>
-      <div class="card kpi-card"><div class="label">평균 점수</div><div class="value" id="kpi-score">-</div></div>
-      <div class="card kpi-card"><div class="label">큐 커서</div><div class="value" id="kpi-cursor">-</div></div>
+      <div class="card kpi-card"><div class="label">전체 상태</div><div class="value" id="kpi-status">-</div></div>
+      <div class="card kpi-card"><div class="label">현재 작업 라운드</div><div class="value" id="kpi-wave">-</div></div>
+      <div class="card kpi-card"><div class="label">주의 필요 건수</div><div class="value" id="kpi-score">-</div></div>
     </section>
 
     <section class="card hero" id="team-visual-section">
@@ -228,6 +232,8 @@
       <div class="section-title">에이전트 작업 공간 (실시간 위치형)</div>
       <div class="workspace-map" id="workspace-map"></div>
     </section>
+
+    <section class="stream-feed" id="stream-feed-section"></section>
 
     <section class="layout">
       <aside class="card" id="profile-section">
@@ -617,6 +623,7 @@
       renderTeamBoard();
       renderStreamBoard();
       renderWorkspaceMap();
+      renderStreamFeed();
       syncUrlWithFilters();
       loadGenerationHistory();
       loadOpsHistory();
@@ -774,14 +781,11 @@
     }
 
     function setKpis(events, queue, state){
-      const scores = events.map(e => Number(e.score)).filter(n => !Number.isNaN(n));
-      const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '-';
       const currentWave = events.length ? (events[events.length-1].wave_id || '-') : '-';
-      const qidx = Number(state.queue_index || 0), tidx = Number(state.task_index || 0), total = (queue[qidx]?.tasks || []).length;
+      const cautionCount = events.filter(e => ['CHECK','FAIL','PASS*'].includes(String(e.status || '').toUpperCase())).length;
       document.getElementById('kpi-status').textContent = computeLoopStatus(events);
       document.getElementById('kpi-wave').textContent = currentWave;
-      document.getElementById('kpi-score').textContent = String(avg);
-      document.getElementById('kpi-cursor').textContent = `${qidx}/${total ? `${tidx}/${total}` : 'done'}`;
+      document.getElementById('kpi-score').textContent = String(cautionCount);
     }
 
     function setControlBadge(el, item, short){
@@ -1346,6 +1350,24 @@
           const profile = ev.currentTarget.getAttribute('data-profile');
           if(!profile) return;
           focusProfile(profile, !!ev.shiftKey);
+        });
+      });
+    }
+
+    function renderStreamFeed(){
+      const root = document.getElementById('stream-feed-section');
+      if(!root) return;
+      const streams = ['physio_bot','overnight','mem'];
+      root.innerHTML = streams.map(s => {
+        const items = CURRENT_EVENTS.filter(e => streamOf(e)===s).sort((a,b)=>String(pickTs(b)).localeCompare(String(pickTs(a)))).slice(0,5);
+        const list = items.length ? items.map(e => `<div class="feed-item" data-profile="${e.profile_id || ''}"><div><strong>${displayProfileName(e.profile_id || '-')}</strong> · ${statusKo(e.status)}</div><div class="muted">${pickTs(e)} · ${e.notes || e.summary || '-'}</div></div>`).join('') : '<div class="muted">최근 이벤트 없음</div>';
+        return `<div class="feed-col"><div class="zone-head"><div class="zone-title">${s}</div><div class="zone-meta">최근 5개</div></div>${list}</div>`;
+      }).join('');
+      root.querySelectorAll('.feed-item[data-profile]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          const p = ev.currentTarget.getAttribute('data-profile');
+          if(!p) return;
+          focusProfile(p, false);
         });
       });
     }
