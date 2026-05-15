@@ -94,6 +94,17 @@
     .collapsible summary::-webkit-details-marker{display:none}
     .collapsible .content{padding:0 10px 10px 10px}
     .fsm-svg{width:100%;height:170px;border:1px solid var(--line);border-radius:10px;background:#0f1726}
+    body.simple-mode .sidebar{display:none}
+    body.simple-mode .app{grid-template-columns:1fr}
+    body.simple-mode #team-visual-section,
+    body.simple-mode #team-board-section,
+    body.simple-mode #profile-section,
+    body.simple-mode #detail-section,
+    body.simple-mode #ops-history,
+    body.simple-mode #fsm-section,
+    body.simple-mode #queue{display:none}
+    body.simple-mode .layout{grid-template-columns:1fr 420px}
+
     @media (max-width:1200px){
       .app{grid-template-columns:1fr}
       .sidebar{display:none}
@@ -157,6 +168,7 @@
       <span class="badge" id="ctl-generation">세대사이클: -</span>
       <span class="badge" id="ctl-api">API: -</span>
       <span class="badge" id="ctl-mode">운영모드: -</span>
+      <button class="btn" id="toggle-simple-mode">초보 모드</button>
     </div>
   </header>
   <main class="wrap">
@@ -197,6 +209,11 @@
     <section class="team-board" id="team-board-section">
       <div class="section-title">팀별 에이전트 보드 (connect-ai 스타일)</div>
       <div class="team-grid" id="team-board"></div>
+    </section>
+
+    <section class="team-board" id="stream-board-section">
+      <div class="section-title">채널/쓰레드별 에이전트 보드 (physio_bot / overnight / mem)</div>
+      <div class="team-grid" id="stream-board"></div>
     </section>
 
     <section class="layout">
@@ -324,6 +341,13 @@
     let SELECTED_PROFILES = new Set();
     let SELECTED_EVENT_INDEX = -1;
     let URL_HYDRATED = false;
+    let SIMPLE_MODE = localStorage.getItem('nautilusSimpleMode') !== '0';
+
+    function applySimpleMode(){
+      document.body.classList.toggle('simple-mode', SIMPLE_MODE);
+      const b = document.getElementById('toggle-simple-mode');
+      if(b) b.textContent = SIMPLE_MODE ? '상세 모드' : '초보 모드';
+    }
 
     async function getText(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.text(); }
     async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
@@ -565,6 +589,7 @@
       }
       renderTeamVisualizer(document.getElementById('team-visualizer'));
       renderTeamBoard();
+      renderStreamBoard();
       syncUrlWithFilters();
       loadGenerationHistory();
       loadOpsHistory();
@@ -1217,6 +1242,45 @@
       });
     }
 
+    function renderStreamBoard(){
+      const root = document.getElementById('stream-board');
+      if(!root) return;
+      const streams = ['physio_bot','overnight','mem'];
+      const statusColor = {'PASS':'#33d17a','PASS*':'#8de6b3','CHECK':'#f6c453','FAIL':'#ff6b6b','PENDING':'#8fa3c7'};
+      const avatarByProfile = {
+        'physio-orchestrator':'🧠','physio-planner':'🗺️','physio-frontend':'🦊',
+        'physio-backend':'🦫','physio-qa':'🐸','physio-ops-reporter':'🛰️'
+      };
+      const latestMap = new Map();
+      CURRENT_EVENTS.forEach(e => {
+        const p = e.profile_id || 'unknown';
+        latestMap.set(`${streamOf(e)}::${p}`, e);
+      });
+
+      root.innerHTML = streams.map(s => {
+        const rows = [...latestMap.entries()].filter(([k]) => k.startsWith(`${s}::`)).map(([,v]) => v);
+        const chips = rows.length ? rows.map(e => {
+          const p = e.profile_id || 'unknown';
+          const st = e.status || 'PENDING';
+          const col = statusColor[st] || '#8fa3c7';
+          return `<div class="agent-chip" data-profile="${p}">
+            <span class="agent-pulse" style="background:${col}"></span>
+            <div class="agent-label"><span class="agent-avatar">${avatarByProfile[p] || '🤖'}</span><span><span class="agent-dot" style="background:${col}"></span>${p.replace('physio-','')}</span></div>
+            <div class="agent-mini">${st} · ${e.wave_id || '-'}</div>
+          </div>`;
+        }).join('') : '<div class="agent-mini">데이터 없음</div>';
+        return `<div class="team-card"><div class="team-head"><div class="team-name">${s}</div><div class="team-meta">${rows.length}개 이벤트</div></div><div class="agent-row2">${chips}</div></div>`;
+      }).join('');
+
+      root.querySelectorAll('.agent-chip[data-profile]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          const profile = ev.currentTarget.getAttribute('data-profile');
+          if(!profile || profile === 'unknown') return;
+          focusProfile(profile, false);
+        });
+      });
+    }
+
     function activateCenterTab(target='center-actions'){
       const group = document.querySelector('[data-tabs="center"]');
       if(!group) return;
@@ -1419,6 +1483,12 @@
 
     bindTabs();
     bindActions();
+    applySimpleMode();
+    document.getElementById('toggle-simple-mode')?.addEventListener('click', () => {
+      SIMPLE_MODE = !SIMPLE_MODE;
+      localStorage.setItem('nautilusSimpleMode', SIMPLE_MODE ? '1' : '0');
+      applySimpleMode();
+    });
     boot(); setInterval(boot, 10000);
     document.getElementById('filter-wave').addEventListener('change', applyFilters);
     document.getElementById('filter-stream')?.addEventListener('change', applyFilters);
