@@ -45,7 +45,8 @@
     .agent-chip{position:relative;border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-width:90px;background:#132038;cursor:pointer}
     .agent-chip.selected{border-color:#ffffff;box-shadow:0 0 0 1px #ffffff inset}
     .agent-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
-    .agent-label{font-size:11px;color:#dce9ff}
+    .agent-label{font-size:11px;color:#dce9ff;display:flex;align-items:center;gap:6px}
+    .agent-avatar{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;background:#1a2a45;border:1px solid #2c4572}
     .agent-mini{font-size:10px;color:var(--muted)}
     .agent-pulse{position:absolute;right:6px;top:6px;width:6px;height:6px;border-radius:50%;background:#6ea8ff;animation:pulse 1.4s infinite}
     .team-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
@@ -1135,6 +1136,16 @@
         {key:'decision', label:'결정요청'}
       ];
       const latestByProfile = new Map();
+      const avatarByProfile = {
+        'physio-orchestrator':'🧠','physio-planner':'🗺️','physio-frontend':'🦊',
+        'physio-backend':'🦫','physio-qa':'🐸','physio-ops-reporter':'🛰️'
+      };
+      const repoOf = (e) => {
+        const c = e?.links?.commit || '';
+        const m = String(c).match(/github\.com\/([^/]+\/[^/]+)\//);
+        return m ? m[1] : (e?.repo_id || '-');
+      };
+      const threadOf = (e) => e?.thread_id || e?.channel_thread_id || e?.meta?.thread_id || '-';
       CURRENT_EVENTS.forEach(e => latestByProfile.set(e.profile_id, e));
 
       root.innerHTML = groups.map(g => {
@@ -1145,10 +1156,14 @@
           const selected = SELECTED_PROFILES.has(p) ? ' selected' : '';
           const name = p.replace('physio-','');
           const wave = e.wave_id || '-';
+          const avatar = avatarByProfile[p] || '🤖';
+          const repo = repoOf(e);
+          const thread = threadOf(e);
           return `<div class="agent-chip${selected}" data-profile="${p}">
             <span class="agent-pulse" style="background:${col}"></span>
-            <div class="agent-label"><span class="agent-dot" style="background:${col}"></span>${name}</div>
+            <div class="agent-label"><span class="agent-avatar">${avatar}</span><span><span class="agent-dot" style="background:${col}"></span>${name}</span></div>
             <div class="agent-mini">${st} · wave ${wave}</div>
+            <div class="agent-mini">repo ${repo} · thread ${thread}</div>
           </div>`;
         }).join('');
         const actions = teamActions.map(a => `<button class="team-action-btn" data-team="${g.name}" data-action="${a.key}">${a.label}</button>`).join('');
