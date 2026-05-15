@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Physio Nautilus 운영 대시보드</title>
+  <title>Nautilus 운영 대시보드</title>
   <style>
     :root{--bg:#0a0f1c;--panel:#121a2b;--panel2:#0f1726;--line:#23324d;--txt:#e6edf7;--muted:#8fa3c7;--ok:#33d17a;--warn:#f6c453;--bad:#ff6b6b;--acc:#6ea8ff}
     *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2b55 0%,var(--bg) 45%);color:var(--txt);font-family:Inter,system-ui,sans-serif}
@@ -144,7 +144,7 @@
 <body>
   <div class="app">
   <aside class="sidebar">
-    <div class="side-brand">Nautilus Control</div>
+    <div class="side-brand">Agent Control</div>
     <nav class="side-nav">
       <a href="#kpi-section">요약 지표</a>
       <a href="#timeline-section">라인리지 타임라인</a>
@@ -157,7 +157,7 @@
   </aside>
   <div class="main-col">
   <header class="top">
-    <div class="brand">Physio Nautilus 운영 대시보드</div>
+    <div class="brand">Nautilus 운영 대시보드</div>
     <div class="top-badges">
       <span class="badge">실시간 / JSONL</span>
       <span class="badge" id="ctl-spawn">스폰: -</span>
@@ -212,7 +212,7 @@
     </section>
 
     <section class="team-board" id="stream-board-section">
-      <div class="section-title">채널/쓰레드별 에이전트 보드 (physio_bot / overnight / mem)</div>
+      <div class="section-title">채널/쓰레드별 에이전트 보드</div>
       <div class="team-grid" id="stream-board"></div>
     </section>
 
@@ -365,6 +365,9 @@
       if(run.includes('physio_bot') || run.includes('physio-bot')) return 'physio_bot';
       return 'unmapped';
     }
+    function displayProfileName(p){
+      return String(p || '').replace(/^physio-/, '').replace(/^agent-/, '') || '-';
+    }
     function statusKo(st){
       const k = String(st || '').toUpperCase();
       const map = { PASS: '통과', 'PASS*': '주의통과', CHECK: '검토필요', FAIL: '실패', PENDING: '대기' };
@@ -409,6 +412,9 @@
       return {level:'warn', title: statusKo(st), hint:'상태 정보 확인 필요', checklist:'[1] 상태 원문 확인 → [2] 수동 점검 수행'};
     }
     const NAUTILUS_CONFIG = (window.NAUTILUS_CONFIG || {});
+    const DASHBOARD_TITLE = (NAUTILUS_CONFIG.dashboardTitle || 'Nautilus 운영 대시보드').trim();
+    document.title = DASHBOARD_TITLE;
+    const brandEl = document.querySelector('.brand'); if(brandEl) brandEl.textContent = DASHBOARD_TITLE;
     const DEFAULT_LOCAL_API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
       ? `${location.protocol}//${location.hostname}:8788`
       : 'http://127.0.0.1:8788';
@@ -1124,7 +1130,7 @@
         out += `<line x1="${cx}" y1="${cy+34}" x2="${x}" y2="${ay-18}" stroke="#3e5f8f" stroke-width="1.5" stroke-dasharray="3 3"/>`;
         out += `<circle data-profile="${p}" cx="${x}" cy="${ay}" r="${selected ? 18 : 16}" fill="#152239" stroke="${selected ? '#ffffff' : col}" stroke-width="${selected ? 3 : 2}" style="cursor:pointer"/>`;
         out += `<text data-profile="${p}" x="${x}" y="${ay+4}" text-anchor="middle" font-size="9" fill="#e8f0ff" style="cursor:pointer">${statusKo(st)}</text>`;
-        const short = p.replace('physio-','').slice(0,10);
+        const short = displayProfileName(p).slice(0,10);
         out += `<text data-profile="${p}" x="${x}" y="${ay+28}" text-anchor="middle" font-size="9" fill="${selected ? '#ffffff' : '#9fb4d6'}" style="cursor:pointer">${short}</text>`;
       });
       svg.innerHTML = out;
@@ -1153,7 +1159,7 @@
         const st = latest.status || 'PENDING';
         const col = statusColor[st] || '#8fa3c7';
         const selected = SELECTED_PROFILES.has(p);
-        const short = p.replace('physio-','');
+        const short = displayProfileName(p);
         const xStart = 170 + ((i % 3) * 60);
         const xEnd = 710 - ((i % 2) * 80);
         const dur = 4 + (i % 4);
@@ -1213,7 +1219,7 @@
           const st = e.status || 'PENDING';
           const col = statusColor[st] || '#8fa3c7';
           const selected = SELECTED_PROFILES.has(p) ? ' selected' : '';
-          const name = p.replace('physio-','');
+          const name = displayProfileName(p);
           const wave = e.wave_id || '-';
           const avatar = avatarByProfile[p] || '🤖';
           const repo = repoOf(e);
@@ -1273,7 +1279,7 @@
           const col = statusColor[st] || '#8fa3c7';
           return `<div class="agent-chip" data-profile="${p}">
             <span class="agent-pulse" style="background:${col}"></span>
-            <div class="agent-label"><span class="agent-avatar">${avatarByProfile[p] || '🤖'}</span><span><span class="agent-dot" style="background:${col}"></span>${p.replace('physio-','')}</span></div>
+            <div class="agent-label"><span class="agent-avatar">${avatarByProfile[p] || '🤖'}</span><span><span class="agent-dot" style="background:${col}"></span>${displayProfileName(p)}</span></div>
             <div class="agent-mini">${st} · ${e.wave_id || '-'}</div>
           </div>`;
         }).join('') : '<div class="agent-mini">데이터 없음</div>';

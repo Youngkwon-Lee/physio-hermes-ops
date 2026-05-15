@@ -3,5 +3,6 @@
 // - Vercel/외부 배포 시 여기에 공개 가능한 read-only API endpoint를 넣어 사용
 //   예) window.NAUTILUS_CONFIG = { opsApiBaseUrl: 'https://ops-api.example.com' };
 window.NAUTILUS_CONFIG = window.NAUTILUS_CONFIG || {
+  // dashboardTitle: 'Nautilus 운영 대시보드',
   // opsApiBaseUrl: 'https://ops-api.example.com'
 };
