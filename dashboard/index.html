@@ -330,6 +330,7 @@
     function parseJsonl(txt){ return txt.split('\n').map(s=>s.trim()).filter(Boolean).map(JSON.parse); }
     function pickTs(e){ return e.timestamp || e.ts || ''; }
     function streamOf(e){
+      if(e?.stream_id) return String(e.stream_id);
       const t = e?.thread_id || e?.channel_thread_id || e?.meta?.thread_id;
       if(t) return `thread:${t}`;
       const c = e?.channel_id || e?.meta?.channel_id;

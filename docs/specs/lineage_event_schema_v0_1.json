@@ -31,7 +31,7 @@
         "physio-ops-reporter"
       ]
     },
-    "stage": { "type": "string", "enum": ["plan", "build", "verify", "orchestrate", "report"] },
+    "stage": { "type": "string", "enum": ["plan", "build", "verify", "orchestrate", "report", "dispatch"] },
     "status": { "type": "string", "enum": ["PASS", "PASS*", "CHECK", "FAIL"] },
     "exit_code": { "type": ["integer", "null"] },
     "artifact_paths": {
@@ -42,6 +42,11 @@
     "cost_tokens": { "type": "integer", "minimum": 0 },
     "retry_count": { "type": "integer", "minimum": 0 },
     "notes": { "type": "string" },
+    "stream_id": { "type": "string", "description": "Logical channel/thread stream (e.g. mem, overnight, thread:123)" },
+    "channel_id": { "type": ["string", "null"] },
+    "thread_id": { "type": ["string", "null"] },
+    "channel_name": { "type": ["string", "null"] },
+    "thread_name": { "type": ["string", "null"] },
     "links": {
       "type": "object",
       "properties": {

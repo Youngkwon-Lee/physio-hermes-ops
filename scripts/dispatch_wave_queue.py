@@ -4,6 +4,8 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from lineage_stream_context import build_stream_context
+
 ROOT = Path(__file__).resolve().parents[1]
 LINEAGE_DIR = ROOT / "lineage"
 REPORT_DIR = ROOT / "docs" / "reports" / "waves"
@@ -154,6 +156,7 @@ def main():
         "notes": result["goal"],
         "links": {"commit": None, "pr": None, "report": str(report_path.relative_to(ROOT))},
     }
+    event.update(build_stream_context(event["run_id"]))
     append_event(event)
 
     state["task_index"] = tidx + 1

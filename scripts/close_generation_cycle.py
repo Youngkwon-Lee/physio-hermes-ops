@@ -3,6 +3,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from lineage_stream_context import build_stream_context
+
 ROOT = Path(__file__).resolve().parents[1]
 EVENTS_PATH = ROOT / "lineage" / "events.jsonl"
 OUT_PATH = ROOT / "lineage" / "generation_cycle_state.json"
@@ -70,6 +72,7 @@ def append_close_event(all_events: list[dict], state: dict):
             "report": "lineage/generation_cycle_state.json",
         },
     }
+    event.update(build_stream_context(run_id))
 
     with EVENTS_PATH.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
