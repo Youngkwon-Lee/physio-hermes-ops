@@ -97,11 +97,11 @@
     .agent-row{display:flex;justify-content:space-between;align-items:center}
     .tag{font-size:11px;padding:2px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
     .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}.ok{background:var(--ok)}.warn{background:var(--warn)}.bad{background:var(--bad)}
-    .timeline-item{padding:10px;border-left:2px solid var(--line);margin-left:8px;position:relative;cursor:pointer;border-radius:8px}
-    .timeline-item:hover{background:#132038}
-    .timeline-item.active{background:#182846;border-left-color:var(--acc)}
-    .timeline-item::before{content:'';position:absolute;left:-6px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--acc)}
-    .timeline-item.gen-close{border-left-color:#b889ff;background:rgba(115,86,173,0.18)}
+    .timeline-item{padding:10px 12px;border:1px solid var(--line2);margin:0 0 8px 0;position:relative;cursor:pointer;border-radius:10px;background:rgba(255,255,255,.02)}
+    .timeline-item:hover{background:rgba(255,255,255,.05)}
+    .timeline-item.active{background:rgba(113,112,255,.18);border-color:#7170ff}
+    .timeline-item::before{content:'';position:absolute;left:8px;top:14px;width:8px;height:8px;border-radius:50%;background:var(--acc)}
+    .timeline-item.gen-close{border-color:#8d6bc8;background:rgba(115,86,173,0.18)}
     .timeline-item.gen-close::before{background:#c89bff}
     .timeline-split{display:grid;grid-template-columns:1fr 320px;gap:10px}
     .mini-detail{border:1px solid var(--line);border-radius:10px;padding:10px;background:#0f1726;position:sticky;top:78px;height:fit-content}
@@ -114,8 +114,8 @@
     .pin{border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:8px 10px;background:#1b2436;margin-bottom:10px}
     .pin.bad{border-left-color:var(--bad);background:#2a1c2a}
     .pin.ok{border-left-color:var(--ok);background:#172a23}
-    .collapsible{border:1px solid var(--line);border-radius:10px;background:#10182a;margin-bottom:10px}
-    .collapsible summary{cursor:pointer;padding:8px 10px;color:var(--muted);font-size:12px;list-style:none}
+    .collapsible{border:1px solid var(--line2);border-radius:10px;background:#111317;margin-bottom:10px;box-shadow:none}
+    .collapsible summary{cursor:pointer;padding:8px 10px;color:var(--muted);font-size:12px;list-style:none;font-weight:600}
     .collapsible summary::-webkit-details-marker{display:none}
     .collapsible .content{padding:0 10px 10px 10px}
     .fsm-svg{width:100%;height:170px;border:1px solid var(--line);border-radius:10px;background:#0f1726}
@@ -283,7 +283,7 @@
             </select>
           </div>
           <div class="timeline-split">
-            <div id="timeline"></div>
+            <div id="timeline" class="list-group list-group-flush"></div>
             <div class="mini-detail" id="lineage-mini-detail">
               <div class="muted" style="margin-bottom:6px">선택 이벤트 요약</div>
               <div id="ld-wave"><strong>-</strong></div>
@@ -324,19 +324,19 @@
             <div class="queue-item"><div class="muted">이벤트 ID</div><div id="d-eid">-</div></div>
             <div class="queue-item"><div class="muted">status</div><div id="d-status">-</div></div>
           </div>
-          <details class="collapsible" open>
+          <details class="collapsible card" open>
             <summary>요약</summary>
             <div class="content"><div id="d-summary">타임라인 항목을 선택하세요</div></div>
           </details>
-          <details class="collapsible">
+          <details class="collapsible card">
             <summary>세대사이클 종료 요약</summary>
             <div class="content"><pre id="d-gen-close">-</pre></div>
           </details>
-          <details class="collapsible" open>
+          <details class="collapsible card" open>
             <summary>연결된 리포트 (json)</summary>
             <div class="content"><pre id="d-report">-</pre></div>
           </details>
-          <details class="collapsible">
+          <details class="collapsible card">
             <summary>ralph 상세</summary>
             <div class="content"><pre id="d-ralph">-</pre></div>
           </details>
@@ -650,7 +650,7 @@
       const box = document.getElementById('timeline'); box.innerHTML = '';
       const recent = events.slice(-10);
       recent.forEach((e, idx) => {
-        const div = document.createElement('div'); div.className = 'timeline-item';
+        const div = document.createElement('div'); div.className = 'timeline-item list-group-item';
         const isGenClose = String(e.run_id || '').startsWith('generation-close-');
         if (isGenClose) div.classList.add('gen-close');
         const label = isGenClose ? '♻️ GEN-CLOSE · ' : '';
