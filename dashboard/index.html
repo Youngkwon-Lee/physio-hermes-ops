@@ -43,6 +43,7 @@
     .team-meta{font-size:11px;color:var(--muted)}
     .agent-row2{display:flex;flex-wrap:wrap;gap:8px}
     .agent-chip{position:relative;border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-width:90px;background:#132038;cursor:pointer}
+    .agent-chip.moving{animation:agentFloat 2.4s ease-in-out infinite}
     .agent-chip.selected{border-color:#ffffff;box-shadow:0 0 0 1px #ffffff inset}
     .agent-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
     .agent-label{font-size:11px;color:#dce9ff;display:flex;align-items:center;gap:6px}
@@ -63,6 +64,7 @@
     .feed-item{border:1px solid #23324d;border-radius:8px;padding:7px;margin-bottom:6px;background:#0f1726;font-size:12px}
     .feed-item .muted{font-size:11px}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
+    @keyframes agentFloat{0%{transform:translateY(0px)}50%{transform:translateY(-4px)}100%{transform:translateY(0px)}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
     .filters select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:36px}
@@ -1335,7 +1337,9 @@
           const st = e.status || 'PENDING';
           const col = statusColor[st] || '#8fa3c7';
           const selected = SELECTED_PROFILES.has(p) ? ' selected' : '';
-          return `<div class="agent-chip${selected}" data-profile="${p}">
+          const moving = ['PASS','PASS*','CHECK'].includes(st) ? ' moving' : '';
+          const delay = (p.length % 5) * 0.25;
+          return `<div class="agent-chip${selected}${moving}" data-profile="${p}" style="animation-delay:${delay}s">
             <span class="agent-pulse" style="background:${col}"></span>
             <div class="agent-label"><span class="agent-avatar">${avatarByProfile[p] || '🤖'}</span><span><span class="agent-dot" style="background:${col}"></span>${displayProfileName(p)}</span></div>
             <div class="agent-mini">${st} · ${streamOf(e)}</div>
