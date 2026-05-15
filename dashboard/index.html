@@ -35,6 +35,20 @@
     .visualizer svg{width:100%;height:230px;display:block}
     .v-legend{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
     .v-row{font-size:11px;color:var(--muted)}
+    .team-board{margin-bottom:14px}
+    .team-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .team-card{background:linear-gradient(180deg,#101a2d,#0f1726);border:1px solid var(--line);border-radius:12px;padding:10px}
+    .team-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .team-name{font-size:13px;font-weight:700}
+    .team-meta{font-size:11px;color:var(--muted)}
+    .agent-row2{display:flex;flex-wrap:wrap;gap:8px}
+    .agent-chip{position:relative;border:1px solid var(--line);border-radius:10px;padding:6px 8px;min-width:90px;background:#132038;cursor:pointer}
+    .agent-chip.selected{border-color:#ffffff;box-shadow:0 0 0 1px #ffffff inset}
+    .agent-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+    .agent-label{font-size:11px;color:#dce9ff}
+    .agent-mini{font-size:10px;color:var(--muted)}
+    .agent-pulse{position:absolute;right:6px;top:6px;width:6px;height:6px;border-radius:50%;background:#6ea8ff;animation:pulse 1.4s infinite}
+    @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
     .filters select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:36px}
@@ -79,6 +93,7 @@
       .app{grid-template-columns:1fr}
       .sidebar{display:none}
       .hero-grid{grid-template-columns:1fr}
+      .team-grid{grid-template-columns:1fr 1fr}
       .layout{grid-template-columns:1fr}
       .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
       .two-col{grid-template-columns:1fr}
@@ -93,6 +108,7 @@
       .top-badges .badge{flex:0 0 auto}
       .brand{font-size:15px}
       .kpis{grid-template-columns:1fr 1fr;gap:10px}
+      .team-grid{grid-template-columns:1fr}
       .value{font-size:24px}
       .section-title{font-size:12px}
     }
@@ -171,6 +187,11 @@
           </div>
         </div>
       </div>
+    </section>
+
+    <section class="team-board" id="team-board-section">
+      <div class="section-title">팀별 에이전트 보드 (connect-ai 스타일)</div>
+      <div class="team-grid" id="team-board"></div>
     </section>
 
     <section class="layout">
@@ -512,6 +533,7 @@
         renderFsmAgentGraph(agSvg, fsmCurrent);
       }
       renderTeamVisualizer(document.getElementById('team-visualizer'));
+      renderTeamBoard();
       syncUrlWithFilters();
       loadGenerationHistory();
       loadOpsHistory();
@@ -1089,6 +1111,49 @@
         if(!profile) return;
         focusProfile(profile, !!ev.shiftKey);
       };
+    }
+
+    function renderTeamBoard(){
+      const root = document.getElementById('team-board');
+      if(!root) return;
+      const statusColor = {'PASS':'#33d17a','PASS*':'#8de6b3','CHECK':'#f6c453','FAIL':'#ff6b6b','PENDING':'#8fa3c7'};
+      const groups = [
+        {name:'Web Platform', key:'프론트/UX', profiles:['physio-frontend']},
+        {name:'API Gateway', key:'백엔드/플래너', profiles:['physio-backend','physio-planner']},
+        {name:'Orchestration', key:'오케스트레이터', profiles:['physio-orchestrator']},
+        {name:'Quality', key:'QA', profiles:['physio-qa']},
+        {name:'Ops/Reporter', key:'운영/리포트', profiles:['physio-ops-reporter']}
+      ];
+      const latestByProfile = new Map();
+      CURRENT_EVENTS.forEach(e => latestByProfile.set(e.profile_id, e));
+
+      root.innerHTML = groups.map(g => {
+        const chips = g.profiles.map(p => {
+          const e = latestByProfile.get(p) || {};
+          const st = e.status || 'PENDING';
+          const col = statusColor[st] || '#8fa3c7';
+          const selected = SELECTED_PROFILES.has(p) ? ' selected' : '';
+          const name = p.replace('physio-','');
+          const wave = e.wave_id || '-';
+          return `<div class="agent-chip${selected}" data-profile="${p}">
+            <span class="agent-pulse" style="background:${col}"></span>
+            <div class="agent-label"><span class="agent-dot" style="background:${col}"></span>${name}</div>
+            <div class="agent-mini">${st} · wave ${wave}</div>
+          </div>`;
+        }).join('');
+        return `<div class="team-card">
+          <div class="team-head"><div class="team-name">${g.name}</div><div class="team-meta">${g.key}</div></div>
+          <div class="agent-row2">${chips}</div>
+        </div>`;
+      }).join('');
+
+      root.querySelectorAll('.agent-chip[data-profile]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          const profile = ev.currentTarget.getAttribute('data-profile');
+          if(!profile) return;
+          focusProfile(profile, !!ev.shiftKey);
+        });
+      });
     }
 
     function focusProfile(profile, additive=false){
