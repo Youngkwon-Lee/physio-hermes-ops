@@ -48,6 +48,9 @@
     .agent-label{font-size:11px;color:#dce9ff}
     .agent-mini{font-size:10px;color:var(--muted)}
     .agent-pulse{position:absolute;right:6px;top:6px;width:6px;height:6px;border-radius:50%;background:#6ea8ff;animation:pulse 1.4s infinite}
+    .team-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+    .team-action-btn{border:1px solid var(--line);background:#0f1a2d;color:#dce9ff;border-radius:8px;padding:6px 8px;font-size:11px;cursor:pointer;text-align:left}
+    .team-action-btn:hover{background:#182846}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
@@ -1124,6 +1127,12 @@
         {name:'Quality', key:'QA', profiles:['physio-qa']},
         {name:'Ops/Reporter', key:'운영/리포트', profiles:['physio-ops-reporter']}
       ];
+      const teamActions = [
+        {key:'chat', label:'대화'},
+        {key:'report', label:'보고서'},
+        {key:'opinion', label:'의견서'},
+        {key:'decision', label:'결정요청'}
+      ];
       const latestByProfile = new Map();
       CURRENT_EVENTS.forEach(e => latestByProfile.set(e.profile_id, e));
 
@@ -1141,9 +1150,11 @@
             <div class="agent-mini">${st} · wave ${wave}</div>
           </div>`;
         }).join('');
+        const actions = teamActions.map(a => `<button class="team-action-btn" data-team="${g.name}" data-action="${a.key}">${a.label}</button>`).join('');
         return `<div class="team-card">
           <div class="team-head"><div class="team-name">${g.name}</div><div class="team-meta">${g.key}</div></div>
           <div class="agent-row2">${chips}</div>
+          <div class="team-actions">${actions}</div>
         </div>`;
       }).join('');
 
@@ -1152,6 +1163,13 @@
           const profile = ev.currentTarget.getAttribute('data-profile');
           if(!profile) return;
           focusProfile(profile, !!ev.shiftKey);
+        });
+      });
+      root.querySelectorAll('.team-action-btn[data-action]').forEach(el => {
+        el.addEventListener('click', () => {
+          const actionLabel = el.textContent?.trim() || '액션';
+          const team = el.getAttribute('data-team') || '팀';
+          setActionFeedback(`[팀 보드] ${team} · ${actionLabel} 요청 준비됨`);
         });
       });
     }
