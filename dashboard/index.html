@@ -79,10 +79,10 @@
     @keyframes agentFloat{0%{transform:translateY(0px)}50%{transform:translateY(-4px)}100%{transform:translateY(0px)}}
     @keyframes stageStep{0%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + 1px),calc(-50% - 3px))}100%{transform:translate(-50%,-50%)}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
-    .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-    .filters select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;min-height:36px}
-    .actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px 0}
-    .actions select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;min-height:36px}
+    .filters{margin-bottom:10px}
+    .filters .form-select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;min-height:36px}
+    .actions{margin:0 0 10px 0}
+    .actions .form-select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;min-height:36px}
     .tabs{display:flex;gap:8px;margin:0 0 10px 0;flex-wrap:wrap}
     .tab-btn{background:#111317;color:var(--muted);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;min-height:36px}
     .tab-btn.active{color:var(--txt);border-color:#7170ff;background:rgba(113,112,255,.18)}
@@ -264,23 +264,23 @@
           <button class="tab-btn" data-tab-target="center-actions">액션</button>
         </div>
         <div class="tab-pane active" data-tab-pane="center-lineage">
-          <div class="filters">
-            <select id="filter-wave"><option value="ALL">웨이브: 전체</option></select>
-            <select id="filter-profile"><option value="ALL">프로필: 전체</option></select>
-            <select id="filter-stream"><option value="ALL">채널/쓰레드: 전체</option></select>
-            <select id="filter-status">
+          <div class="filters row g-2">
+            <div class="col-12 col-md-6 col-lg-3"><select class="form-select" id="filter-wave"><option value="ALL">웨이브: 전체</option></select></div>
+            <div class="col-12 col-md-6 col-lg-3"><select class="form-select" id="filter-profile"><option value="ALL">프로필: 전체</option></select></div>
+            <div class="col-12 col-md-6 col-lg-3"><select class="form-select" id="filter-stream"><option value="ALL">채널/쓰레드: 전체</option></select></div>
+            <div class="col-12 col-md-6 col-lg-3"><select class="form-select" id="filter-status">
               <option value="ALL">상태: 전체</option>
               <option value="PASS">PASS</option>
               <option value="PASS*">PASS*</option>
               <option value="CHECK">CHECK</option>
               <option value="FAIL">FAIL</option>
-            </select>
-            <select id="sort-mode">
+            </select></div>
+            <div class="col-12 col-lg-3"><select class="form-select" id="sort-mode">
               <option value="time_desc">정렬: 최신순</option>
               <option value="time_asc">정렬: 오래된순</option>
               <option value="score_desc">정렬: 점수 높은순</option>
               <option value="score_asc">정렬: 점수 낮은순</option>
-            </select>
+            </select></div>
           </div>
           <div class="timeline-split">
             <div id="timeline" class="list-group list-group-flush"></div>
@@ -293,15 +293,15 @@
           </div>
         </div>
         <div class="tab-pane" data-tab-pane="center-actions">
-          <div class="actions">
-            <button class="btn" id="act-refresh">지금 새로고침(실행)</button>
-            <button class="btn" id="act-copy-pause">cron 전체 pause 실행</button>
-            <button class="btn" id="act-copy-resume-core">core cron resume 실행</button>
-            <button class="btn" id="act-copy-finalize">generation finalize 1회 실행</button>
-            <button class="btn" id="act-set-read-token">READ 토큰 설정</button>
-            <button class="btn" id="act-set-exec-admin-token">EXEC ADMIN 토큰 설정</button>
-            <button class="btn" id="act-set-exec-operator-token">EXEC OPERATOR 토큰 설정</button>
-            <select id="exec-role-mode">
+          <div class="actions d-flex flex-wrap gap-2 align-items-center">
+            <button class="btn btn-outline-light" id="act-refresh">지금 새로고침(실행)</button>
+            <button class="btn btn-outline-light" id="act-copy-pause">cron 전체 pause 실행</button>
+            <button class="btn btn-outline-light" id="act-copy-resume-core">core cron resume 실행</button>
+            <button class="btn btn-outline-light" id="act-copy-finalize">generation finalize 1회 실행</button>
+            <button class="btn btn-outline-light" id="act-set-read-token">READ 토큰 설정</button>
+            <button class="btn btn-outline-light" id="act-set-exec-admin-token">EXEC ADMIN 토큰 설정</button>
+            <button class="btn btn-outline-light" id="act-set-exec-operator-token">EXEC OPERATOR 토큰 설정</button>
+            <select class="form-select" style="max-width:220px" id="exec-role-mode">
               <option value="operator">실행 권한: 운영자</option>
               <option value="admin">실행 권한: 관리자</option>
             </select>
