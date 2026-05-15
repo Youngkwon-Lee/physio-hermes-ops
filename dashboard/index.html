@@ -52,6 +52,12 @@
     .team-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
     .team-action-btn{border:1px solid var(--line);background:#0f1a2d;color:#dce9ff;border-radius:8px;padding:6px 8px;font-size:11px;cursor:pointer;text-align:left}
     .team-action-btn:hover{background:#182846}
+    .workspace{margin-bottom:14px}
+    .workspace-map{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .zone{border:1px solid var(--line);border-radius:12px;background:#101a2d;padding:10px}
+    .zone-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .zone-title{font-size:12px;font-weight:700}
+    .zone-meta{font-size:11px;color:var(--muted)}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
@@ -110,6 +116,7 @@
       .sidebar{display:none}
       .hero-grid{grid-template-columns:1fr}
       .team-grid{grid-template-columns:1fr 1fr}
+      .workspace-map{grid-template-columns:1fr 1fr}
       .layout{grid-template-columns:1fr}
       .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
       .two-col{grid-template-columns:1fr}
@@ -125,6 +132,7 @@
       .brand{font-size:15px}
       .kpis{grid-template-columns:1fr 1fr;gap:10px}
       .team-grid{grid-template-columns:1fr}
+      .workspace-map{grid-template-columns:1fr}
       .value{font-size:24px}
       .section-title{font-size:12px}
     }
@@ -214,6 +222,11 @@
     <section class="team-board" id="stream-board-section">
       <div class="section-title">채널/쓰레드별 에이전트 보드</div>
       <div class="team-grid" id="stream-board"></div>
+    </section>
+
+    <section class="workspace" id="workspace-section">
+      <div class="section-title">에이전트 작업 공간 (실시간 위치형)</div>
+      <div class="workspace-map" id="workspace-map"></div>
     </section>
 
     <section class="layout">
@@ -603,6 +616,7 @@
       renderTeamVisualizer(document.getElementById('team-visualizer'));
       renderTeamBoard();
       renderStreamBoard();
+      renderWorkspaceMap();
       syncUrlWithFilters();
       loadGenerationHistory();
       loadOpsHistory();
@@ -1291,6 +1305,47 @@
           const profile = ev.currentTarget.getAttribute('data-profile');
           if(!profile || profile === 'unknown') return;
           focusProfile(profile, false);
+        });
+      });
+    }
+
+    function renderWorkspaceMap(){
+      const root = document.getElementById('workspace-map');
+      if(!root) return;
+      const statusColor = {'PASS':'#33d17a','PASS*':'#8de6b3','CHECK':'#f6c453','FAIL':'#ff6b6b','PENDING':'#8fa3c7'};
+      const avatarByProfile = {
+        'physio-orchestrator':'🧠','physio-planner':'🗺️','physio-frontend':'🦊',
+        'physio-backend':'🦫','physio-qa':'🐸','physio-ops-reporter':'🛰️'
+      };
+      const zones = [
+        {name:'기획실', key:'planner', profiles:['physio-planner']},
+        {name:'개발실', key:'build', profiles:['physio-frontend','physio-backend']},
+        {name:'품질/운영실', key:'ops', profiles:['physio-qa','physio-orchestrator','physio-ops-reporter']}
+      ];
+      const latestByProfile = new Map();
+      CURRENT_EVENTS.forEach(e => latestByProfile.set(e.profile_id, e));
+
+      root.innerHTML = zones.map(z => {
+        const chips = z.profiles.map(p => {
+          const e = latestByProfile.get(p) || {};
+          const st = e.status || 'PENDING';
+          const col = statusColor[st] || '#8fa3c7';
+          const selected = SELECTED_PROFILES.has(p) ? ' selected' : '';
+          return `<div class="agent-chip${selected}" data-profile="${p}">
+            <span class="agent-pulse" style="background:${col}"></span>
+            <div class="agent-label"><span class="agent-avatar">${avatarByProfile[p] || '🤖'}</span><span><span class="agent-dot" style="background:${col}"></span>${displayProfileName(p)}</span></div>
+            <div class="agent-mini">${st} · ${streamOf(e)}</div>
+          </div>`;
+        }).join('');
+        const activeCount = z.profiles.filter(p => latestByProfile.has(p)).length;
+        return `<div class="zone"><div class="zone-head"><div class="zone-title">${z.name}</div><div class="zone-meta">${activeCount}/${z.profiles.length} active</div></div><div class="agent-row2">${chips}</div></div>`;
+      }).join('');
+
+      root.querySelectorAll('.agent-chip[data-profile]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          const profile = ev.currentTarget.getAttribute('data-profile');
+          if(!profile) return;
+          focusProfile(profile, !!ev.shiftKey);
         });
       });
     }
