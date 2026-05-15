@@ -64,6 +64,7 @@
     .tab-pane.active{display:block}
     .btn{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;min-height:36px}
     .btn:hover{background:#182846}
+    .btn.active{border-color:#6ea8ff;box-shadow:0 0 0 1px #6ea8ff inset}
     .cmdbox{margin-top:8px;border:1px dashed var(--line);border-radius:8px;padding:8px;font-size:12px;color:#c8d8f7;background:#0e1627;white-space:pre-wrap}
     .mini{font-size:12px;color:var(--muted)}
     .agent,.queue-item{display:block;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#10182a}
@@ -1169,9 +1170,55 @@
         el.addEventListener('click', () => {
           const actionLabel = el.textContent?.trim() || '액션';
           const team = el.getAttribute('data-team') || '팀';
-          setActionFeedback(`[팀 보드] ${team} · ${actionLabel} 요청 준비됨`);
+          const actionKey = el.getAttribute('data-action') || '';
+          presetTeamAction(team, actionKey, actionLabel);
         });
       });
+    }
+
+    function activateCenterTab(target='center-actions'){
+      const group = document.querySelector('[data-tabs="center"]');
+      if(!group) return;
+      const buttons = group.querySelectorAll('.tab-btn');
+      const host = group.parentElement;
+      buttons.forEach(btn => {
+        const isActive = btn.getAttribute('data-tab-target') === target;
+        btn.classList.toggle('active', isActive);
+      });
+      host?.querySelectorAll('[data-tab-pane]').forEach(p => {
+        p.classList.toggle('active', p.getAttribute('data-tab-pane') === target);
+      });
+    }
+
+    function presetTeamAction(team, actionKey, actionLabel){
+      const teamProfiles = {
+        'Web Platform':['physio-frontend'],
+        'API Gateway':['physio-backend','physio-planner'],
+        'Orchestration':['physio-orchestrator'],
+        'Quality':['physio-qa'],
+        'Ops/Reporter':['physio-ops-reporter']
+      };
+      const actionButtonByKey = {
+        chat: 'act-refresh',
+        report: 'act-copy-finalize',
+        opinion: 'act-copy-resume-core',
+        decision: 'act-copy-pause'
+      };
+      const profiles = teamProfiles[team] || [];
+      if(profiles.length){
+        SELECTED_PROFILES = new Set(profiles);
+        const sel = document.getElementById('filter-profile');
+        if(sel){
+          sel.value = profiles.length === 1 ? profiles[0] : 'ALL';
+        }
+        applyFilters();
+      }
+      activateCenterTab('center-actions');
+      const actionBtnId = actionButtonByKey[actionKey];
+      document.getElementById(actionBtnId)?.classList.add('active');
+      setTimeout(() => document.getElementById(actionBtnId)?.classList.remove('active'), 900);
+      const profileText = profiles.length ? profiles.join(',') : '전체';
+      setActionFeedback(`[팀 보드 프리셋] ${team} · ${actionLabel} | profile=${profileText}`);
     }
 
     function focusProfile(profile, additive=false){
