@@ -14,8 +14,8 @@
     .sidebar{border-right:1px solid var(--line2);background:linear-gradient(180deg,#0c0d10,#090a0b);padding:14px 10px;position:sticky;top:0;height:100vh}
     .side-brand{font-weight:600;font-size:13px;padding:8px 10px;margin-bottom:10px;letter-spacing:.01em;color:#d4d7de}
     .side-nav{display:flex;flex-direction:column;gap:6px}
-    .side-nav a{color:var(--muted);text-decoration:none;padding:8px 10px;border:1px solid transparent;border-radius:8px;font-size:12px}
-    .side-nav a:hover{color:var(--txt);border-color:var(--line2);background:rgba(255,255,255,.03)}
+    .side-nav .nav-link{color:var(--muted)!important;text-decoration:none;padding:8px 10px;border:1px solid transparent;border-radius:8px;font-size:12px}
+    .side-nav .nav-link:hover{color:var(--txt)!important;border-color:var(--line2);background:rgba(255,255,255,.03)}
     .main-col{min-width:0}
     .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:rgba(8,9,10,.86);backdrop-filter:blur(8px);z-index:5}
     .brand{font-weight:600;letter-spacing:-.015em;font-size:15px}
@@ -24,7 +24,7 @@
     .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:#d4d7de}
     .pill-dot{width:6px;height:6px;border-radius:50%;background:#7170ff;display:inline-block}
     .wrap{max-width:1400px;margin:0 auto;padding:20px}
-    .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .kpis{margin-bottom:14px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line2);border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.22)}
     .kpi-card{position:relative;overflow:hidden}
     .kpi-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,rgba(113,112,255,.2),#7170ff)}
@@ -80,17 +80,17 @@
     @keyframes stageStep{0%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + 1px),calc(-50% - 3px))}100%{transform:translate(-50%,-50%)}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-    .filters select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:36px}
+    .filters select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;min-height:36px}
     .actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px 0}
-    .actions select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:36px}
+    .actions select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:8px 10px;min-height:36px}
     .tabs{display:flex;gap:8px;margin:0 0 10px 0;flex-wrap:wrap}
-    .tab-btn{background:#0f1a2d;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;min-height:36px}
-    .tab-btn.active{color:var(--txt);border-color:#3b5e90;background:#182846}
+    .tab-btn{background:#111317;color:var(--muted);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;min-height:36px}
+    .tab-btn.active{color:var(--txt);border-color:#7170ff;background:rgba(113,112,255,.18)}
     .tab-pane{display:none}
     .tab-pane.active{display:block}
-    .btn{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;min-height:36px}
-    .btn:hover{background:#182846}
-    .btn.active{border-color:#6ea8ff;box-shadow:0 0 0 1px #6ea8ff inset}
+    .btn{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;padding:8px 12px;cursor:pointer;font-size:12px;min-height:36px}
+    .btn:hover{background:rgba(255,255,255,.05)}
+    .btn.active{border-color:#7170ff;box-shadow:0 0 0 1px #7170ff inset}
     .cmdbox{margin-top:8px;border:1px dashed var(--line);border-radius:8px;padding:8px;font-size:12px;color:#c8d8f7;background:#0e1627;white-space:pre-wrap}
     .mini{font-size:12px;color:var(--muted)}
     .agent,.queue-item{display:block;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#10182a}
@@ -171,16 +171,16 @@
 </head>
 <body class="theme-dark">
   <div class="page app">
-  <aside class="sidebar">
-    <div class="side-brand">Agent Control</div>
-    <nav class="side-nav">
-      <a href="#kpi-section">요약 지표</a>
-      <a href="#timeline-section">라인리지 타임라인</a>
-      <a href="#profile-section">프로필 상태</a>
-      <a href="#detail-section">이벤트 상세</a>
-      <a href="#ops-history">운영 액션 이력</a>
-      <a href="#fsm-section">FSM / 에이전트 그래프</a>
-      <a href="#queue">웨이브 큐</a>
+  <aside class="sidebar navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+    <div class="side-brand navbar-brand">Agent Control</div>
+    <nav class="side-nav navbar-nav">
+      <a class="nav-link" href="#kpi-section">요약 지표</a>
+      <a class="nav-link" href="#timeline-section">라인리지 타임라인</a>
+      <a class="nav-link" href="#profile-section">프로필 상태</a>
+      <a class="nav-link" href="#detail-section">이벤트 상세</a>
+      <a class="nav-link" href="#ops-history">운영 액션 이력</a>
+      <a class="nav-link" href="#fsm-section">FSM / 에이전트 그래프</a>
+      <a class="nav-link" href="#queue">웨이브 큐</a>
     </nav>
   </aside>
   <div class="main-col">
@@ -200,10 +200,10 @@
     </div>
   </header>
   <main class="wrap">
-    <section class="kpis" id="kpi-section">
-      <div class="card kpi-card"><div class="label">전체 상태</div><div class="value" id="kpi-status">-</div></div>
-      <div class="card kpi-card"><div class="label">현재 작업 라운드</div><div class="value" id="kpi-wave">-</div></div>
-      <div class="card kpi-card"><div class="label">주의 필요 건수</div><div class="value" id="kpi-score">-</div></div>
+    <section class="kpis row g-2" id="kpi-section">
+      <div class="col-12 col-md-4"><div class="card kpi-card"><div class="label">전체 상태</div><div class="value" id="kpi-status">-</div></div></div>
+      <div class="col-12 col-md-4"><div class="card kpi-card"><div class="label">현재 작업 라운드</div><div class="value" id="kpi-wave">-</div></div></div>
+      <div class="col-12 col-md-4"><div class="card kpi-card"><div class="label">주의 필요 건수</div><div class="value" id="kpi-score">-</div></div></div>
     </section>
 
     <section class="card hero" id="team-visual-section">
