@@ -54,7 +54,14 @@
     .team-action-btn{border:1px solid var(--line);background:#0f1a2d;color:#dce9ff;border-radius:8px;padding:6px 8px;font-size:11px;cursor:pointer;text-align:left}
     .team-action-btn:hover{background:#182846}
     .workspace{margin-bottom:14px}
-    .workspace-map{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .workspace-map{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:10px}
+    .workspace-stage{position:relative;height:300px;border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,#132038,#0f1726);overflow:hidden}
+    .stage-zone{position:absolute;border:1px solid #2a3d63;border-radius:10px;background:rgba(19,31,52,.75);padding:6px;font-size:11px;color:#c8d8f7}
+    .stage-char{position:absolute;transform:translate(-50%,-50%);font-size:28px;line-height:1;transition:left .8s ease, top .8s ease;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+    .stage-char .name{position:absolute;left:50%;top:30px;transform:translateX(-50%);font-size:10px;background:#0f1a2d;border:1px solid #2a3d63;border-radius:999px;padding:2px 6px;white-space:nowrap}
+    .stage-char.pass{animation:stageStep 2s ease-in-out infinite}
+    .stage-char.check{animation:stageStep 3.2s ease-in-out infinite}
+    .stage-char.fail{filter:grayscale(.25) drop-shadow(0 0 6px rgba(255,80,80,.45))}
     .zone{border:1px solid var(--line);border-radius:12px;background:#101a2d;padding:10px}
     .zone-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
     .zone-title{font-size:12px;font-weight:700}
@@ -65,6 +72,7 @@
     .feed-item .muted{font-size:11px}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     @keyframes agentFloat{0%{transform:translateY(0px)}50%{transform:translateY(-4px)}100%{transform:translateY(0px)}}
+    @keyframes stageStep{0%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + 1px),calc(-50% - 3px))}100%{transform:translate(-50%,-50%)}}
     .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
     .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
     .filters select{background:#0f1a2d;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:36px}
@@ -233,6 +241,7 @@
     <section class="workspace" id="workspace-section">
       <div class="section-title">에이전트 작업 공간 (실시간 위치형)</div>
       <div class="workspace-map" id="workspace-map"></div>
+      <div class="workspace-stage" id="workspace-stage"></div>
     </section>
 
     <section class="stream-feed" id="stream-feed-section"></section>
@@ -625,6 +634,7 @@
       renderTeamBoard();
       renderStreamBoard();
       renderWorkspaceMap();
+      renderWorkspaceStage();
       renderStreamFeed();
       syncUrlWithFilters();
       loadGenerationHistory();
@@ -1354,6 +1364,47 @@
           const profile = ev.currentTarget.getAttribute('data-profile');
           if(!profile) return;
           focusProfile(profile, !!ev.shiftKey);
+        });
+      });
+    }
+
+    function renderWorkspaceStage(){
+      const root = document.getElementById('workspace-stage');
+      if(!root) return;
+      const latestByProfile = new Map();
+      CURRENT_EVENTS.forEach(e => latestByProfile.set(e.profile_id, e));
+      const avatarByProfile = {
+        'physio-orchestrator':'🕴️','physio-planner':'🧑‍💼','physio-frontend':'🧑‍💻',
+        'physio-backend':'👨‍💻','physio-qa':'🧪','physio-ops-reporter':'🛰️'
+      };
+      const pos = {
+        'physio-planner': [17, 22],
+        'physio-frontend': [45, 28],
+        'physio-backend': [58, 36],
+        'physio-qa': [73, 66],
+        'physio-orchestrator': [34, 68],
+        'physio-ops-reporter': [83, 22]
+      };
+      const zones = [
+        {name:'기획실', x:6, y:8, w:26, h:28},
+        {name:'개발실', x:35, y:10, w:30, h:36},
+        {name:'품질/운영실', x:68, y:52, w:26, h:38}
+      ];
+      const zoneHtml = zones.map(z => `<div class="stage-zone" style="left:${z.x}%;top:${z.y}%;width:${z.w}%;height:${z.h}%">${z.name}</div>`).join('');
+      const chars = Object.keys(pos).map(p => {
+        const e = latestByProfile.get(p) || {};
+        const st = String(e.status || 'PENDING').toUpperCase();
+        const cls = st === 'FAIL' ? 'fail' : (st === 'CHECK' ? 'check' : 'pass');
+        const [x,y] = pos[p];
+        const nudge = (String(streamOf(e)).length % 3) * 2;
+        return `<div class="stage-char ${cls}" data-profile="${p}" style="left:${x+nudge}%;top:${y+(nudge?1:0)}%">${avatarByProfile[p] || '🧑'}<span class="name">${displayProfileName(p)}</span></div>`;
+      }).join('');
+      root.innerHTML = zoneHtml + chars;
+      root.querySelectorAll('.stage-char[data-profile]').forEach(el => {
+        el.addEventListener('click', (ev) => {
+          const p = ev.currentTarget.getAttribute('data-profile');
+          if(!p) return;
+          focusProfile(p, !!ev.shiftKey);
         });
       });
     }
