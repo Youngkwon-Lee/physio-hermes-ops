@@ -7,33 +7,33 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#08090a;--panel:#0f1011;--panel2:#141516;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.05);--txt:#f7f8f8;--muted:#9ea4af;--ok:#27a644;--warn:#f6c453;--bad:#ff6b6b;--acc:#7170ff}
+    :root{--bg:#0b0d12;--panel:#121722;--panel2:#171e2b;--line:rgba(255,255,255,.10);--line2:rgba(255,255,255,.08);--txt:#f4f7ff;--muted:#a9b2c3;--ok:#32c766;--warn:#f4c84f;--bad:#ff6b6b;--acc:#7c7bff}
     *{box-sizing:border-box}
-    body{margin:0;background:radial-gradient(1200px 680px at 50% -20%,#1a1c22 0%,var(--bg) 55%);color:var(--txt);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;letter-spacing:-.01em}
+    body{margin:0;background:radial-gradient(1200px 680px at 50% -20%,#222b3d 0%,var(--bg) 52%);color:var(--txt);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;letter-spacing:-.008em;line-height:1.45}
     .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
-    .sidebar{border-right:1px solid var(--line2);background:linear-gradient(180deg,#0c0d10,#090a0b);padding:14px 10px;position:sticky;top:0;height:100vh}
+    .sidebar{border-right:1px solid var(--line2);background:linear-gradient(180deg,#121826,#0d111a);padding:16px 12px;position:sticky;top:0;height:100vh}
     .side-brand{font-weight:600;font-size:13px;padding:8px 10px;margin-bottom:10px;letter-spacing:.01em;color:#d4d7de}
     .side-nav{display:flex;flex-direction:column;gap:6px}
     .side-nav .nav-link{color:var(--muted)!important;text-decoration:none;padding:8px 10px;border:1px solid transparent;border-radius:8px;font-size:12px}
     .side-nav .nav-link:hover{color:var(--txt)!important;border-color:var(--line2);background:rgba(255,255,255,.03)}
     .main-col{min-width:0}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:rgba(8,9,10,.86);backdrop-filter:blur(8px);z-index:5}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 22px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:rgba(11,13,18,.88);backdrop-filter:blur(10px);z-index:5}
     .brand{font-weight:600;letter-spacing:-.015em;font-size:15px}
     .top-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
     .badge{font-size:12px;padding:4px 8px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.02)}
     .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:#d4d7de}
     .pill-dot{width:6px;height:6px;border-radius:50%;background:#7170ff;display:inline-block}
-    .wrap{max-width:1400px;margin:0 auto;padding:20px}
+    .wrap{max-width:1520px;margin:0 auto;padding:22px}
     .kpis{margin-bottom:14px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line2);border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.22)}
+    .card{background:linear-gradient(180deg,#151c29,#121824);border:1px solid var(--line2);border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.26)}
     .kpi-card{position:relative;overflow:hidden}
     .kpi-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,rgba(113,112,255,.2),#7170ff)}
     .label{font-size:12px;color:var(--muted)} .value{font-size:28px;font-weight:800;margin-top:6px}
     .layout{display:grid;grid-template-columns:260px 1fr 420px;gap:14px}
     .hero{margin-bottom:14px}
     .hero-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:12px;align-items:stretch}
-    .hero-title{font-size:18px;font-weight:800;margin:0 0 4px}
-    .hero-sub{font-size:13px;color:var(--muted);line-height:1.45}
+    .hero-title{font-size:20px;font-weight:800;margin:0 0 6px}
+    .hero-sub{font-size:14px;color:var(--muted);line-height:1.6}
     .hero-tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .hero-tag{font-size:11px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);color:#b9ceef;background:#111d32}
     .visualizer{border:1px solid var(--line);border-radius:10px;background:#0f1726;padding:8px}
@@ -78,7 +78,7 @@
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     @keyframes agentFloat{0%{transform:translateY(0px)}50%{transform:translateY(-4px)}100%{transform:translateY(0px)}}
     @keyframes stageStep{0%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + 1px),calc(-50% - 3px))}100%{transform:translate(-50%,-50%)}}
-    .section-title{font-size:13px;color:var(--muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px}
+    .section-title{font-size:12px;color:#c6d0e2;margin-bottom:10px;text-transform:uppercase;letter-spacing:.7px;font-weight:700}
     .filters{margin-bottom:10px}
     .filters .form-select{background:#111317;color:var(--txt);border:1px solid var(--line2);border-radius:8px;min-height:36px}
     .actions{margin:0 0 10px 0}
@@ -209,16 +209,15 @@
     <section class="card hero" id="team-visual-section">
       <div class="hero-grid">
         <div>
-          <h2 class="hero-title">NAUTILUS 에이전트 팀 시각화</h2>
+          <h2 class="hero-title">에이전트 작업 현황</h2>
           <div class="hero-sub">
-            이 화면은 <strong>라인리지 로그 + FSM + 실행 액션</strong>을 한 번에 보는 운영 콘솔입니다.
-            아래 그래프에서 각 에이전트가 상태 색상(PASS/CHECK/FAIL)에 따라 움직이며,
-            클릭하면 해당 프로필로 타임라인이 즉시 필터링됩니다.
+            핵심만 보이게 정리했습니다. <strong>지금 누가, 어떤 채널/쓰레드에서, 어떤 상태인지</strong>
+            빠르게 확인하고 바로 필터링할 수 있습니다.
           </div>
           <div class="hero-tags">
             <span class="hero-tag">실시간 갱신: 10초</span>
-            <span class="hero-tag">Shift+클릭: 다중 선택</span>
-            <span class="hero-tag">상태 색상: PASS/CHECK/FAIL</span>
+            <span class="hero-tag">클릭: 해당 에이전트만 보기</span>
+            <span class="hero-tag">Shift+클릭: 여러 명 동시에 보기</span>
           </div>
         </div>
         <div class="visualizer">
