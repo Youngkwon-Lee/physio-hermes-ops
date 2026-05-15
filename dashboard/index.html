@@ -215,6 +215,7 @@
           <div class="filters">
             <select id="filter-wave"><option value="ALL">웨이브: 전체</option></select>
             <select id="filter-profile"><option value="ALL">프로필: 전체</option></select>
+            <select id="filter-stream"><option value="ALL">채널/쓰레드: 전체</option></select>
             <select id="filter-status">
               <option value="ALL">상태: 전체</option>
               <option value="PASS">PASS</option>
@@ -328,6 +329,17 @@
     async function getJson(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.json(); }
     function parseJsonl(txt){ return txt.split('\n').map(s=>s.trim()).filter(Boolean).map(JSON.parse); }
     function pickTs(e){ return e.timestamp || e.ts || ''; }
+    function streamOf(e){
+      const t = e?.thread_id || e?.channel_thread_id || e?.meta?.thread_id;
+      if(t) return `thread:${t}`;
+      const c = e?.channel_id || e?.meta?.channel_id;
+      if(c) return `channel:${c}`;
+      const run = String(e?.run_id || '').toLowerCase();
+      if(run.includes('overnight') || run.includes('nightly')) return 'overnight';
+      if(run.includes('mem')) return 'mem';
+      if(run.includes('physio_bot') || run.includes('physio-bot')) return 'physio_bot';
+      return 'unmapped';
+    }
     function statusKo(st){
       const k = String(st || '').toUpperCase();
       const map = { PASS: '통과', 'PASS*': '주의통과', CHECK: '검토필요', FAIL: '실패', PENDING: '대기' };
@@ -451,17 +463,24 @@
     function populateFilters(events){
       const waveSel = document.getElementById('filter-wave');
       const profileSel = document.getElementById('filter-profile');
+      const streamSel = document.getElementById('filter-stream');
       const wCur = waveSel.value || 'ALL';
       const pCur = profileSel.value || 'ALL';
+      const stCur = streamSel?.value || 'ALL';
 
       const waves = [...new Set(events.map(e => e.wave_id).filter(Boolean))].sort();
       const profiles = [...new Set(events.map(e => e.profile_id).filter(Boolean))].sort();
+      const streams = [...new Set(events.map(streamOf).filter(Boolean))].sort();
 
       waveSel.innerHTML = '<option value="ALL">웨이브: 전체</option>' + waves.map(w => `<option value="${w}">${w}</option>`).join('');
       profileSel.innerHTML = '<option value="ALL">프로필: 전체</option>' + profiles.map(p => `<option value="${p}">${p}</option>`).join('');
+      if(streamSel){
+        streamSel.innerHTML = '<option value="ALL">채널/쓰레드: 전체</option>' + streams.map(s => `<option value="${s}">${s}</option>`).join('');
+      }
 
       waveSel.value = waves.includes(wCur) ? wCur : 'ALL';
       profileSel.value = profiles.includes(pCur) ? pCur : 'ALL';
+      if(streamSel) streamSel.value = streams.includes(stCur) ? stCur : 'ALL';
 
       SELECTED_PROFILES = new Set([...SELECTED_PROFILES].filter(p => profiles.includes(p)));
       if(SELECTED_PROFILES.size === 1) profileSel.value = [...SELECTED_PROFILES][0];
@@ -472,10 +491,12 @@
       const q = new URLSearchParams(location.search);
       const w = document.getElementById('filter-wave').value;
       const s = document.getElementById('filter-status').value;
+      const st = document.getElementById('filter-stream')?.value || 'ALL';
       const sort = document.getElementById('sort-mode').value;
       const pList = [...SELECTED_PROFILES];
       if(w !== 'ALL') q.set('wave', w); else q.delete('wave');
       if(s !== 'ALL') q.set('status', s); else q.delete('status');
+      if(st !== 'ALL') q.set('stream', st); else q.delete('stream');
       if(sort !== 'time_desc') q.set('sort', sort); else q.delete('sort');
       if(pList.length) q.set('profiles', pList.join(',')); else q.delete('profiles');
       const next = `${location.pathname}${q.toString() ? '?' + q.toString() : ''}`;
@@ -488,9 +509,11 @@
       SELECTED_PROFILES = new Set(profiles);
       const wave = q.get('wave');
       const status = q.get('status');
+      const stream = q.get('stream');
       const sort = q.get('sort');
       if(wave) document.getElementById('filter-wave').value = wave;
       if(status) document.getElementById('filter-status').value = status;
+      if(stream && document.getElementById('filter-stream')) document.getElementById('filter-stream').value = stream;
       if(sort) document.getElementById('sort-mode').value = sort;
     }
 
@@ -503,6 +526,7 @@
     function applyFilters(){
       const w = document.getElementById('filter-wave').value;
       const p = document.getElementById('filter-profile').value;
+      const st = document.getElementById('filter-stream')?.value || 'ALL';
       const s = document.getElementById('filter-status').value;
       const sortMode = document.getElementById('sort-mode').value;
 
@@ -511,6 +535,7 @@
       FILTERED_EVENTS = CURRENT_EVENTS.filter(e =>
         (w === 'ALL' || e.wave_id === w) &&
         (activeProfiles.size === 0 || activeProfiles.has(e.profile_id)) &&
+        (st === 'ALL' || streamOf(e) === st) &&
         (s === 'ALL' || e.status === s)
       );
 
@@ -1395,6 +1420,7 @@
     bindActions();
     boot(); setInterval(boot, 10000);
     document.getElementById('filter-wave').addEventListener('change', applyFilters);
+    document.getElementById('filter-stream')?.addEventListener('change', applyFilters);
     document.getElementById('filter-profile').addEventListener('change', () => {
       const v = document.getElementById('filter-profile').value;
       SELECTED_PROFILES = (v && v !== 'ALL') ? new Set([v]) : new Set();
