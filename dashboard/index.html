@@ -385,6 +385,13 @@
       const map = { RESUME: '재개', LIMITED_RESUME: '제한적 재개', HOLD: '보류', CHECK_REQUIRED: '검토 필요' };
       return map[k] || (k || '-');
     }
+    function genCloseDecisionText(e){
+      const note = String(e?.notes || e?.summary || '');
+      const m = note.match(/decision\s*=\s*(GREEN|YELLOW|RED)/i);
+      const d = (m ? m[1] : '').toUpperCase();
+      if(!d) return `최종판단: ${statusKo(e?.status)}(${e?.status || '-'})`;
+      return `최종판단: ${decisionKo(d)} (${d})`;
+    }
     function classifyIssue(event){
       const st = String(event?.status || '').toUpperCase();
       const text = `${event?.notes || ''} ${event?.summary || ''}`.toLowerCase();
@@ -604,7 +611,8 @@
         if (isGenClose) div.classList.add('gen-close');
         const label = isGenClose ? '♻️ GEN-CLOSE · ' : '';
         div.dataset.index = String(events.length - recent.length + idx);
-        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${statusKo(e.status)}(${e.status || '-'}) · 점수 ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
+        const statusText = isGenClose ? genCloseDecisionText(e) : `${statusKo(e.status)}(${e.status || '-'})`;
+        div.innerHTML = `<strong>${label}${e.wave_id || '-'} / ${e.profile_id || '-'}</strong><div class="muted">${pickTs(e)} · ${statusText} · 점수 ${e.score ?? '-'} · ${e.notes || e.summary || ''}</div>`;
         div.onclick = () => selectEvent(Number(div.dataset.index));
         box.appendChild(div);
       });
@@ -661,7 +669,7 @@
       const metaEl = document.getElementById('ld-meta');
       const sumEl = document.getElementById('ld-summary');
       if(waveEl) waveEl.innerHTML = `<strong>${e.wave_id || '-'} / ${e.profile_id || '-'}</strong>`;
-      if(metaEl) metaEl.textContent = `${pickTs(e)} · ${statusKo(e.status)}(${e.status || '-'}) · 점수 ${e.score ?? '-'}`;
+      if(metaEl) metaEl.textContent = `${pickTs(e)} · ${isGenClose ? genCloseDecisionText(e) : `${statusKo(e.status)}(${e.status || '-'})`} · 점수 ${e.score ?? '-'}`;
       if(sumEl) sumEl.textContent = e.notes || e.summary || '-';
 
       document.getElementById('d-eid').textContent = e.event_id || '-';
