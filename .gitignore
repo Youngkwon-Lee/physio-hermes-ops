@@ -19,3 +19,4 @@
 # runtime artifacts
 .runtime/
 lineage/actions_audit.jsonl
+.vercel
