@@ -1290,6 +1290,12 @@
       if(el) el.textContent = msg;
     }
 
+    function confirmAction(actionKey, label){
+      const profileText = SELECTED_PROFILES.size ? [...SELECTED_PROFILES].join(',') : 'ALL';
+      const roleText = OPS_API.execRoleMode === 'admin' ? '관리자(admin)' : '운영자(operator)';
+      return confirm(`[실행 확인]\n작업: ${label} (${actionKey})\n대상 프로필: ${profileText}\n권한 모드: ${roleText}\n\n계속 진행할까요?`);
+    }
+
     function bindTabs(){
       document.querySelectorAll('[data-tabs]').forEach(group => {
         const buttons = group.querySelectorAll('.tab-btn');
@@ -1322,6 +1328,7 @@
       document.getElementById('act-set-exec-admin-token')?.addEventListener('click', () => setToken('exec_admin'));
       document.getElementById('act-set-exec-operator-token')?.addEventListener('click', () => setToken('exec_operator'));
       document.getElementById('act-refresh')?.addEventListener('click', async () => {
+        if(!confirmAction('refresh', '지금 새로고침(실행)')) return;
         try{
           const payload = await executeAction('refresh');
           setActionFeedback(`action: refresh 완료\n${briefResult(payload)}`);
@@ -1333,7 +1340,7 @@
       });
 
       document.getElementById('act-copy-pause')?.addEventListener('click', async () => {
-        if(!confirm('cron 전체를 pause 할까요?')) return;
+        if(!confirmAction('pause_all', 'cron 전체 pause 실행')) return;
         try{
           const payload = await executeAction('pause_all');
           setActionFeedback(`action: pause_all 완료\n${briefResult(payload)}`);
@@ -1345,7 +1352,7 @@
       });
 
       document.getElementById('act-copy-resume-core')?.addEventListener('click', async () => {
-        if(!confirm('core cron(resume)을 실행할까요?')) return;
+        if(!confirmAction('resume_core', 'core cron resume 실행')) return;
         try{
           const payload = await executeAction('resume_core');
           setActionFeedback(`action: resume_core 완료\n${briefResult(payload)}`);
@@ -1357,7 +1364,7 @@
       });
 
       document.getElementById('act-copy-finalize')?.addEventListener('click', async () => {
-        if(!confirm('generation finalize 1회 실행할까요?')) return;
+        if(!confirmAction('finalize_once', 'generation finalize 1회 실행')) return;
         try{
           const payload = await executeAction('finalize_once');
           setActionFeedback(`action: finalize_once 완료\n${briefResult(payload)}`);
