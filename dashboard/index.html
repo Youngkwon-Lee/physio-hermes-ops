@@ -376,12 +376,12 @@
     let SELECTED_PROFILES = new Set();
     let SELECTED_EVENT_INDEX = -1;
     let URL_HYDRATED = false;
-    let SIMPLE_MODE = localStorage.getItem('nautilusSimpleMode') !== '0';
+    let SIMPLE_MODE = localStorage.getItem('nautilusSimpleMode') === '1';
 
     function applySimpleMode(){
       document.body.classList.toggle('simple-mode', SIMPLE_MODE);
       const b = document.getElementById('toggle-simple-mode');
-      if(b) b.textContent = SIMPLE_MODE ? '상세 모드' : '초보 모드';
+      if(b) b.textContent = SIMPLE_MODE ? '모드: 초보 (클릭: 상세)' : '모드: 상세 (클릭: 초보)';
     }
 
     async function getText(url){ const r = await fetch(url, {cache:'no-store'}); if(!r.ok) throw new Error(`fetch failed: ${url}`); return await r.text(); }
