@@ -4,25 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Nautilus 운영 대시보드</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0a0f1c;--panel:#121a2b;--panel2:#0f1726;--line:#23324d;--txt:#e6edf7;--muted:#8fa3c7;--ok:#33d17a;--warn:#f6c453;--bad:#ff6b6b;--acc:#6ea8ff}
-    *{box-sizing:border-box} body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2b55 0%,var(--bg) 45%);color:var(--txt);font-family:Inter,system-ui,sans-serif}
+    :root{--bg:#08090a;--panel:#0f1011;--panel2:#141516;--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.05);--txt:#f7f8f8;--muted:#9ea4af;--ok:#27a644;--warn:#f6c453;--bad:#ff6b6b;--acc:#7170ff}
+    *{box-sizing:border-box}
+    body{margin:0;background:radial-gradient(1200px 680px at 50% -20%,#1a1c22 0%,var(--bg) 55%);color:var(--txt);font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;letter-spacing:-.01em}
     .app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
-    .sidebar{border-right:1px solid var(--line);background:linear-gradient(180deg,#0c1424,#0a1322);padding:14px 10px;position:sticky;top:0;height:100vh}
-    .side-brand{font-weight:800;font-size:14px;padding:8px 10px;margin-bottom:10px}
+    .sidebar{border-right:1px solid var(--line2);background:linear-gradient(180deg,#0c0d10,#090a0b);padding:14px 10px;position:sticky;top:0;height:100vh}
+    .side-brand{font-weight:600;font-size:13px;padding:8px 10px;margin-bottom:10px;letter-spacing:.01em;color:#d4d7de}
     .side-nav{display:flex;flex-direction:column;gap:6px}
     .side-nav a{color:var(--muted);text-decoration:none;padding:8px 10px;border:1px solid transparent;border-radius:8px;font-size:12px}
-    .side-nav a:hover{color:var(--txt);border-color:var(--line);background:#132038}
+    .side-nav a:hover{color:var(--txt);border-color:var(--line2);background:rgba(255,255,255,.03)}
     .main-col{min-width:0}
-    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(10,15,28,.88);backdrop-filter:blur(8px);z-index:5}
-    .brand{font-weight:800}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:rgba(8,9,10,.86);backdrop-filter:blur(8px);z-index:5}
+    .brand{font-weight:600;letter-spacing:-.015em}
     .top-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-    .badge{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}
+    .badge{font-size:12px;padding:4px 8px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);white-space:nowrap;background:rgba(255,255,255,.02)}
     .wrap{max-width:1400px;margin:0 auto;padding:20px}
     .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:14px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line2);border-radius:14px;padding:14px;box-shadow:0 8px 28px rgba(0,0,0,.22)}
     .kpi-card{position:relative;overflow:hidden}
-    .kpi-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,#2c4572,#6ea8ff)}
+    .kpi-card::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,rgba(113,112,255,.2),#7170ff)}
     .label{font-size:12px;color:var(--muted)} .value{font-size:28px;font-weight:800;margin-top:6px}
     .layout{display:grid;grid-template-columns:260px 1fr 420px;gap:14px}
     .hero{margin-bottom:14px}
