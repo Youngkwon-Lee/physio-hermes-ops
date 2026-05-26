@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-05-24T16:34:02+09:00",
+  "items": [
+    {
+      "stream_id": "overnight",
+      "stream_label": "야간 자동화실",
+      "items": [
+        {
+          "event_id": "evt-20260513-003",
+          "profile_id": "physio-orchestrator",
+          "display_name": "오케스트레이터",
+          "status": "PASS*",
+          "wave_id": "wave-1",
+          "summary": "final status compiled",
+          "timestamp": "2026-05-13T13:54:00+09:00"
+        },
+        {
+          "event_id": "evt-20260513-002",
+          "profile_id": "physio-qa",
+          "display_name": "QA",
+          "status": "PASS*",
+          "wave_id": "wave-1",
+          "summary": "timeout but artifact exists",
+          "timestamp": "2026-05-13T13:52:00+09:00"
+        },
+        {
+          "event_id": "evt-20260513-001",
+          "profile_id": "physio-planner",
+          "display_name": "기획자",
+          "status": "PASS",
+          "wave_id": "wave-1",
+          "summary": "task spec generated",
+          "timestamp": "2026-05-13T13:50:00+09:00"
+        }
+      ]
+    },
+    {
+      "stream_id": "physio_bot",
+      "stream_label": "메인 작업방",
+      "items": [
+        {
+          "event_id": "evt-gen-close-wave-2-20260513T123227",
+          "profile_id": "physio-orchestrator",
+          "display_name": "오케스트레이터",
+          "status": "CHECK",
+          "wave_id": "wave-2",
+          "summary": "generation cycle close decision=YELLOW",
+          "timestamp": "2026-05-13T12:32:27.792900+00:00"
+        },
+        {
+          "event_id": "evt-dispatch-20260513_155003",
+          "profile_id": "physio-orchestrator",
+          "display_name": "오케스트레이터",
+          "status": "PASS*",
+          "wave_id": "wave-2",
+          "summary": "Aggregate and decide GREEN/YELLOW/RED",
+          "timestamp": "2026-05-13T15:50:03"
+        },
+        {
+          "event_id": "evt-dispatch-20260513_153746",
+          "profile_id": "physio-qa",
+          "display_name": "QA",
+          "status": "PASS*",
+          "wave_id": "wave-2",
+          "summary": "Verify PASS/PASS* criteria and produce evidence",
+          "timestamp": "2026-05-13T15:37:46"
+        },
+        {
+          "event_id": "evt-dispatch-20260513_152531",
+          "profile_id": "physio-backend",
+          "display_name": "백엔드",
+          "status": "PASS*",
+          "wave_id": "wave-2",
+          "summary": "Harden backend logic from seed scope",
+          "timestamp": "2026-05-13T15:25:31"
+        },
+        {
+          "event_id": "evt-dispatch-20260513_151340",
+          "profile_id": "physio-frontend",
+          "display_name": "프론트엔드",
+          "status": "PASS*",
+          "wave_id": "wave-2",
+          "summary": "Polish UI tasks from seed scope",
+          "timestamp": "2026-05-13T15:13:40"
+        }
+      ]
+    }
+  ]
+}

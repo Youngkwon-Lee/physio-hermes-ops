@@ -1,0 +1,2090 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nautilus Spatial Ops</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="../dashboard/config.js"></script>
+    <script src="./config.js"></script>
+    <style>
+      :root {
+        --bg: #f4efe6;
+        --bg-2: #eadcc6;
+        --panel: rgba(255, 250, 241, 0.88);
+        --panel-strong: rgba(255, 247, 234, 0.96);
+        --line: rgba(98, 71, 39, 0.14);
+        --text: #1f1a17;
+        --muted: #6c5d4e;
+        --brown: #6e4d2e;
+        --terracotta: #c86e4d;
+        --teal: #1e7774;
+        --gold: #d3a74f;
+        --red: #c64d4d;
+        --shadow: 0 18px 50px rgba(88, 60, 34, 0.12);
+        --radius: 18px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "Noto Sans KR", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(227, 205, 168, 0.85), transparent 34%),
+          radial-gradient(circle at top right, rgba(72, 136, 121, 0.18), transparent 28%),
+          linear-gradient(180deg, #f7f1e8 0%, #efe4d4 42%, #f8f2ea 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(110, 77, 46, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(110, 77, 46, 0.03) 1px, transparent 1px);
+        background-size: 24px 24px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.66), transparent 95%);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      .app-shell {
+        max-width: 1540px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .topbar {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 18px;
+        align-items: stretch;
+        margin-bottom: 18px;
+      }
+
+      .hero,
+      .status-strip,
+      .panel,
+      .ops-drawer {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(14px);
+      }
+
+      .hero {
+        position: relative;
+        overflow: hidden;
+        padding: 24px;
+        background:
+          linear-gradient(135deg, rgba(255, 246, 231, 0.96), rgba(240, 226, 206, 0.88)),
+          var(--panel);
+      }
+
+      .hero::after {
+        content: "";
+        position: absolute;
+        right: -42px;
+        top: -32px;
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(30, 119, 116, 0.22), rgba(30, 119, 116, 0));
+      }
+
+      .eyebrow,
+      .section-eyebrow {
+        font-family: "Sora", sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 8px;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      .stat-value {
+        font-family: "Sora", sans-serif;
+      }
+
+      h1 {
+        font-size: clamp(30px, 4vw, 44px);
+        line-height: 1.08;
+        margin: 0 0 10px;
+      }
+
+      .hero p {
+        max-width: 56ch;
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.65;
+      }
+
+      .hero-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        padding: 0 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(98, 71, 39, 0.14);
+        background: rgba(255, 251, 243, 0.78);
+        color: var(--brown);
+        white-space: nowrap;
+      }
+
+      .flash-change {
+        animation: flashPulse 2.2s ease;
+      }
+
+      @keyframes flashPulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(30, 119, 116, 0.34);
+          border-color: rgba(30, 119, 116, 0.42);
+          background: rgba(226, 247, 239, 0.92);
+        }
+        35% {
+          box-shadow: 0 0 0 8px rgba(30, 119, 116, 0.08);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(30, 119, 116, 0);
+        }
+      }
+
+      .chip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--teal);
+      }
+
+      .status-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        padding: 18px;
+      }
+
+      .stat-card {
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(255, 249, 240, 0.84);
+        border: 1px solid rgba(98, 71, 39, 0.08);
+      }
+
+      .stat-label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stat-value {
+        margin-top: 8px;
+        font-size: 28px;
+        font-weight: 800;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 380px;
+        gap: 18px;
+      }
+
+      .main-stack {
+        display: grid;
+        gap: 18px;
+        min-width: 0;
+      }
+
+      .stack {
+        display: grid;
+        gap: 18px;
+        align-content: start;
+      }
+
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+      }
+
+      .panel {
+        padding: 18px;
+      }
+
+      .panel-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+
+      .panel-head h2,
+      .panel-head h3 {
+        margin: 0;
+        font-size: 20px;
+      }
+
+      .panel-head p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .floor-list,
+      .help-list,
+      .showcase-list,
+      .feed-streams {
+        display: grid;
+        gap: 12px;
+      }
+
+      .floor-card,
+      .queue-item,
+      .showcase-card,
+      .feed-card {
+        border: 1px solid rgba(98, 71, 39, 0.09);
+        border-radius: 16px;
+        background: rgba(255, 251, 244, 0.74);
+        padding: 14px;
+      }
+
+      .floor-card {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .floor-card::after {
+        content: "";
+        position: absolute;
+        inset: auto -24px -52px auto;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(200, 110, 77, 0.14), rgba(200, 110, 77, 0));
+      }
+
+      .row,
+      .queue-top,
+      .showcase-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .room-name,
+      .queue-title,
+      .showcase-title {
+        font-family: "Sora", sans-serif;
+        font-weight: 700;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .mini-box {
+        min-height: 72px;
+        padding: 10px;
+        border-radius: 14px;
+        background: rgba(252, 246, 236, 0.94);
+        border: 1px solid rgba(98, 71, 39, 0.08);
+      }
+
+      .mini-box strong {
+        display: block;
+        font-family: "Sora", sans-serif;
+        font-size: 18px;
+      }
+
+      .seat-stage {
+        min-height: 620px;
+        padding: 22px;
+        background:
+          linear-gradient(180deg, rgba(255, 250, 242, 0.96), rgba(242, 230, 214, 0.92)),
+          var(--panel-strong);
+      }
+
+      .cafe-strip {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .pass-card,
+      .room-directory {
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        background: rgba(255, 250, 242, 0.82);
+      }
+
+      .pass-card {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .pass-card::after {
+        content: "";
+        position: absolute;
+        right: -26px;
+        top: -18px;
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(30, 119, 116, 0.18), rgba(30, 119, 116, 0));
+      }
+
+      .pass-top,
+      .directory-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 10px;
+      }
+
+      .pass-title,
+      .directory-title {
+        font-family: "Sora", sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .barcode-row {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 14px;
+        margin-top: 14px;
+      }
+
+      .barcode {
+        flex: 1 1 auto;
+        height: 36px;
+        border-radius: 10px;
+        background:
+          repeating-linear-gradient(
+            90deg,
+            rgba(31, 26, 23, 0.92) 0 3px,
+            rgba(255, 251, 244, 0) 3px 6px,
+            rgba(31, 26, 23, 0.78) 6px 8px,
+            rgba(255, 251, 244, 0) 8px 12px
+          );
+        opacity: 0.7;
+      }
+
+      .directory-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .directory-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(98, 71, 39, 0.08);
+        background: rgba(255, 254, 249, 0.84);
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      .stage-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+
+      .workshop-map {
+        position: relative;
+        min-height: 320px;
+        margin-bottom: 16px;
+        border-radius: 24px;
+        border: 1px solid rgba(98, 71, 39, 0.12);
+        background: linear-gradient(180deg, rgba(246, 236, 217, 0.95), rgba(240, 226, 202, 0.92));
+        overflow: hidden;
+      }
+
+      .workshop-map::before {
+        content: "";
+        position: absolute;
+        inset: 14px;
+        border-radius: 20px;
+        border: 2px dashed rgba(110, 77, 46, 0.15);
+        pointer-events: none;
+      }
+
+      .workshop-lobby {
+        position: absolute;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: rgba(255, 252, 246, 0.92);
+        border: 1px solid rgba(98, 71, 39, 0.12);
+        font-family: "Sora", sans-serif;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--brown);
+      }
+
+      .map-room {
+        position: absolute;
+        padding: 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(98, 71, 39, 0.12);
+        background: rgba(255, 252, 247, 0.82);
+      }
+
+      .map-room.plan { background: rgba(252, 243, 223, 0.9); }
+      .map-room.build { background: rgba(232, 246, 242, 0.9); }
+      .map-room.verify { background: rgba(248, 239, 221, 0.9); }
+      .map-room.orchestrate { background: rgba(243, 239, 249, 0.92); }
+
+      .map-room-title {
+        font-family: "Sora", sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .map-room-meta {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .map-seats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .map-seat {
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        padding: 10px 8px;
+        border-radius: 16px;
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        background: rgba(255,255,255,0.5);
+        cursor: pointer;
+      }
+
+      .map-seat.active {
+        border-color: rgba(30, 119, 116, 0.42);
+        box-shadow: 0 0 0 2px rgba(30, 119, 116, 0.12);
+      }
+
+      .map-seat-avatar {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        background: rgba(255, 250, 242, 0.94);
+        font-family: "Sora", sans-serif;
+        font-weight: 700;
+        color: var(--brown);
+      }
+
+      .map-seat-name {
+        font-size: 12px;
+        font-weight: 700;
+        text-align: center;
+        line-height: 1.2;
+      }
+
+      .legend-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .stage-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .zone {
+        min-height: 260px;
+        padding: 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        background: rgba(255, 251, 244, 0.68);
+      }
+
+      .zone.sign-plan {
+        background: linear-gradient(180deg, rgba(252, 243, 223, 0.78), rgba(255, 251, 244, 0.68));
+      }
+
+      .zone.sign-build {
+        background: linear-gradient(180deg, rgba(236, 247, 245, 0.78), rgba(255, 251, 244, 0.68));
+      }
+
+      .zone.sign-verify {
+        background: linear-gradient(180deg, rgba(248, 239, 221, 0.78), rgba(255, 251, 244, 0.68));
+      }
+
+      .zone.sign-orchestrate {
+        background: linear-gradient(180deg, rgba(243, 239, 249, 0.78), rgba(255, 251, 244, 0.68));
+      }
+
+      .zone-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+
+      .zone-title {
+        font-family: "Sora", sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .seat-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .seat-card {
+        display: grid;
+        gap: 10px;
+        min-height: 124px;
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        background: rgba(254, 250, 242, 0.92);
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+      }
+
+      .seat-card::before {
+        content: attr(data-seat-label);
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: rgba(211, 167, 79, 0.14);
+        color: var(--brown);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .seat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(93, 62, 35, 0.1);
+      }
+
+      .seat-card.active {
+        border-color: rgba(30, 119, 116, 0.48);
+        box-shadow: 0 0 0 2px rgba(30, 119, 116, 0.12);
+      }
+
+      .seat-card.active .avatar {
+        background: rgba(30, 119, 116, 0.16);
+        color: #155b4e;
+      }
+
+      .seat-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 10px;
+      }
+
+      .avatar {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: 14px;
+        background: rgba(211, 167, 79, 0.18);
+        color: var(--brown);
+        font-family: "Sora", sans-serif;
+        font-weight: 800;
+      }
+
+      .seat-name {
+        font-family: "Sora", sans-serif;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .seat-summary {
+        font-size: 13px;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .status-pill,
+      .small-pill,
+      .score-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid transparent;
+        white-space: nowrap;
+      }
+
+      .score-pill {
+        color: var(--brown);
+        background: rgba(211, 167, 79, 0.18);
+        border-color: rgba(211, 167, 79, 0.28);
+      }
+
+      .status-pass,
+      .status-passstar {
+        color: #155b4e;
+        background: rgba(30, 119, 116, 0.14);
+        border-color: rgba(30, 119, 116, 0.24);
+      }
+
+      .status-check {
+        color: #8a6113;
+        background: rgba(211, 167, 79, 0.18);
+        border-color: rgba(211, 167, 79, 0.32);
+      }
+
+      .status-fail {
+        color: #8a2430;
+        background: rgba(198, 77, 77, 0.15);
+        border-color: rgba(198, 77, 77, 0.3);
+      }
+
+      .detail-card {
+        min-height: 320px;
+        padding: 20px;
+        border-radius: 20px;
+        background:
+          linear-gradient(180deg, rgba(255, 249, 239, 0.96), rgba(248, 237, 220, 0.92)),
+          var(--panel-strong);
+      }
+
+      .detail-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .detail-meta .mini-box {
+        min-height: 84px;
+      }
+
+      .detail-links {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .detail-link {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 14px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: var(--text);
+        border: 1px solid rgba(98, 71, 39, 0.12);
+        background: rgba(255, 253, 247, 0.82);
+      }
+
+      .detail-link[data-inline-report="1"] {
+        border-color: rgba(30, 119, 116, 0.22);
+      }
+
+      .ops-drawer {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        width: min(420px, calc(100vw - 32px));
+        max-height: calc(100vh - 48px);
+        padding: 18px;
+        z-index: 30;
+        transform: translateX(calc(100% + 32px));
+        transition: transform 220ms ease;
+        overflow: auto;
+      }
+
+      .ops-drawer.open {
+        transform: translateX(0);
+      }
+
+      .drawer-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(35, 22, 11, 0.32);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 220ms ease;
+        z-index: 20;
+      }
+
+      .drawer-backdrop.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .action-button,
+      .ghost-button {
+        min-height: 42px;
+        padding: 0 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(98, 71, 39, 0.14);
+        cursor: pointer;
+      }
+
+      .action-button {
+        background: var(--teal);
+        color: white;
+      }
+
+      .ghost-button {
+        background: rgba(255, 252, 246, 0.84);
+        color: var(--text);
+      }
+
+      .toolbar input {
+        flex: 1 1 180px;
+        min-height: 42px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(98, 71, 39, 0.16);
+        background: rgba(255, 255, 255, 0.7);
+      }
+
+      .ops-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .ops-log {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(252, 246, 236, 0.92);
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+        white-space: pre-wrap;
+      }
+
+      .empty-state {
+        padding: 18px;
+        border-radius: 16px;
+        background: rgba(255, 251, 244, 0.72);
+        border: 1px dashed rgba(98, 71, 39, 0.16);
+        color: var(--muted);
+      }
+
+      .activity-lane {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 16px;
+        margin-top: 18px;
+      }
+
+      .lane-card {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        background: rgba(255, 251, 244, 0.74);
+      }
+
+      .lane-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .lane-item {
+        display: grid;
+        gap: 6px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(255, 254, 249, 0.86);
+        border: 1px solid rgba(98, 71, 39, 0.08);
+      }
+
+      .lane-item-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .lane-note {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        background: rgba(255, 246, 231, 0.9);
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .report-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        margin-top: 12px;
+        margin-bottom: 12px;
+      }
+
+      .report-meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .report-content {
+        min-height: 260px;
+        max-height: 520px;
+        overflow: auto;
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(98, 71, 39, 0.1);
+        background: rgba(255, 253, 247, 0.86);
+      }
+
+      .report-structured {
+        display: grid;
+        gap: 14px;
+      }
+
+      .report-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .report-summary-item {
+        min-height: 78px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(98, 71, 39, 0.09);
+        background: rgba(255, 250, 242, 0.94);
+      }
+
+      .report-summary-item strong {
+        display: block;
+        margin-top: 8px;
+        font-family: "Sora", sans-serif;
+        font-size: 16px;
+        line-height: 1.35;
+      }
+
+      .report-section {
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid rgba(98, 71, 39, 0.09);
+        background: rgba(255, 250, 242, 0.86);
+      }
+
+      .report-section h4 {
+        margin: 0 0 10px;
+        font-family: "Sora", sans-serif;
+        font-size: 14px;
+      }
+
+      .report-kv {
+        display: grid;
+        gap: 8px;
+      }
+
+      .report-kv-row {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .report-kv-key {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .report-kv-value {
+        font-size: 13px;
+        line-height: 1.6;
+        word-break: break-word;
+      }
+
+      .report-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .report-list-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(255, 254, 249, 0.88);
+        border: 1px solid rgba(98, 71, 39, 0.08);
+        font-size: 13px;
+        line-height: 1.6;
+        word-break: break-word;
+      }
+
+      .report-collapsible {
+        border-radius: 12px;
+        border: 1px solid rgba(98, 71, 39, 0.08);
+        background: rgba(255, 254, 249, 0.88);
+        padding: 10px 12px;
+      }
+
+      .report-collapsible summary {
+        cursor: pointer;
+        color: var(--brown);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .report-inline-link {
+        color: var(--teal);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(30, 119, 116, 0.25);
+      }
+
+      .report-raw {
+        display: grid;
+        gap: 8px;
+      }
+
+      .report-pre {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      @media (max-width: 1180px) {
+        .topbar,
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .status-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .overview-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .app-shell {
+          padding: 16px;
+        }
+
+        .status-strip,
+        .cafe-strip,
+        .stage-grid,
+        .activity-lane,
+        .report-summary-grid,
+        .detail-meta,
+        .ops-actions {
+          grid-template-columns: 1fr;
+        }
+
+        .report-kv-row {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+
+        .seat-grid,
+        .directory-list,
+        .mini-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .seat-stage {
+          min-height: auto;
+          padding: 16px;
+        }
+
+        .ops-drawer {
+          top: 12px;
+          right: 12px;
+          max-height: calc(100vh - 24px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <section class="topbar">
+        <article class="hero">
+          <p class="eyebrow">Spatial Operations Studio</p>
+          <h1>Nautilus를 스터디카페처럼 보고 운영하는 화면</h1>
+          <p id="heroSummary">최근 에이전트 상태와 결과물을 공간형 레이아웃으로 묶어 보여줍니다.</p>
+          <div class="hero-meta">
+            <span class="chip" id="chipWave"><span class="chip-dot"></span><span id="heroWave">wave -</span></span>
+            <span class="chip" id="chipFsm"><span class="chip-dot"></span><span id="heroFsm">fsm -</span></span>
+            <span class="chip" id="chipResume"><span class="chip-dot"></span><span id="heroResume">resume -</span></span>
+          </div>
+        </article>
+        <section class="status-strip">
+          <article class="stat-card" id="cardProfiles">
+            <div class="stat-label">활성 프로필</div>
+            <div class="stat-value" id="statProfiles">-</div>
+          </article>
+          <article class="stat-card" id="cardStreams">
+            <div class="stat-label">활성 스트림</div>
+            <div class="stat-value" id="statStreams">-</div>
+          </article>
+          <article class="stat-card" id="cardAttention">
+            <div class="stat-label">도움 필요</div>
+            <div class="stat-value" id="statAttention">-</div>
+          </article>
+          <article class="stat-card" id="cardScore">
+            <div class="stat-label">평균 점수</div>
+            <div class="stat-value" id="statScore">-</div>
+          </article>
+        </section>
+      </section>
+
+      <section class="layout">
+        <div class="main-stack">
+          <section class="panel seat-stage">
+            <div class="panel-head">
+              <div>
+                <p class="section-eyebrow">Seat Map</p>
+                <h2>에이전트 작업 공간</h2>
+                <p>프로필을 좌석 단위로 보고, 클릭하면 오른쪽 상세 카드가 바뀝니다.</p>
+              </div>
+              <button class="ghost-button" id="openOpsButton" type="button">운영 드로어</button>
+            </div>
+            <div class="cafe-strip">
+              <section class="pass-card">
+                <div class="pass-top">
+                  <div>
+                    <p class="section-eyebrow" style="margin-bottom:6px;">Daily Pass</p>
+                    <div class="pass-title">AI Builder Day Ticket</div>
+                    <div class="muted" id="passSummary">오늘 wave와 운영 상태를 한 장의 작업권처럼 봅니다.</div>
+                  </div>
+                  <span class="score-pill" id="passStatusBadge">OPEN</span>
+                </div>
+                <div class="barcode-row">
+                  <div class="barcode" aria-hidden="true"></div>
+                  <div class="muted" id="passWaveCode">wave-</div>
+                </div>
+              </section>
+              <section class="room-directory">
+                <div class="directory-top">
+                  <div>
+                    <p class="section-eyebrow" style="margin-bottom:6px;">Room Guide</p>
+                    <div class="directory-title">오늘의 작업실 안내</div>
+                  </div>
+                  <span class="small-pill score-pill">FLOORS</span>
+                </div>
+                <div class="directory-list" id="roomDirectory"></div>
+              </section>
+            </div>
+            <section class="workshop-map" id="workshopMap">
+              <div class="workshop-lobby">ENTRANCE LOBBY</div>
+            </section>
+            <div class="stage-meta">
+              <div class="legend-row">
+                <span class="small-pill status-pass">PASS / PASS*</span>
+                <span class="small-pill status-check">CHECK</span>
+                <span class="small-pill status-fail">FAIL</span>
+              </div>
+              <span class="muted" id="seatMapHint">좌석을 고르면 우측 카드와 activity lane이 함께 바뀝니다.</span>
+            </div>
+            <div class="stage-grid" id="seatZones"></div>
+            <div class="activity-lane">
+              <section class="lane-card">
+                <p class="section-eyebrow">Activity Lane</p>
+                <h3 style="margin:0;">최근 움직임</h3>
+                <div class="lane-list" id="activityLane"></div>
+              </section>
+              <section class="lane-card">
+                <p class="section-eyebrow">Selection Note</p>
+                <h3 style="margin:0;">선택된 좌석 맥락</h3>
+                <div class="lane-note" id="selectionNote">좌석을 선택하면 최근 이벤트와 방 맥락을 요약합니다.</div>
+              </section>
+            </div>
+          </section>
+
+          <div class="overview-grid">
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="section-eyebrow">Floor View</p>
+                  <h2>방과 혼잡도</h2>
+                  <p>stage와 stream 기준으로 에이전트가 머무는 구역을 봅니다.</p>
+                </div>
+              </div>
+              <div class="floor-list" id="roomsList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div>
+                  <p class="section-eyebrow">Help Desk</p>
+                  <h2>막힌 일 큐</h2>
+                  <p>`CHECK`와 `FAIL`을 먼저 모아 운영 개입 지점을 드러냅니다.</p>
+                </div>
+              </div>
+              <div class="help-list" id="helpList"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="stack">
+          <section class="panel detail-card">
+            <div class="panel-head">
+              <div>
+                <p class="section-eyebrow">Agent Card</p>
+                <h2 id="detailName">좌석을 선택하세요</h2>
+                <p id="detailSummary">가운데 공간에서 에이전트를 고르면 최근 상태와 산출 연결을 볼 수 있습니다.</p>
+              </div>
+              <span class="status-pill status-check" id="detailStatus">idle</span>
+            </div>
+            <div class="detail-meta" id="detailMeta">
+              <div class="mini-box"><span class="muted">현재 방</span><strong>-</strong></div>
+              <div class="mini-box"><span class="muted">최근 wave</span><strong>-</strong></div>
+              <div class="mini-box"><span class="muted">점수</span><strong>-</strong></div>
+              <div class="mini-box"><span class="muted">최근 업데이트</span><strong>-</strong></div>
+            </div>
+            <div class="detail-links" id="detailLinks"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="section-eyebrow">Report Viewer</p>
+                <h2 id="reportTitle">산출물 미리보기</h2>
+                <p id="reportSubtitle">로컬 report나 lineage 산출물을 새 탭 없이 여기서 바로 확인합니다.</p>
+              </div>
+            </div>
+            <div class="report-toolbar">
+              <span class="report-meta" id="reportMeta">아직 선택된 report가 없습니다.</span>
+              <a class="ghost-button" id="reportOpenRaw" href="#" target="_blank" rel="noreferrer" style="display:none; text-decoration:none; align-items:center;">원본 열기</a>
+            </div>
+            <div class="report-content" id="reportContent">
+              <div class="empty-state">detail 카드의 `report 열기` 또는 showcase의 `연결 열기`를 누르면 이 패널에서 내용을 읽습니다.</div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="section-eyebrow">Showcase</p>
+                <h2>최근 결과물</h2>
+                <p>점수와 링크가 있는 이벤트를 묶어 빠르게 훑어봅니다.</p>
+              </div>
+            </div>
+            <div class="showcase-list" id="showcaseList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <p class="section-eyebrow">Live Feed</p>
+                <h2>스트림별 최근 이벤트</h2>
+                <p>메인 작업방, 야간 자동화실, 메모리/기록실 흐름을 나란히 봅니다.</p>
+              </div>
+            </div>
+            <div class="feed-streams" id="feedList"></div>
+          </section>
+        </div>
+      </section>
+    </div>
+
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <aside class="ops-drawer" id="opsDrawer">
+      <div class="panel-head">
+        <div>
+          <p class="section-eyebrow">Ops Drawer</p>
+          <h2>운영 상태와 제어</h2>
+          <p>기존 Hermes 운영 액션은 여기에서 유지합니다.</p>
+        </div>
+        <button class="ghost-button" id="closeOpsButton" type="button">닫기</button>
+      </div>
+
+      <div class="mini-grid" id="opsSummary"></div>
+
+      <div class="toolbar" style="margin-top: 14px;">
+        <input id="opsTokenInput" type="password" placeholder="EXEC or READ token" />
+        <button class="ghost-button" id="saveTokenButton" type="button">토큰 저장</button>
+      </div>
+
+      <div class="ops-actions">
+        <button class="action-button" type="button" data-action="refresh">refresh</button>
+        <button class="ghost-button" type="button" data-action="resume_core">resume_core</button>
+        <button class="ghost-button" type="button" data-action="pause_all">pause_all</button>
+        <button class="ghost-button" type="button" data-action="finalize_once">finalize_once</button>
+      </div>
+
+      <div class="ops-log" id="opsLog">운영 액션 결과가 여기에 표시됩니다.</div>
+    </aside>
+
+    <script>
+      const config = window.NAUTILUS_V2_CONFIG || {};
+      const derivedBase = new URLSearchParams(window.location.search).get("derived") || config.derivedBaseUrl || "../dashboard/derived";
+      const opsApiBase = new URLSearchParams(window.location.search).get("api") || config.opsApiBaseUrl || "http://127.0.0.1:8788";
+      const roomLabelById = {};
+      let isBooting = false;
+      let currentReportPath = null;
+      let previousSnapshot = null;
+      let highlightTimeout = null;
+      let changedKeys = new Set();
+      let appState = {
+        rooms: [],
+        seats: [],
+        helpQueue: [],
+        showcase: [],
+        feed: [],
+        kpis: null,
+        ops: null,
+        selectedSeatId: null
+      };
+
+      function fetchJson(name) {
+        return fetch(`${derivedBase}/${name}`, { cache: "no-store" }).then((response) => {
+          if (!response.ok) {
+            throw new Error(`${name} ${response.status}`);
+          }
+          return response.json();
+        });
+      }
+
+      function isExternalLink(value) {
+        return /^https?:\/\//i.test(String(value || ""));
+      }
+
+      function normalizeArtifactHref(value) {
+        const text = String(value || "").trim();
+        if (!text) return null;
+        if (isExternalLink(text)) return text;
+        const clean = text.replace(/^\.?\//, "");
+        return `../${clean}`;
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function buildAnchor(label, href, extraStyle = "") {
+        const normalized = normalizeArtifactHref(href);
+        if (!normalized) return "";
+        const target = isExternalLink(href) ? ` target="_blank" rel="noreferrer"` : "";
+        const styleAttr = extraStyle ? ` style="${extraStyle}"` : "";
+        const inlineAttr = isExternalLink(href) ? "" : ` data-inline-report="1" data-artifact-path="${escapeHtml(normalized)}"`;
+        return `<a class="detail-link" href="${normalized}"${target}${inlineAttr}${styleAttr}>${label}</a>`;
+      }
+
+      function formatStatus(status) {
+        return String(status || "").toUpperCase() || "-";
+      }
+
+      function statusClass(status) {
+        const normalized = String(status || "").toUpperCase().replace("*", "STAR");
+        if (normalized === "FAIL") return "status-fail";
+        if (normalized === "CHECK") return "status-check";
+        return normalized === "PASSSTAR" ? "status-passstar" : "status-pass";
+      }
+
+      function formatDate(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString("ko-KR", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        });
+      }
+
+      function formatScore(value) {
+        if (value === null || value === undefined || value === "") return "-";
+        return typeof value === "number" ? `${value}` : String(value);
+      }
+
+      function avatarLabel(name) {
+        return String(name || "?").slice(0, 1);
+      }
+
+      function setText(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+      }
+
+      function captureSnapshot() {
+        const summary = appState.kpis ? appState.kpis.summary || {} : {};
+        const ops = appState.ops || {};
+        return {
+          wave: summary.latest_wave_id || "-",
+          fsm: ops.fsm ? ops.fsm.state : "-",
+          resume: ops.generation ? ops.generation.resume_recommendation : "-",
+          active_profiles: String(summary.active_profiles || 0),
+          active_streams: String(summary.active_streams || 0),
+          attention: String((summary.check_count || 0) + (summary.fail_count || 0)),
+          avg_score: summary.avg_score ? String(summary.avg_score) : "-",
+          decision: ops.generation ? ops.generation.decision : "-",
+          heartbeat: ops.heartbeat && ops.heartbeat.alive ? "alive" : "down"
+        };
+      }
+
+      function updateChangedKeys() {
+        const nextSnapshot = captureSnapshot();
+        const nextChanged = new Set();
+        if (previousSnapshot) {
+          Object.keys(nextSnapshot).forEach((key) => {
+            if (previousSnapshot[key] !== nextSnapshot[key]) {
+              nextChanged.add(key);
+            }
+          });
+        }
+        previousSnapshot = nextSnapshot;
+        changedKeys = nextChanged;
+        if (highlightTimeout) {
+          clearTimeout(highlightTimeout);
+          highlightTimeout = null;
+        }
+        if (changedKeys.size) {
+          highlightTimeout = setTimeout(() => {
+            changedKeys = new Set();
+            applyChangeHighlights();
+          }, 2200);
+        }
+      }
+
+      function toggleFlash(id, on) {
+        const element = document.getElementById(id);
+        if (!element) return;
+        element.classList.toggle("flash-change", on);
+      }
+
+      function applyChangeHighlights() {
+        toggleFlash("chipWave", changedKeys.has("wave"));
+        toggleFlash("chipFsm", changedKeys.has("fsm") || changedKeys.has("decision"));
+        toggleFlash("chipResume", changedKeys.has("resume"));
+        toggleFlash("cardProfiles", changedKeys.has("active_profiles"));
+        toggleFlash("cardStreams", changedKeys.has("active_streams"));
+        toggleFlash("cardAttention", changedKeys.has("attention"));
+        toggleFlash("cardScore", changedKeys.has("avg_score"));
+        document.querySelectorAll("[data-ops-key]").forEach((element) => {
+          const key = element.getAttribute("data-ops-key");
+          element.classList.toggle("flash-change", changedKeys.has(key));
+        });
+      }
+
+      function renderTopbar() {
+        const summary = appState.kpis ? appState.kpis.summary : {};
+        const ops = appState.ops || {};
+        setText("heroWave", `${summary.latest_wave_id || "-"}`);
+        setText("heroFsm", `fsm ${ops.fsm ? ops.fsm.state : "-"}`);
+        setText("heroResume", `resume ${ops.generation ? ops.generation.resume_recommendation : "-"}`);
+        setText("statProfiles", String(summary.active_profiles || 0));
+        setText("statStreams", String(summary.active_streams || 0));
+        setText("statAttention", String((summary.check_count || 0) + (summary.fail_count || 0)));
+        setText("statScore", summary.avg_score ? String(summary.avg_score) : "-");
+        const sentence = [
+          `${summary.latest_wave_id || "-"} 기준`,
+          `${summary.active_profiles || 0}개 프로필`,
+          `CHECK ${summary.check_count || 0}`,
+          `FAIL ${summary.fail_count || 0}`
+        ].join(" · ");
+        setText("heroSummary", sentence);
+        setText("passSummary", `${summary.active_profiles || 0}개 프로필이 오늘 작업권을 사용 중입니다.`);
+        setText("passWaveCode", summary.latest_wave_id || "wave-");
+        setText("passStatusBadge", ops.fsm ? ops.fsm.state : "OPEN");
+        applyChangeHighlights();
+      }
+
+      function renderRooms() {
+        const root = document.getElementById("roomsList");
+        if (!appState.rooms.length) {
+          root.innerHTML = `<div class="empty-state">방 데이터가 아직 없습니다.</div>`;
+          return;
+        }
+        root.innerHTML = appState.rooms.map((room) => {
+          roomLabelById[room.room_id] = room.name;
+          return `
+            <article class="floor-card">
+              <div class="row">
+                <div>
+                  <div class="room-name">${room.name}</div>
+                  <div class="muted">${room.stream_label || room.stream_id || "-"} · ${room.latest_wave_id || "-"}</div>
+                </div>
+                <span class="status-pill ${statusClass(room.dominant_status)}">${formatStatus(room.dominant_status)}</span>
+              </div>
+              <div class="mini-grid">
+                <div class="mini-box"><span class="muted">활성 좌석</span><strong>${room.active_count}</strong></div>
+                <div class="mini-box"><span class="muted">CHECK</span><strong>${room.check_count}</strong></div>
+                <div class="mini-box"><span class="muted">FAIL</span><strong>${room.fail_count}</strong></div>
+              </div>
+            </article>
+          `;
+        }).join("");
+      }
+
+      function roomOrder(roomId) {
+        const order = {
+          "plan-room": 1,
+          "build-room": 2,
+          "qa-room": 3,
+          "dispatch-room": 4,
+          "orchestrator-room": 5,
+          "ops-room": 6,
+          "unknown-room": 7
+        };
+        return order[roomId] || 99;
+      }
+
+      function renderSeatZones() {
+        const root = document.getElementById("seatZones");
+        if (!appState.seats.length) {
+          root.innerHTML = `<div class="empty-state">좌석 데이터가 아직 없습니다.</div>`;
+          return;
+        }
+        const grouped = new Map();
+        appState.seats.forEach((seat) => {
+          if (!grouped.has(seat.room_id)) grouped.set(seat.room_id, []);
+          grouped.get(seat.room_id).push(seat);
+        });
+        const roomIds = [...grouped.keys()].sort((a, b) => roomOrder(a) - roomOrder(b));
+        root.innerHTML = roomIds.map((roomId) => {
+          const seats = grouped.get(roomId).sort((a, b) => (b.score || 0) - (a.score || 0));
+          const roomName = roomLabelById[roomId] || roomId;
+          const zoneClass = roomId.includes("plan") ? "sign-plan" : roomId.includes("dispatch") || roomId.includes("build") ? "sign-build" : roomId.includes("qa") ? "sign-verify" : roomId.includes("orchestrator") ? "sign-orchestrate" : "";
+          return `
+            <section class="zone ${zoneClass}">
+              <div class="zone-head">
+                <div>
+                  <div class="zone-title">${roomName}</div>
+                  <div class="muted">${seats[0] ? seats[0].stream_label : "-"}</div>
+                </div>
+                <span class="small-pill score-pill">${seats.length} seats</span>
+              </div>
+              <div class="seat-grid">
+                ${seats.map((seat) => `
+                  <article class="seat-card ${appState.selectedSeatId === seat.seat_id ? "active" : ""}" data-seat-id="${seat.seat_id}" data-seat-label="${seat.display_name} seat">
+                    <div class="seat-top">
+                      <div style="display:flex; gap:10px; align-items:center;">
+                        <div class="avatar">${avatarLabel(seat.display_name)}</div>
+                        <div>
+                          <div class="seat-name">${seat.display_name}</div>
+                          <div class="muted">${seat.wave_id || "-"} · ${seat.stage || "-"}</div>
+                        </div>
+                      </div>
+                      <span class="status-pill ${statusClass(seat.status)}">${formatStatus(seat.status)}</span>
+                    </div>
+                    <div class="seat-summary">${seat.summary || "최근 요약 없음"}</div>
+                    <div class="row">
+                      <span class="score-pill">score ${formatScore(seat.score)}</span>
+                      <span class="muted">${formatDate(seat.last_event_at)}</span>
+                    </div>
+                  </article>
+                `).join("")}
+              </div>
+            </section>
+          `;
+        }).join("");
+        root.querySelectorAll("[data-seat-id]").forEach((element) => {
+          element.addEventListener("click", () => {
+            appState.selectedSeatId = element.getAttribute("data-seat-id");
+            renderSeatZones();
+            renderDetail();
+          });
+        });
+      }
+
+      function renderRoomDirectory() {
+        const root = document.getElementById("roomDirectory");
+        if (!root) return;
+        if (!appState.rooms.length) {
+          root.innerHTML = `<div class="directory-item">아직 방 데이터가 없습니다.</div>`;
+          return;
+        }
+        root.innerHTML = appState.rooms.map((room) => `
+          <div class="directory-item">
+            <strong style="display:block; color:var(--text); font-family:'Sora', sans-serif; margin-bottom:4px;">${room.name}</strong>
+            ${room.active_count} seats · ${room.stream_label || room.stream_id || "-"}
+          </div>
+        `).join("");
+      }
+
+      function renderWorkshopMap() {
+        const root = document.getElementById("workshopMap");
+        if (!root) return;
+        const grouped = new Map();
+        appState.seats.forEach((seat) => {
+          if (!grouped.has(seat.room_id)) grouped.set(seat.room_id, []);
+          grouped.get(seat.room_id).push(seat);
+        });
+        const layouts = {
+          "dispatch-room": { left: "3%", top: "18%", width: "45%", height: "56%", cls: "build" },
+          "orchestrator-room": { left: "53%", top: "18%", width: "28%", height: "34%", cls: "orchestrate" },
+          "qa-room": { left: "53%", top: "56%", width: "28%", height: "20%", cls: "verify" },
+          "plan-room": { left: "83%", top: "22%", width: "14%", height: "26%", cls: "plan" }
+        };
+        const roomsHtml = [...grouped.keys()].map((roomId) => {
+          const seats = grouped.get(roomId) || [];
+          const layout = layouts[roomId] || { left: "83%", top: "54%", width: "14%", height: "22%", cls: "plan" };
+          const roomName = roomLabelById[roomId] || roomId;
+          return `
+            <section class="map-room ${layout.cls}" style="left:${layout.left}; top:${layout.top}; width:${layout.width}; min-height:${layout.height};">
+              <div class="map-room-title">${roomName}</div>
+              <div class="map-room-meta">${seats.length} seats · ${seats[0] ? seats[0].stream_label : "-"}</div>
+              <div class="map-seats">
+                ${seats.map((seat) => `
+                  <div class="map-seat ${appState.selectedSeatId === seat.seat_id ? "active" : ""}" data-seat-id="${seat.seat_id}">
+                    <div class="map-seat-avatar">${avatarLabel(seat.display_name)}</div>
+                    <div class="map-seat-name">${seat.display_name}</div>
+                    <span class="status-pill ${statusClass(seat.status)} map-seat-state">${formatStatus(seat.status)}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </section>
+          `;
+        }).join("");
+        root.innerHTML = `<div class="workshop-lobby">ENTRANCE LOBBY</div>${roomsHtml}`;
+        root.querySelectorAll("[data-seat-id]").forEach((element) => {
+          element.addEventListener("click", () => {
+            appState.selectedSeatId = element.getAttribute("data-seat-id");
+            renderWorkshopMap();
+            renderSeatZones();
+            renderDetail();
+          });
+        });
+      }
+
+      function renderHelpQueue() {
+        const root = document.getElementById("helpList");
+        if (!appState.helpQueue.length) {
+          root.innerHTML = `<div class="empty-state">현재 개입이 필요한 이벤트가 없습니다.</div>`;
+          return;
+        }
+        root.innerHTML = appState.helpQueue.map((item) => `
+          <article class="queue-item">
+            <div class="queue-top">
+              <div class="queue-title">${item.display_name}</div>
+              <span class="status-pill ${statusClass(item.status)}">${formatStatus(item.status)}</span>
+            </div>
+            <p class="muted">${item.wave_id || "-"} · ${item.stream_label || item.stream_id || "-"}</p>
+            <div style="margin-top:8px; line-height:1.55;">${item.summary || "요약 없음"}</div>
+            <div class="row" style="margin-top:12px;">
+              <span class="score-pill">${item.priority}</span>
+              <span class="muted">${formatDate(item.last_event_at)}</span>
+            </div>
+          </article>
+        `).join("");
+      }
+
+      function renderShowcase() {
+        const root = document.getElementById("showcaseList");
+        if (!appState.showcase.length) {
+          root.innerHTML = `<div class="empty-state">아직 표시할 결과물이 없습니다.</div>`;
+          return;
+        }
+        root.innerHTML = appState.showcase.slice(0, 5).map((item) => {
+          const link = item.links && (item.links.pr || item.links.commit || item.links.report);
+          return `
+            <article class="showcase-card">
+              <div class="showcase-top">
+                <div class="showcase-title">${item.display_name}</div>
+                <span class="score-pill">score ${formatScore(item.score)}</span>
+              </div>
+              <p class="muted">${item.wave_id || "-"} · ${formatDate(item.published_at)}</p>
+              <div style="line-height:1.55; margin-top:8px;">${item.summary || item.title || "-"}</div>
+              ${link ? buildAnchor("연결 열기", link, "margin-top:12px;") : ""}
+            </article>
+          `;
+        }).join("");
+      }
+
+      function renderFeed() {
+        const root = document.getElementById("feedList");
+        if (!appState.feed.length) {
+          root.innerHTML = `<div class="empty-state">스트림 피드가 아직 없습니다.</div>`;
+          return;
+        }
+        root.innerHTML = appState.feed.map((stream) => `
+          <article class="feed-card">
+            <div class="showcase-top">
+              <div class="showcase-title">${stream.stream_label || stream.stream_id}</div>
+              <span class="small-pill score-pill">${stream.items.length} items</span>
+            </div>
+            <div style="display:grid; gap:10px; margin-top:12px;">
+              ${stream.items.map((item) => `
+                <div>
+                  <div class="row">
+                    <strong>${item.display_name}</strong>
+                    <span class="status-pill ${statusClass(item.status)}">${formatStatus(item.status)}</span>
+                  </div>
+                  <div class="muted" style="margin-top:4px;">${item.wave_id || "-"} · ${formatDate(item.timestamp)}</div>
+                  <div style="margin-top:6px; font-size:13px; line-height:1.5;">${item.summary || "-"}</div>
+                </div>
+              `).join("")}
+            </div>
+          </article>
+        `).join("");
+      }
+
+      function renderDetail() {
+        const seat = appState.seats.find((item) => item.seat_id === appState.selectedSeatId) || appState.seats[0];
+        if (!seat) {
+          return;
+        }
+        appState.selectedSeatId = seat.seat_id;
+        setText("detailName", seat.display_name);
+        setText("detailSummary", seat.summary || "최근 요약 없음");
+        const detailStatus = document.getElementById("detailStatus");
+        detailStatus.className = `status-pill ${statusClass(seat.status)}`;
+        detailStatus.textContent = formatStatus(seat.status);
+        const meta = document.getElementById("detailMeta");
+        meta.innerHTML = `
+          <div class="mini-box"><span class="muted">현재 방</span><strong>${roomLabelById[seat.room_id] || seat.room_id}</strong></div>
+          <div class="mini-box"><span class="muted">최근 wave</span><strong>${seat.wave_id || "-"}</strong></div>
+          <div class="mini-box"><span class="muted">점수</span><strong>${formatScore(seat.score)}</strong></div>
+          <div class="mini-box"><span class="muted">최근 업데이트</span><strong>${formatDate(seat.last_event_at)}</strong></div>
+        `;
+        const links = document.getElementById("detailLinks");
+        const linkItems = [];
+        if (seat.links && seat.links.commit) linkItems.push(buildAnchor("commit 열기", seat.links.commit));
+        if (seat.links && seat.links.pr) linkItems.push(buildAnchor("PR 열기", seat.links.pr));
+        if (seat.links && seat.links.report) linkItems.push(buildAnchor("report 열기", seat.links.report));
+        links.innerHTML = linkItems.length ? linkItems.join("") : `<div class="empty-state">연결된 산출 링크가 아직 없습니다.</div>`;
+        const autoReportPath = seat.links && seat.links.report ? normalizeArtifactHref(seat.links.report) : null;
+        if (autoReportPath && !isExternalLink(seat.links.report) && currentReportPath !== autoReportPath) {
+          openArtifactInViewer(autoReportPath, `${seat.display_name} report`);
+        }
+        renderActivityLane(seat);
+      }
+
+      function renderActivityLane(selectedSeat) {
+        const root = document.getElementById("activityLane");
+        const note = document.getElementById("selectionNote");
+        const entries = [];
+        appState.feed.forEach((stream) => {
+          (stream.items || []).forEach((item) => {
+            entries.push({
+              streamLabel: stream.stream_label || stream.stream_id,
+              item
+            });
+          });
+        });
+        const related = entries.filter((entry) => entry.item.profile_id === selectedSeat.profile_id);
+        const finalItems = (related.length ? related : entries).slice(0, 3);
+        if (!finalItems.length) {
+          root.innerHTML = `<div class="empty-state">최근 활동 데이터가 없습니다.</div>`;
+        } else {
+          root.innerHTML = finalItems.map((entry) => `
+            <article class="lane-item">
+              <div class="lane-item-head">
+                <strong>${entry.item.display_name}</strong>
+                <span class="status-pill ${statusClass(entry.item.status)}">${formatStatus(entry.item.status)}</span>
+              </div>
+              <div class="muted">${entry.streamLabel} · ${entry.item.wave_id || "-"} · ${formatDate(entry.item.timestamp)}</div>
+              <div>${entry.item.summary || "-"}</div>
+            </article>
+          `).join("");
+        }
+        note.textContent = `${selectedSeat.display_name}는 ${roomLabelById[selectedSeat.room_id] || selectedSeat.room_id}에 있고, ${selectedSeat.stream_label || selectedSeat.stream_id || "-"} 흐름에서 ${selectedSeat.status || "-"} 상태입니다. 최근 메모는 "${selectedSeat.summary || "요약 없음"}" 입니다.`;
+      }
+
+      function renderOps() {
+        const root = document.getElementById("opsSummary");
+        const ops = appState.ops || {};
+        root.innerHTML = `
+          <div class="mini-box ${changedKeys.has("fsm") ? "flash-change" : ""}" data-ops-key="fsm"><span class="muted">FSM</span><strong>${ops.fsm ? ops.fsm.state : "-"}</strong></div>
+          <div class="mini-box ${changedKeys.has("resume") ? "flash-change" : ""}" data-ops-key="resume"><span class="muted">resume</span><strong>${ops.generation ? ops.generation.resume_recommendation : "-"}</strong></div>
+          <div class="mini-box ${changedKeys.has("decision") ? "flash-change" : ""}" data-ops-key="decision"><span class="muted">decision</span><strong>${ops.generation ? ops.generation.decision : "-"}</strong></div>
+          <div class="mini-box ${changedKeys.has("heartbeat") ? "flash-change" : ""}" data-ops-key="heartbeat"><span class="muted">heartbeat</span><strong>${ops.heartbeat && ops.heartbeat.alive ? "alive" : "down"}</strong></div>
+        `;
+      }
+
+      function setOpsLog(text) {
+        document.getElementById("opsLog").textContent = text;
+      }
+
+      function setReportViewer(title, subtitle, meta, bodyHtml, rawHref) {
+        setText("reportTitle", title);
+        setText("reportSubtitle", subtitle);
+        setText("reportMeta", meta);
+        document.getElementById("reportContent").innerHTML = bodyHtml;
+        const raw = document.getElementById("reportOpenRaw");
+        if (rawHref) {
+          raw.href = rawHref;
+          raw.style.display = "inline-flex";
+        } else {
+          raw.href = "#";
+          raw.style.display = "none";
+        }
+      }
+
+      function prettyLabel(key) {
+        return String(key || "")
+          .replaceAll("_", " ")
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+      }
+
+      function renderValue(value) {
+        if (value === null || value === undefined || value === "") return "-";
+        if (typeof value === "object") {
+          return `<pre class="report-pre">${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+        }
+        return escapeHtml(String(value));
+      }
+
+      function renderMaybeLongText(value, label = "자세히 보기") {
+        if (value === null || value === undefined || value === "") return "-";
+        const text = String(value);
+        if (text.length <= 160 && !text.includes("\n")) {
+          return escapeHtml(text);
+        }
+        const preview = `${text.slice(0, 160).trim()}...`;
+        return `
+          <details class="report-collapsible">
+            <summary>${label}</summary>
+            <div class="report-kv-value">${escapeHtml(preview)}</div>
+            <pre class="report-pre" style="margin-top:10px;">${escapeHtml(text)}</pre>
+          </details>
+        `;
+      }
+
+      function buildKvRows(source, keys) {
+        return keys
+          .filter((key) => source && source[key] !== undefined && source[key] !== null)
+          .map((key) => `
+            <div class="report-kv-row">
+              <div class="report-kv-key">${prettyLabel(key)}</div>
+              <div class="report-kv-value">${typeof source[key] === "string" ? renderMaybeLongText(source[key], `${prettyLabel(key)} 펼치기`) : renderValue(source[key])}</div>
+            </div>
+          `)
+          .join("");
+      }
+
+      function buildListSection(title, items) {
+        if (!Array.isArray(items) || !items.length) return "";
+        return `
+          <section class="report-section">
+            <h4>${title}</h4>
+            <div class="report-list">
+              ${items.map((item) => `<div class="report-list-item">${typeof item === "string" ? renderMaybeLongText(item, `${title} 펼치기`) : renderValue(item)}</div>`).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function buildArtifactPathSection(items) {
+        if (!Array.isArray(items) || !items.length) return "";
+        return `
+          <section class="report-section">
+            <h4>Artifact Paths</h4>
+            <div class="report-list">
+              ${items.map((item) => {
+                const href = normalizeArtifactHref(item);
+                if (!href) {
+                  return `<div class="report-list-item">${escapeHtml(String(item))}</div>`;
+                }
+                return `
+                  <div class="report-list-item">
+                    <a class="report-inline-link" href="${href}" data-inline-report="1" data-artifact-path="${escapeHtml(href)}">${escapeHtml(String(item))}</a>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function buildStructuredJsonView(data, rawText) {
+        const summaryCards = [
+          { label: "Wave", value: data.wave_id || data.trigger_wave || data.next_wave || "-" },
+          { label: "Profile", value: data.profile_id || (data.result && data.result.profile_id) || "-" },
+          { label: "Status", value: data.status || (data.result && data.result.status) || "-" },
+          { label: "Score", value: data.score ?? (data.result && data.result.score) ?? "-" }
+        ];
+
+        const topLevelRows = buildKvRows(data, ["run_id", "event_id", "trigger_wave", "next_wave", "parent_wave_id", "created_at", "timestamp", "generated_at"]);
+        const resultRows = buildKvRows(data.result || {}, ["goal", "started_at", "ended_at", "exit_code", "status", "score"]);
+        const linkItems = [];
+        if (data.links && typeof data.links === "object") {
+          Object.entries(data.links).forEach(([key, value]) => {
+            if (!value) return;
+            const href = normalizeArtifactHref(value);
+            if (!href) return;
+            const target = isExternalLink(value) ? ` target="_blank" rel="noreferrer"` : "";
+            const inlineAttr = isExternalLink(value) ? "" : ` data-inline-report="1" data-artifact-path="${escapeHtml(href)}"`;
+            linkItems.push(`<a class="detail-link" href="${href}"${target}${inlineAttr}>${prettyLabel(key)}</a>`);
+          });
+        }
+
+        return `
+          <div class="report-structured">
+            <div class="report-summary-grid">
+              ${summaryCards.map((card) => `
+                <div class="report-summary-item">
+                  <span class="report-kv-key">${card.label}</span>
+                  <strong>${escapeHtml(String(card.value))}</strong>
+                </div>
+              `).join("")}
+            </div>
+            ${topLevelRows ? `<section class="report-section"><h4>기본 메타데이터</h4><div class="report-kv">${topLevelRows}</div></section>` : ""}
+            ${resultRows ? `<section class="report-section"><h4>Result 요약</h4><div class="report-kv">${resultRows}</div></section>` : ""}
+            ${buildArtifactPathSection(data.artifact_paths)}
+            ${Array.isArray(data.tasks) && data.tasks.length ? `
+              <section class="report-section">
+                <h4>Tasks</h4>
+                <div class="report-list">
+                  ${data.tasks.map((task) => `
+                    <div class="report-list-item">
+                      <strong>${escapeHtml(task.profile_id || "-")}</strong><br />
+                      ${escapeHtml(task.goal || "-")}
+                    </div>
+                  `).join("")}
+                </div>
+              </section>
+            ` : ""}
+            ${linkItems.length ? `<section class="report-section"><h4>Links</h4><div class="detail-links">${linkItems.join("")}</div></section>` : ""}
+            <section class="report-section report-raw">
+              <h4>원문 JSON</h4>
+              <pre class="report-pre">${escapeHtml(rawText)}</pre>
+            </section>
+          </div>
+        `;
+      }
+
+      async function openArtifactInViewer(path, label = "산출물") {
+        if (!path) return;
+        currentReportPath = path;
+        setReportViewer(label, "산출물을 불러오는 중입니다.", path, `<div class="empty-state">로딩 중...</div>`, path);
+        try {
+          const response = await fetch(path, { cache: "no-store" });
+          if (!response.ok) {
+            throw new Error(`${response.status} ${response.statusText}`);
+          }
+          const text = await response.text();
+          const looksJson = path.endsWith(".json") || path.endsWith(".jsonl") || text.trim().startsWith("{") || text.trim().startsWith("[");
+          let content = text;
+          let subtitle = "텍스트 산출물";
+          if (looksJson) {
+            subtitle = path.endsWith(".jsonl") ? "JSONL 산출물" : "JSON 산출물";
+            if (path.endsWith(".jsonl")) {
+              const rows = text.split(/\r?\n/).filter(Boolean).slice(0, 20).map((line) => {
+                try {
+                  return JSON.stringify(JSON.parse(line), null, 2);
+                } catch {
+                  return line;
+                }
+              });
+              content = rows.join("\n\n");
+            } else {
+              try {
+                const parsed = JSON.parse(text);
+                content = JSON.stringify(parsed, null, 2);
+                const bodyHtml = buildStructuredJsonView(parsed, content);
+                setReportViewer(label, subtitle, path, bodyHtml, path);
+                return;
+              } catch {
+                content = text;
+              }
+            }
+          }
+          const bodyHtml = `<pre class="report-pre">${escapeHtml(content)}</pre>`;
+          setReportViewer(label, subtitle, path, bodyHtml, path);
+        } catch (error) {
+          setReportViewer(label, "산출물을 읽지 못했습니다.", path, `<div class="empty-state">load error: ${escapeHtml(error.message)}</div>`, path);
+        }
+      }
+
+      function bindArtifactLinks() {
+        document.addEventListener("click", (event) => {
+          const anchor = event.target.closest("a[data-inline-report='1']");
+          if (!anchor) return;
+          event.preventDefault();
+          const path = anchor.getAttribute("data-artifact-path");
+          const label = anchor.textContent.trim() || "산출물";
+          openArtifactInViewer(path, label);
+        });
+      }
+
+      function setOpsButtonsDisabled(disabled) {
+        document.querySelectorAll("[data-action]").forEach((button) => {
+          button.disabled = disabled;
+          button.style.opacity = disabled ? "0.6" : "1";
+          button.style.cursor = disabled ? "wait" : "pointer";
+        });
+      }
+
+      function bindDrawer() {
+        const drawer = document.getElementById("opsDrawer");
+        const backdrop = document.getElementById("drawerBackdrop");
+        function setOpen(open) {
+          drawer.classList.toggle("open", open);
+          backdrop.classList.toggle("show", open);
+        }
+        document.getElementById("openOpsButton").addEventListener("click", () => setOpen(true));
+        document.getElementById("closeOpsButton").addEventListener("click", () => setOpen(false));
+        backdrop.addEventListener("click", () => setOpen(false));
+      }
+
+      function bindOpsActions() {
+        const storageKey = "nautilus-v2-token";
+        const input = document.getElementById("opsTokenInput");
+        input.value = localStorage.getItem(storageKey) || "";
+        document.getElementById("saveTokenButton").addEventListener("click", () => {
+          localStorage.setItem(storageKey, input.value.trim());
+          setOpsLog("토큰을 로컬에 저장했습니다.");
+        });
+        document.querySelectorAll("[data-action]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const action = button.getAttribute("data-action");
+            const token = input.value.trim();
+            if (!action) return;
+            if (!token) {
+              setOpsLog("먼저 EXEC 또는 READ 토큰을 입력하세요.");
+              return;
+            }
+            setOpsButtonsDisabled(true);
+            setOpsLog(`${action} 실행 중...`);
+            try {
+              const response = await fetch(`${opsApiBase}/action`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ action })
+              });
+              const payload = await response.json();
+              if (!response.ok) {
+                throw new Error(payload.error || `${response.status}`);
+              }
+              setOpsLog(`${action} 완료\n${JSON.stringify(payload, null, 2)}\n\n화면을 다시 읽어오는 중...`);
+              await boot({ preserveLog: true });
+              setOpsLog(`${action} 완료\n${JSON.stringify(payload, null, 2)}\n\nread model을 다시 반영했습니다.`);
+            } catch (error) {
+              setOpsLog(`${action} 실패\n${error.message}`);
+            } finally {
+              setOpsButtonsDisabled(false);
+            }
+          });
+        });
+      }
+
+      async function boot(options = {}) {
+        if (isBooting) return;
+        isBooting = true;
+        try {
+          const [rooms, seats, helpQueue, showcase, feed, kpis, ops] = await Promise.all([
+            fetchJson("rooms.json"),
+            fetchJson("seats.json"),
+            fetchJson("help_queue.json"),
+            fetchJson("showcase.json"),
+            fetchJson("feed.json"),
+            fetchJson("kpis.json"),
+            fetchJson("ops_snapshot.json")
+          ]);
+          appState.rooms = rooms.items || [];
+          appState.seats = seats.items || [];
+          appState.helpQueue = helpQueue.items || [];
+          appState.showcase = showcase.items || [];
+          appState.feed = feed.items || [];
+          appState.kpis = kpis;
+          appState.ops = ops;
+          updateChangedKeys();
+          if (!appState.selectedSeatId && appState.seats[0]) {
+            appState.selectedSeatId = appState.seats[0].seat_id;
+          }
+          renderTopbar();
+          renderRoomDirectory();
+          renderWorkshopMap();
+          renderRooms();
+          renderSeatZones();
+          renderHelpQueue();
+          renderShowcase();
+          renderFeed();
+          renderDetail();
+          renderOps();
+          if (!options.preserveLog) {
+            setOpsLog(`마지막 동기화: ${new Date().toLocaleTimeString("ko-KR")}`);
+          }
+        } catch (error) {
+          document.getElementById("seatZones").innerHTML = `<div class="empty-state">load error: ${error.message}<br />repo root에서 <code>python -m http.server 8787</code> 후 <code>/dashboard-v2/</code>로 접속해 주세요.</div>`;
+          setOpsLog(`load error: ${error.message}`);
+        } finally {
+          isBooting = false;
+        }
+      }
+
+      bindDrawer();
+      bindOpsActions();
+      bindArtifactLinks();
+      boot();
+    </script>
+  </body>
+</html>

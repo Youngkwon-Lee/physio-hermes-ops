@@ -1,0 +1,22 @@
+{
+  "generated_at": "2026-05-24T16:34:02+09:00",
+  "items": [
+    {
+      "id": "evt-gen-close-wave-2-20260513T123227",
+      "priority": "medium",
+      "status": "CHECK",
+      "profile_id": "physio-orchestrator",
+      "display_name": "오케스트레이터",
+      "stream_id": "physio_bot",
+      "stream_label": "메인 작업방",
+      "wave_id": "wave-2",
+      "stage": "orchestrate",
+      "summary": "generation cycle close decision=YELLOW",
+      "retry_count": 0,
+      "last_event_at": "2026-05-13T12:32:27.792900+00:00",
+      "artifact_paths": [
+        "lineage/generation_cycle_state.json"
+      ]
+    }
+  ]
+}

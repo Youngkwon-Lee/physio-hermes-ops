@@ -1,0 +1,50 @@
+{
+  "generated_at": "2026-05-24T16:34:02+09:00",
+  "fsm": {
+    "state": "CAUTION",
+    "reason": "decision=YELLOW, check=1"
+  },
+  "generation": {
+    "decision": "YELLOW",
+    "resume_recommendation": "LIMITED_RESUME",
+    "status_breakdown": {
+      "PASS": 1,
+      "PASS*": 5,
+      "CHECK": 0,
+      "FAIL": 0
+    },
+    "wave_id": "wave-2"
+  },
+  "heartbeat": {
+    "generated_at": "2026-05-13T18:23:59",
+    "alive": true,
+    "source": "physio-heartbeat",
+    "event_count": 9,
+    "last_event_at": "2026-05-13T15:50:03",
+    "last_wave": "wave-2",
+    "dispatch_cursor": {
+      "queue_index": 1,
+      "task_index": 0,
+      "last_dispatched_at": "2026-05-13T16:00:16"
+    }
+  },
+  "spawn_state": {
+    "last_wave": 1,
+    "last_spawned_at": "2026-05-13T21:04:05"
+  },
+  "dispatch_state": {
+    "queue_index": 1,
+    "task_index": 0,
+    "completed_waves": [
+      "wave-2"
+    ],
+    "last_dispatched_wave": "wave-2",
+    "last_dispatched_at": "2026-05-13T16:00:16"
+  },
+  "actions": [
+    "refresh",
+    "pause_all",
+    "resume_core",
+    "finalize_once"
+  ]
+}

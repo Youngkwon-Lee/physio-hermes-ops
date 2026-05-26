@@ -1,0 +1,149 @@
+{
+  "generated_at": "2026-05-24T16:34:02+09:00",
+  "items": [
+    {
+      "id": "showcase:wave-1:physio-planner",
+      "profile_id": "physio-planner",
+      "display_name": "기획자",
+      "wave_id": "wave-1",
+      "score": 92,
+      "title": "task spec generated",
+      "summary": "task spec generated",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/7af9175f3f37ccbcf6bead5d31a4de05b550a843",
+        "pr": null,
+        "report": "docs/planning/SMOKE_REHEARSAL_V0_2.md"
+      },
+      "artifact_paths": [
+        "docs/planning/smoke_sandbox/TASK_SPEC_V2.md"
+      ],
+      "published_at": "2026-05-13T13:50:00+09:00"
+    },
+    {
+      "id": "showcase:wave-2:physio-frontend",
+      "profile_id": "physio-frontend",
+      "display_name": "프론트엔드",
+      "wave_id": "wave-2",
+      "score": 90,
+      "title": "Polish UI tasks from seed scope",
+      "summary": "Polish UI tasks from seed scope",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/84b1df514f76d9e93b1a705e96cf4ec87762a582",
+        "pr": null,
+        "report": "docs/reports/waves/dispatch_wave-2_task2_20260513_151316.json"
+      },
+      "artifact_paths": [
+        "docs/reports/waves/dispatch_wave-2_task2_20260513_151316.json"
+      ],
+      "published_at": "2026-05-13T15:13:16"
+    },
+    {
+      "id": "showcase:wave-1:physio-orchestrator",
+      "profile_id": "physio-orchestrator",
+      "display_name": "오케스트레이터",
+      "wave_id": "wave-1",
+      "score": 88,
+      "title": "final status compiled",
+      "summary": "final status compiled",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/7af9175f3f37ccbcf6bead5d31a4de05b550a843",
+        "pr": null,
+        "report": "docs/planning/SMOKE_REHEARSAL_V0_2.md"
+      },
+      "artifact_paths": [
+        "docs/planning/smoke_sandbox/ORCH_STATUS_V2.md"
+      ],
+      "published_at": "2026-05-13T13:54:00+09:00"
+    },
+    {
+      "id": "showcase:wave-1:physio-qa",
+      "profile_id": "physio-qa",
+      "display_name": "QA",
+      "wave_id": "wave-1",
+      "score": 85,
+      "title": "timeout but artifact exists",
+      "summary": "timeout but artifact exists",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/7af9175f3f37ccbcf6bead5d31a4de05b550a843",
+        "pr": null,
+        "report": "docs/planning/SMOKE_REHEARSAL_V0_2.md"
+      },
+      "artifact_paths": [
+        "docs/planning/smoke_sandbox/QA_VERIFY_V2.md"
+      ],
+      "published_at": "2026-05-13T13:52:00+09:00"
+    },
+    {
+      "id": "showcase:wave-2:physio-orchestrator",
+      "profile_id": "physio-orchestrator",
+      "display_name": "오케스트레이터",
+      "wave_id": "wave-2",
+      "score": 80,
+      "title": "generation cycle close decision=YELLOW",
+      "summary": "generation cycle close decision=YELLOW",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/70b7fe23eba3579f105d77f0cf54bd0b9dadcbad",
+        "pr": null,
+        "report": "lineage/generation_cycle_state.json"
+      },
+      "artifact_paths": [
+        "lineage/generation_cycle_state.json"
+      ],
+      "published_at": "2026-05-13T12:32:27.792900+00:00"
+    },
+    {
+      "id": "showcase:wave-2:physio-qa",
+      "profile_id": "physio-qa",
+      "display_name": "QA",
+      "wave_id": "wave-2",
+      "score": 80,
+      "title": "Verify PASS/PASS* criteria and produce evidence",
+      "summary": "Verify PASS/PASS* criteria and produce evidence",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/84b1df514f76d9e93b1a705e96cf4ec87762a582",
+        "pr": null,
+        "report": "docs/reports/waves/dispatch_wave-2_task4_20260513_153746.json"
+      },
+      "artifact_paths": [
+        "docs/reports/waves/dispatch_wave-2_task4_20260513_153746.json"
+      ],
+      "published_at": "2026-05-13T15:37:46"
+    },
+    {
+      "id": "showcase:wave-2:physio-backend",
+      "profile_id": "physio-backend",
+      "display_name": "백엔드",
+      "wave_id": "wave-2",
+      "score": 80,
+      "title": "Harden backend logic from seed scope",
+      "summary": "Harden backend logic from seed scope",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/84b1df514f76d9e93b1a705e96cf4ec87762a582",
+        "pr": null,
+        "report": "docs/reports/waves/dispatch_wave-2_task3_20260513_152531.json"
+      },
+      "artifact_paths": [
+        "docs/reports/waves/dispatch_wave-2_task3_20260513_152531.json"
+      ],
+      "published_at": "2026-05-13T15:25:31"
+    },
+    {
+      "id": "showcase:wave-2:physio-planner",
+      "profile_id": "physio-planner",
+      "display_name": "기획자",
+      "wave_id": "wave-2",
+      "score": 80,
+      "title": "Refine next wave task spec from previous best seed",
+      "summary": "Refine next wave task spec from previous best seed",
+      "links": {
+        "commit": "https://github.com/Youngkwon-Lee/physio-hermes-ops/commit/84b1df514f76d9e93b1a705e96cf4ec87762a582",
+        "pr": null,
+        "report": "docs/reports/waves/dispatch_wave-2_task1_20260513_151011.json"
+      },
+      "artifact_paths": [
+        "docs/reports/waves/dispatch_wave-2_task1_20260513_151011.json"
+      ],
+      "published_at": "2026-05-13T15:10:11"
+    }
+  ]
+}

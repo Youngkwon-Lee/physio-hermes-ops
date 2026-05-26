@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-05-24T16:34:02+09:00",
+  "source_window": {
+    "event_limit": 200,
+    "latest_wave_id": "wave-2"
+  },
+  "items": [
+    {
+      "room_id": "dispatch-room",
+      "name": "배차실",
+      "stream_id": "physio_bot",
+      "stream_label": "메인 작업방",
+      "stage_group": "dispatch",
+      "capacity": 4,
+      "active_count": 4,
+      "check_count": 0,
+      "fail_count": 0,
+      "dominant_status": "PASS*",
+      "profiles": [
+        "physio-planner",
+        "physio-qa",
+        "physio-frontend",
+        "physio-backend"
+      ],
+      "latest_wave_id": "wave-2"
+    },
+    {
+      "room_id": "orchestrator-room",
+      "name": "오케스트레이션 룸",
+      "stream_id": "physio_bot",
+      "stream_label": "메인 작업방",
+      "stage_group": "orchestrate",
+      "capacity": 1,
+      "active_count": 1,
+      "check_count": 1,
+      "fail_count": 0,
+      "dominant_status": "CHECK",
+      "profiles": [
+        "physio-orchestrator"
+      ],
+      "latest_wave_id": "wave-2"
+    }
+  ]
+}

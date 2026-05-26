@@ -20,6 +20,25 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 - `scripts/` : 집계/리포트 스크립트
 - `dashboard/` : 정적 대시보드
 
+## dashboard read model 생성
+- `python scripts/build_dashboard_read_models.py`
+- 생성 위치: `dashboard/derived/`
+- 산출물:
+  - `rooms.json`
+  - `seats.json`
+  - `help_queue.json`
+  - `showcase.json`
+  - `ops_snapshot.json`
+  - `feed.json`
+  - `kpis.json`
+
+이 파생 JSON은 `dashboard-v2` 같은 공간형 UI가 raw lineage 대신 읽는 1차 read model 용도다.
+
+## dashboard-v2 미리보기
+- repo root에서 `python -m http.server 8787`
+- 접속 경로: `http://localhost:8787/dashboard-v2/`
+- `dashboard-v2`는 `dashboard/derived/*.json`을 읽는 공간형 운영 UI MVP다.
+
 ## Vercel 배포 (대시보드)
 - `vercel.json` 기준으로 `/` → `dashboard/index.html` 라우팅
 - API endpoint는 `dashboard/config.js`의 `window.NAUTILUS_CONFIG.opsApiBaseUrl`로 오버라이드 가능
