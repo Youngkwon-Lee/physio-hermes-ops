@@ -10,11 +10,16 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 - 정적 미니 대시보드(`dashboard/index.html`)
 
 ## 디렉토리
-- `docs/planning/` : 운영 문서
+- `docs/architecture/` : 시스템 맵, delivery channel map, 구조 문서
+- `docs/planning/` : 운영 문서 및 실험/로드맵 문서
 - `docs/runbook/` : 실행/장애 대응 runbook
-- `docs/specs/` : lineage/event 스키마
+- `docs/specs/` : 브리핑 포맷 spec, lineage/event 스키마
+- `docs/reports/` : 공개 가능한 샘플 리포트/산출물
 - `docs/planning/smoke_sandbox/` : 스모크 리허설 샘플 아티팩트
-- `profiles/` : 프로필 템플릿(민감정보 제외)
+- `cron/registry/` : public-safe cron job registry
+- `cron/prompts/` : cron prompt 원본(향후 관리 대상)
+- `cron/scripts/` : cron용 스크립트 원본(향후 관리 대상)
+- `profiles/` : 프로필 템플릿/정책 문서(민감정보 제외)
 - `automation/` : 스크립트 템플릿(민감정보 제외)
 - `lineage/` : 실행 이벤트 로그(JSONL)
 - `scripts/` : 집계/리포트 스크립트

@@ -1,0 +1,136 @@
+version: 0.1
+updated_at: 2026-06-01
+owner: Youngkwon-Lee
+purpose: Canonical registry for public-safe Hermes cron job definitions used in physio operations.
+notes:
+  - This file is documentation-first and should not contain secrets, tokens, or private message contents.
+  - Discord delivery targets are intentionally abstracted to human-readable labels rather than raw private IDs.
+  - Runtime truth still lives in Hermes cron state; this registry is the version-controlled source of intent.
+
+jobs:
+  - name: daily-ai-news-briefing
+    purpose: Summarize high-signal AI news relevant to rehab, clinical AI, agent operations, and knowledge workflows.
+    schedule: "30 5 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/news/AI 뉴스 토론"
+    output_type: briefing
+    prompt_file: "cron/prompts/daily-ai-news-brief.md"
+    enabled_toolsets: [web, file]
+    quality_targets:
+      - concise
+      - source-linked
+      - action-oriented
+
+  - name: daily-ai-news-discussion-kickoff
+    purpose: Convert the morning AI news brief into actionable discussion questions and experiment prompts.
+    schedule: "30 7 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/news/AI 뉴스 토론"
+    output_type: kickoff
+    prompt_file: "cron/prompts/daily-ai-news-discussion-kickoff.md"
+    enabled_toolsets: [session_search, file]
+    depends_on:
+      - daily-ai-news-briefing
+
+  - name: daily-rehab-ai-research-brief
+    purpose: Deliver a daily research brief focused on physical therapy, rehabilitation, multimodal AI, and clinical relevance.
+    schedule: "0 6 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/research/물리치료·재활 일일 브리핑 토론장"
+    output_type: research_brief
+    prompt_file: "cron/prompts/daily-rehab-ai-research-brief.md"
+    enabled_toolsets: [web, terminal, file]
+
+  - name: overnight-pt-morning-summary
+    purpose: Summarize overnight PT/rehab/research discussions into a short morning handoff.
+    schedule: "5 7 * * 1-5"
+    mode: agent
+    status: active
+    deliver_label: "discord/research/물리치료·재활 일일 브리핑 토론장"
+    output_type: handoff
+    prompt_file: "cron/prompts/overnight-pt-morning-summary.md"
+    enabled_toolsets: [session_search, file]
+
+  - name: daily-calendar-mail-brief
+    purpose: Combine calendar context and important unread mail into a single operational morning brief.
+    schedule: "30 7 * * 1-5"
+    mode: script
+    status: active
+    deliver_label: "discord/비서/아침 일정·메일 요약"
+    output_type: ops_brief
+    script_file: "cron/scripts/daily_calendar_mail_brief.py"
+    storage_notes:
+      - writes public-safe summary to docs or wiki layer when needed
+      - should not commit raw personal email contents
+
+  - name: home-rehab-morning-brief
+    purpose: Present today's home-rehab schedule in a compact action-ready morning format.
+    schedule: "0 9 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/비서/방문재활 일정 관리"
+    output_type: schedule_brief
+    prompt_file: "cron/prompts/home-rehab-morning-brief.md"
+    enabled_toolsets: [terminal, file]
+
+  - name: home-rehab-lunch-recommendation
+    purpose: Recommend lunch options based on the day's home-rehab route and prior preferences.
+    schedule: "0 8 * * *"
+    mode: agent
+    status: needs_review
+    deliver_label: "discord/비서/맛집 추천 기록"
+    output_type: recommendation
+    prompt_file: "cron/prompts/home-rehab-lunch-recommendation.md"
+    enabled_toolsets: [web, terminal, file]
+    known_issue: recent runtime error observed; verify before relying on output
+
+  - name: weekly-pt-kpi-brief
+    purpose: Weekly KPI summary for PT MVP operations.
+    schedule: "0 9 * * 1"
+    mode: agent
+    status: active
+    deliver_label: "discord/사업/지원사업 회의실"
+    output_type: kpi_brief
+    prompt_file: "cron/prompts/weekly-pt-kpi-brief.md"
+    enabled_toolsets: [terminal, file]
+
+  - name: daily-conversation-curator
+    purpose: Curate long-term-value conversation items for memory and knowledge promotion.
+    schedule: "0 23 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/비서/장기기억 기록 도우미"
+    output_type: curator
+    prompt_file: "cron/prompts/daily-conversation-curator.md"
+    enabled_toolsets: [session_search, memory]
+
+  - name: daily-discord-digest
+    purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions.
+    schedule: "35 23 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/비서/하루 대화 요약 리포터"
+    output_type: digest
+    prompt_file: "cron/prompts/daily-discord-digest.md"
+    enabled_toolsets: [session_search, file]
+
+  - name: calendar-auto-classify
+    purpose: Apply lightweight automated classification to calendar items.
+    schedule: "10 23 * * *"
+    mode: script
+    status: active
+    deliver_label: "local-only"
+    output_type: maintenance
+    script_file: "cron/scripts/calendar_auto_classify.py"
+
+  - name: ensure-kinelo-8888-server
+    purpose: Watchdog job to keep the local Kinelo service on port 8888 alive.
+    schedule: "every 5m"
+    mode: script
+    status: active
+    deliver_label: "local-only"
+    output_type: watchdog
+    script_file: "cron/scripts/ensure-kinelo-8888.sh"
