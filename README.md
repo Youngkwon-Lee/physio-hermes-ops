@@ -12,7 +12,7 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 ## 디렉토리
 - `docs/architecture/` : 시스템 맵, delivery channel map, runtime split 등 구조 문서 (`HERMES_SYSTEM_MAP.md`, `PHYSIO_APP_RUNTIME_SPLIT.md` 포함)
 - `docs/planning/` : 운영 문서 및 실험/로드맵 문서
-- `docs/runbook/` : 실행/장애 대응 runbook (`CRON_OPERATIONS.md`, `OPS_CONTROL_API_RUNBOOK.md` 등)
+- `docs/runbook/` : 실행/장애 대응 runbook (`CRON_OPERATIONS.md`, `HEARTBEAT_RUNTIME_POLICY.md`, `OPS_CONTROL_API_RUNBOOK.md` 등)
 - `docs/specs/` : 브리핑 포맷 spec, lineage/event 스키마
 - `docs/reports/` : 공개 가능한 샘플 리포트/산출물
 - `docs/planning/smoke_sandbox/` : 스모크 리허설 샘플 아티팩트
