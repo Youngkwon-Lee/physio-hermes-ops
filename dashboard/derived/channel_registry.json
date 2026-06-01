@@ -1,0 +1,135 @@
+{
+  "generated_at": "2026-06-01T11:05:00+09:00",
+  "source": "manual-seed",
+  "notes": [
+    "Mission Control MVP용 채널 레지스트리 초안",
+    "Discord 전체 채널 목록이 아니라 Hermes가 실제로 쓰는 deliver destination만 관리한다",
+    "delivery_keys는 hermes cron list --all 출력의 Deliver 문자열과 매칭되는 canonical key다"
+  ],
+  "items": [
+    {
+      "id": "discord:1490334925411454976",
+      "platform": "discord",
+      "kind": "home",
+      "name": "비서",
+      "scope": "home-channel",
+      "purpose": ["ops", "general"],
+      "active": true,
+      "delivery_keys": []
+    },
+    {
+      "id": "discord:topic:1510472054044885174",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "장기기억_기록_도우미",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 장기기억_기록_도우미 / topic 1510472054044885174",
+      "purpose": ["memory", "curation"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 장기기억_기록_도우미 / topic 1510472054044885174"
+      ]
+    },
+    {
+      "id": "discord:topic:1510472141664030832",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "하루 대화 요약 리포터",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 하루 대화 요약 리포터 / topic 1510472141664030832",
+      "purpose": ["digest", "conversation"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 하루 대화 요약 리포터 / topic 1510472141664030832"
+      ]
+    },
+    {
+      "id": "discord:topic:1490386250031431772",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "아침 일정·메일 요약",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 아침 일정·메일 요약 / topic 1490386250031431772",
+      "purpose": ["calendar", "mail", "briefing"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 아침 일정·메일 요약 / topic 1490386250031431772"
+      ]
+    },
+    {
+      "id": "discord:topic:1495573191152898078",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "방문재활 일정 관리",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 방문재활 일정 관리 / topic 1495573191152898078",
+      "purpose": ["clinical", "calendar", "home-rehab"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 방문재활 일정 관리 / topic 1495573191152898078"
+      ]
+    },
+    {
+      "id": "discord:topic:1496052252601749514",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "맛집 추천 기록",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 맛집 추천 기록 / topic 1496052252601749514",
+      "purpose": ["personal", "recommendation"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 맛집 추천 기록 / topic 1496052252601749514"
+      ]
+    },
+    {
+      "id": "discord:topic:1493405253738041486",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "물리치료·재활 일일 브리핑 토론장",
+      "parent_name": "research",
+      "scope": "discord:자비스brain / #research / 물리치료·재활 일일 브리핑 토론장 / topic 1493405253738041486",
+      "purpose": ["research", "briefing", "rehab"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #research / 물리치료·재활 일일 브리핑 토론장 / topic 1493405253738041486"
+      ]
+    },
+    {
+      "id": "discord:topic:1491018394424705124",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "지원사업 회의실 (DB운영)",
+      "parent_name": "사업",
+      "scope": "discord:자비스brain / #사업 / 지원사업 회의실 (DB운영) / topic 1491018394424705124",
+      "purpose": ["business", "kpi", "db-ops"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #사업 / 지원사업 회의실 (DB운영) / topic 1491018394424705124"
+      ]
+    },
+    {
+      "id": "discord:topic:1490878409625309184",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "AI 뉴스 토론",
+      "parent_name": "news",
+      "scope": "discord:자비스brain / #news / AI 뉴스 토론 / topic 1490878409625309184",
+      "purpose": ["news", "ai", "briefing"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #news / AI 뉴스 토론 / topic 1490878409625309184"
+      ]
+    },
+    {
+      "id": "local",
+      "platform": "local",
+      "kind": "local",
+      "name": "Local only",
+      "scope": "scheduler-local-output",
+      "purpose": ["ops", "script-only"],
+      "active": true,
+      "delivery_keys": ["local"]
+    }
+  ]
+}
