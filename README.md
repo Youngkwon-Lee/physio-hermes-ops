@@ -22,7 +22,7 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 - `profiles/` : 프로필 템플릿/정책 문서(민감정보 제외)
 - `automation/` : 스크립트 템플릿(민감정보 제외)
 - `lineage/` : 실행 이벤트 로그(JSONL)
-- `scripts/` : 집계/리포트 스크립트
+- `scripts/` : 집계/리포트/점검 스크립트 (`check_cron_registry.py` 포함)
 - `dashboard/` : 정적 대시보드
 
 ## dashboard read model 생성
