@@ -19,4 +19,5 @@
 # runtime artifacts
 .runtime/
 lineage/actions_audit.jsonl
+lineage/mission_control_events.jsonl
 .vercel
