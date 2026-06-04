@@ -23,6 +23,7 @@ export type {
   MissionApprovalItem,
   MissionPriority,
   MissionRun,
+  MissionRunSource,
   MissionRunStatus,
   MissionTraceItem,
   TraceTone,

@@ -33,6 +33,14 @@ export interface MissionApprovalItem {
   requiredBy: AgentId;
 }
 
+export interface MissionRunSource {
+  streamId: string;
+  channelId?: string;
+  threadId?: string;
+  channelName?: string;
+  threadName?: string;
+}
+
 export interface MissionRun {
   id: string;
   title: string;
@@ -45,6 +53,7 @@ export interface MissionRun {
   approvalItems: MissionApprovalItem[];
   traceItems: MissionTraceItem[];
   artifacts: MissionArtifact[];
+  source?: MissionRunSource;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +63,7 @@ export interface CreateMissionRunInput {
   description: string;
   laneId: CompanyLaneId;
   priority?: MissionPriority;
+  source?: MissionRunSource;
 }
 
 function compactId(seed: string) {
@@ -142,7 +152,11 @@ export function createMissionRunDraft(input: CreateMissionRunInput): MissionRun 
           AGENT_PROFILES.find((agent) => agent.id === agentId)?.label ?? agentId
         )).join(', '),
       },
+      ...(input.source?.streamId ? [{ label: 'Source stream', value: input.source.streamId }] : []),
+      ...(input.source?.threadName ? [{ label: 'Source thread', value: input.source.threadName }] : []),
+      ...(input.source?.channelName ? [{ label: 'Source channel', value: input.source.channelName }] : []),
     ],
+    source: input.source,
     createdAt: now,
     updatedAt: now,
   };

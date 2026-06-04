@@ -252,6 +252,24 @@ def make_trace(agent_id: str, title: str, summary: str, tone: str) -> dict[str, 
     }
 
 
+def normalize_run_source(payload: Any) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+
+    stream_id = str(payload.get("streamId") or "").strip()
+    if not stream_id:
+        return None
+
+    source = {
+        "streamId": stream_id,
+        "channelId": str(payload.get("channelId") or "").strip() or None,
+        "threadId": str(payload.get("threadId") or "").strip() or None,
+        "channelName": str(payload.get("channelName") or "").strip() or None,
+        "threadName": str(payload.get("threadName") or "").strip() or None,
+    }
+    return source
+
+
 def branch_slug(value: str) -> str:
     out = []
     for ch in value.lower():
@@ -283,6 +301,10 @@ def github_create_pull_request_enabled() -> bool:
 
 def github_bootstrap_branch_enabled() -> bool:
     return is_enabled(env_value("AGENT_OS_GITHUB_BOOTSTRAP_BRANCH"))
+
+
+def github_base_branch() -> str:
+    return env_value("AGENT_OS_GITHUB_BASE_BRANCH") or "main"
 
 
 def github_apply_labels_enabled() -> bool:
@@ -432,6 +454,7 @@ def build_base_run(
     approval_gates: list[str] | None = None,
     artifacts: list[dict[str, Any]] | None = None,
     trace_items: list[dict[str, Any]] | None = None,
+    source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     lane = LANES.get(lane_id)
     if not lane:
@@ -459,6 +482,12 @@ def build_base_run(
         {"label": "Target green level", "value": lane["defaultGreenLevel"]},
         {"label": "Primary agents", "value": ", ".join(run_agents)},
     ]
+    if source and source.get("streamId"):
+        base_artifacts.append({"label": "Source stream", "value": str(source["streamId"])})
+    if source and source.get("threadName"):
+        base_artifacts.append({"label": "Source thread", "value": str(source["threadName"])})
+    if source and source.get("channelName"):
+        base_artifacts.append({"label": "Source channel", "value": str(source["channelName"])})
     if artifacts:
         base_artifacts.extend(artifacts)
 
@@ -489,6 +518,7 @@ def build_base_run(
         "approvalItems": approval_items,
         "traceItems": base_trace,
         "artifacts": base_artifacts,
+        "source": source,
         "createdAt": created_at,
         "updatedAt": created_at,
     }
@@ -566,6 +596,7 @@ def create_issue_draft_artifacts(run: dict[str, Any]) -> list[dict[str, Any]]:
 
 def create_issue_to_pr_artifacts(run: dict[str, Any]) -> list[dict[str, Any]]:
     branch_name = f"codex/agent-os-{branch_slug(run['title'])}"
+    base_branch = github_base_branch()
     pr_body = "\n".join(
         [
             "## Summary",
@@ -635,7 +666,7 @@ def create_issue_to_pr_artifacts(run: dict[str, Any]) -> list[dict[str, Any]]:
             "metadata": {
                 "title": f"[Agent OS] {run['title']}",
                 "branchName": branch_name,
-                "baseBranch": "main",
+                "baseBranch": base_branch,
                 "dryRun": True,
             },
         },
@@ -644,6 +675,7 @@ def create_issue_to_pr_artifacts(run: dict[str, Any]) -> list[dict[str, Any]]:
 
 def create_worker_pr_artifacts(run: dict[str, Any]) -> list[dict[str, Any]]:
     branch_name = f"codex/agent-os-{branch_slug(run['title'])}"
+    base_branch = github_base_branch()
     pr_url = f"https://github.com/Youngkwon-Lee/physio_app/pull/{abs(hash(run['id'])) % 9000 + 1000}"
     return [
         {
@@ -718,7 +750,7 @@ def create_worker_pr_artifacts(run: dict[str, Any]) -> list[dict[str, Any]]:
                 "dryRun": True,
                 "title": f"[Agent OS] {run['title']}",
                 "branchName": branch_name,
-                "baseBranch": "main",
+                "baseBranch": base_branch,
                 "pullRequestUrl": pr_url,
             },
         },
@@ -758,7 +790,7 @@ def create_github_pull_request_payload(run: dict[str, Any]) -> dict[str, Any]:
     metadata = artifact.get("metadata", {})
     title = str(metadata.get("title") or f"[Agent OS] {run['title']}")
     head = str(metadata.get("branchName") or f"codex/agent-os-{run['id']}")
-    base = str(metadata.get("baseBranch") or "main")
+    base = str(metadata.get("baseBranch") or github_base_branch())
     body = "\n".join(
         [
             str(artifact.get("value") or f"Implements Mission Control run {run['id']}."),
@@ -1722,9 +1754,16 @@ def create_mission_run(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("laneId is invalid")
     description = str(payload.get("description") or "No description yet.").strip() or "No description yet."
     priority = str(payload.get("priority") or "medium").strip() or "medium"
+    source = normalize_run_source(payload.get("source"))
     if priority not in {"low", "medium", "high", "urgent"}:
         raise ValueError("priority is invalid")
-    return build_base_run(title=title, description=description, lane_id=lane_id, priority=priority)
+    return build_base_run(
+        title=title,
+        description=description,
+        lane_id=lane_id,
+        priority=priority,
+        source=source,
+    )
 
 
 def summarize_readiness_counts(readiness: list[dict[str, Any]]) -> dict[str, int]:
@@ -2151,7 +2190,11 @@ def create_heartbeat_cron_enablement_run() -> dict[str, Any]:
                 "label": "Draft PR",
                 "kind": "pull-request",
                 "value": pr_body,
-                "metadata": {"title": "[Agent OS] Enable heartbeat cron", "branchName": branch_name, "baseBranch": "main"},
+                "metadata": {
+                    "title": "[Agent OS] Enable heartbeat cron",
+                    "branchName": branch_name,
+                    "baseBranch": github_base_branch(),
+                },
             },
         ],
         trace_items=[
@@ -2327,7 +2370,17 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     runs.append(run)
                     set_runs_for_org(state, organization_id, runs)
                     save_state(state)
-                log_event("run.created", {"organizationId": organization_id, "runId": run["id"], "laneId": run["laneId"]})
+                log_event(
+                    "run.created",
+                    {
+                        "organizationId": organization_id,
+                        "runId": run["id"],
+                        "laneId": run["laneId"],
+                        "streamId": run.get("source", {}).get("streamId"),
+                        "channelId": run.get("source", {}).get("channelId"),
+                        "threadId": run.get("source", {}).get("threadId"),
+                    },
+                )
                 return self._json(200, ok(run))
 
             if parsed.path.startswith("/runs/") and parsed.path.endswith("/approve"):

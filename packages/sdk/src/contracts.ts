@@ -2,6 +2,7 @@ import type {
   CompanyLaneId,
   MissionPriority,
   MissionRun,
+  MissionRunSource,
 } from '../../runtime/src/index';
 
 export type AgentOsIntegrationStatus = 'ready' | 'dry-run' | 'blocked';
@@ -76,6 +77,7 @@ export interface CreateMissionRunInput {
   description?: string;
   laneId: CompanyLaneId;
   priority?: MissionPriority;
+  source?: MissionRunSource;
 }
 
 export interface MissionRunGateInput {

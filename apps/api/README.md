@@ -38,6 +38,16 @@ State is file-backed for now:
 - runtime state: `.runtime/mission_control/state.json`
 - append-only events: `lineage/mission_control_events.jsonl`
 
+`POST /runs` optional source context:
+
+- `source.streamId`
+- `source.channelId`
+- `source.threadId`
+- `source.channelName`
+- `source.threadName`
+
+Use these when a run starts from a specific chat thread, operator channel, or reporting stream.
+
 Auth:
 
 - when `HERMES_MISSION_CONTROL_API_KEY` is set, send it as `x-hermes-api-key`
