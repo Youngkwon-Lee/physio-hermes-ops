@@ -60,6 +60,7 @@ Auth:
 - `POST /runs/:id/approve`
 - `POST /runs/:id/reject`
 - `POST /daily-ops`
+- `POST /runs/:id/codex-bridge/smoke-result`
 - `POST /heartbeat/check`
 - `GET /heartbeat/control`
 - `GET /readiness`
@@ -84,3 +85,40 @@ This gives product UIs a single initial Mission Control hydration payload.
 - It should not own Physio-specific UI or route logic.
 - When the GitHub env is missing, issue and PR publish stays in dry-run and records the reason in Mission Control artifacts and traces.
 - Codex worker execution is outside this API for now. Validate the worker host with `python3 scripts/codex_remote_smoke.py --host macbook` before wiring execution into Mission Control runs.
+
+## Codex bridge result
+
+Attach a Codex remote smoke result to a run:
+
+```bash
+curl -X POST "http://127.0.0.1:8791/runs/<run-id>/codex-bridge/smoke-result" \
+  -H "Content-Type: application/json" \
+  -d @- <<'JSON'
+{
+  "organizationId": "default",
+  "result": {
+    "schema": "codex_remote_smoke_v0_1",
+    "status": "pass",
+    "target": {
+      "host": "macbook",
+      "codex": "/Applications/Codex.app/Contents/Resources/codex",
+      "workdir": "~/tmp/codex-smoke",
+      "healthOnly": false
+    },
+    "expected": "CODEX_REMOTE_SMOKE_OK",
+    "failure": null,
+    "steps": [
+      {
+        "name": "transport",
+        "passed": true,
+        "failureClass": "transport_failure",
+        "exitCode": 0,
+        "durationMs": 100,
+        "stdout": "",
+        "stderr": ""
+      }
+    ]
+  }
+}
+JSON
+```

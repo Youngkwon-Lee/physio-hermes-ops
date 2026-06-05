@@ -1742,6 +1742,114 @@ def recheck_preview_gate(run: dict[str, Any]) -> dict[str, Any]:
     return run
 
 
+def normalize_codex_smoke_result(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("result must be an object")
+    if payload.get("schema") != "codex_remote_smoke_v0_1":
+        raise ValueError("result.schema must be codex_remote_smoke_v0_1")
+    if payload.get("status") not in {"pass", "fail"}:
+        raise ValueError("result.status must be pass or fail")
+
+    target = payload.get("target")
+    if not isinstance(target, dict):
+        raise ValueError("result.target is required")
+    for key in ["host", "codex", "workdir"]:
+        if not str(target.get(key) or "").strip():
+            raise ValueError(f"result.target.{key} is required")
+
+    steps = payload.get("steps")
+    if not isinstance(steps, list) or not steps:
+        raise ValueError("result.steps must be a non-empty list")
+    for step in steps:
+        if not isinstance(step, dict):
+            raise ValueError("result.steps must contain objects")
+        if not str(step.get("name") or "").strip():
+            raise ValueError("result.steps[].name is required")
+        if not isinstance(step.get("passed"), bool):
+            raise ValueError("result.steps[].passed must be boolean")
+
+    failure = payload.get("failure")
+    if payload["status"] == "fail":
+        if not isinstance(failure, dict) or not str(failure.get("class") or "").strip():
+            raise ValueError("result.failure.class is required when status is fail")
+    elif failure is not None:
+        raise ValueError("result.failure must be null when status is pass")
+
+    result = deepcopy(payload)
+    result["target"]["healthOnly"] = bool(result["target"].get("healthOnly"))
+    return result
+
+
+def format_codex_smoke_step(step: dict[str, Any]) -> str:
+    status = "PASS" if step.get("passed") else "FAIL"
+    duration = int(step.get("durationMs") or 0)
+    failure_class = str(step.get("failureClass") or "unknown")
+    return f"- {step.get('name')}: {status} ({duration}ms, {failure_class})"
+
+
+def codex_smoke_summary(result: dict[str, Any]) -> str:
+    failure = result.get("failure")
+    lines = [
+        f"Status: {result['status']}",
+        f"Host: {result['target']['host']}",
+        f"Codex: {result['target']['codex']}",
+        f"Workdir: {result['target']['workdir']}",
+        f"Health only: {'yes' if result['target']['healthOnly'] else 'no'}",
+        "",
+        "Steps:",
+        *[format_codex_smoke_step(step) for step in result["steps"]],
+    ]
+    if failure:
+        lines.extend(
+            [
+                "",
+                "Failure:",
+                f"- class: {failure.get('class')}",
+                f"- message: {failure.get('message')}",
+            ]
+        )
+        if failure.get("hint"):
+            lines.append(f"- hint: {failure.get('hint')}")
+    return "\n".join(lines)
+
+
+def create_codex_smoke_result_artifact(result: dict[str, Any]) -> dict[str, Any]:
+    failure = result.get("failure")
+    return {
+        "label": "Codex Bridge Smoke Result",
+        "kind": "codex-bridge-result",
+        "value": codex_smoke_summary(result),
+        "metadata": {
+            "status": result["status"],
+            "targetHost": result["target"]["host"],
+            "codexBinary": result["target"]["codex"],
+            "healthOnly": result["target"]["healthOnly"],
+            "failureClass": failure.get("class") if failure else None,
+        },
+    }
+
+
+def attach_codex_bridge_smoke_result(run: dict[str, Any], payload: Any) -> dict[str, Any]:
+    result = normalize_codex_smoke_result(payload)
+    run = deepcopy(run)
+    passed = result["status"] == "pass"
+    replace_or_append_artifacts(run, [create_codex_smoke_result_artifact(result)])
+    run["traceItems"].append(
+        make_trace(
+            "devops",
+            "Codex bridge smoke passed" if passed else "Codex bridge smoke failed",
+            f"{result['target']['host']} can run Codex and return artifacts."
+            if passed
+            else f"{result['target']['host']} is blocked: {result.get('failure', {}).get('class', 'unknown')}.",
+            "success" if passed else "danger",
+        )
+    )
+    if not passed:
+        run["status"] = "blocked"
+    run["updatedAt"] = now_iso()
+    return run
+
+
 def create_mission_run(payload: dict[str, Any]) -> dict[str, Any]:
     title = str(payload.get("title", "")).strip()
     organization_id = str(payload.get("organizationId", "")).strip()
@@ -2370,15 +2478,16 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     runs.append(run)
                     set_runs_for_org(state, organization_id, runs)
                     save_state(state)
+                run_source = run.get("source") or {}
                 log_event(
                     "run.created",
                     {
                         "organizationId": organization_id,
                         "runId": run["id"],
                         "laneId": run["laneId"],
-                        "streamId": run.get("source", {}).get("streamId"),
-                        "channelId": run.get("source", {}).get("channelId"),
-                        "threadId": run.get("source", {}).get("threadId"),
+                        "streamId": run_source.get("streamId"),
+                        "channelId": run_source.get("channelId"),
+                        "threadId": run_source.get("threadId"),
                     },
                 )
                 return self._json(200, ok(run))
@@ -2429,6 +2538,30 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     state["runsByOrg"][organization_id][index] = updated
                     save_state(state)
                 log_event("run.preview-rechecked", {"organizationId": organization_id, "runId": run_id})
+                return self._json(200, ok(updated))
+
+            if parsed.path.startswith("/runs/") and parsed.path.endswith("/codex-bridge/smoke-result"):
+                run_id = parsed.path.split("/")[2]
+                organization_id = str(data.get("organizationId", "")).strip()
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                result = data.get("result") if "result" in data else data
+                with STATE_LOCK:
+                    state = load_state()
+                    index, current = find_run(state, organization_id, run_id)
+                    if current is None:
+                        return self._json(404, err("Mission run not found", "NOT_FOUND"))
+                    updated = attach_codex_bridge_smoke_result(current, result)
+                    state["runsByOrg"][organization_id][index] = updated
+                    save_state(state)
+                log_event(
+                    "run.codex-bridge-smoke-attached",
+                    {
+                        "organizationId": organization_id,
+                        "runId": run_id,
+                        "status": result.get("status") if isinstance(result, dict) else None,
+                    },
+                )
                 return self._json(200, ok(updated))
 
             if parsed.path == "/daily-ops":
