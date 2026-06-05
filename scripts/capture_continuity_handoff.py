@@ -10,6 +10,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,6 +98,12 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
 def bullet(items: list[str]) -> str:
     if not items:
         return "- none"
@@ -179,7 +187,61 @@ def valid_candidate(value: Any) -> dict[str, Any] | None:
     }
 
 
-def capture(payload: dict[str, Any], brain_dir: Path, no_candidate: bool) -> dict[str, Any]:
+def resolve_event_log(value: str | None, brain_dir: Path) -> Path:
+    if value:
+        return Path(value).expanduser()
+    env_value = os.getenv("CONTINUITY_HANDOFF_EVENT_LOG")
+    if env_value:
+        return Path(env_value).expanduser()
+    return brain_dir / "operations" / "events" / "continuity_handoff_events.jsonl"
+
+
+def build_event(result: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "timestamp": now_iso(),
+        "eventType": "continuity_handoff.captured",
+        "schema": SCHEMA,
+        "handoffId": result["handoffId"],
+        "source": payload["source"],
+        "goal": payload["goal"],
+        "rawJsonPath": result["rawJsonPath"],
+        "rawMarkdownPath": result["rawMarkdownPath"],
+        "candidatePaths": result["candidatePaths"],
+    }
+
+
+def notify(url: str, token: str | None, event: dict[str, Any], timeout: float) -> dict[str, Any]:
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["x-hermes-api-key"] = token
+    request = Request(
+        url,
+        data=json.dumps(event, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            body = response.read().decode("utf-8", errors="replace")
+            return {"ok": True, "status": response.status, "body": body[:1000]}
+    except HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        return {"ok": False, "status": error.code, "error": body[:1000]}
+    except URLError as error:
+        return {"ok": False, "error": str(error.reason)}
+    except Exception as error:
+        return {"ok": False, "error": str(error)}
+
+
+def capture(
+    payload: dict[str, Any],
+    brain_dir: Path,
+    no_candidate: bool,
+    event_log: Path | None,
+    notify_url: str | None,
+    notify_token: str | None,
+    notify_timeout: float,
+) -> dict[str, Any]:
     normalized = normalize(payload)
     stamp = datetime.now().strftime("%H%M%S")
     base_name = f"{stamp}-{slug(normalized['goal'])}"
@@ -201,7 +263,7 @@ def capture(payload: dict[str, Any], brain_dir: Path, no_candidate: bool) -> dic
             write_text(path, candidate_markdown(candidate, normalized, raw_md_path, brain_dir))
             candidate_paths.append(str(path))
 
-    return {
+    result = {
         "ok": True,
         "brainDir": str(brain_dir),
         "handoffId": normalized["id"],
@@ -209,6 +271,13 @@ def capture(payload: dict[str, Any], brain_dir: Path, no_candidate: bool) -> dic
         "rawMarkdownPath": str(raw_md_path),
         "candidatePaths": candidate_paths,
     }
+    event = build_event(result, normalized)
+    if event_log is not None:
+        append_jsonl(event_log, event)
+        result["eventLogPath"] = str(event_log)
+    if notify_url:
+        result["notification"] = notify(notify_url, notify_token, event, notify_timeout)
+    return result
 
 
 def parse_args() -> argparse.Namespace:
@@ -216,6 +285,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=None, help="JSON file. Reads stdin when omitted.")
     parser.add_argument("--brain-dir", default=None, help="second-brain directory. Defaults to SECOND_BRAIN_DIR, ~/brain, then ops_knowledge.")
     parser.add_argument("--no-candidate", action="store_true", help="Write raw only.")
+    parser.add_argument("--event-log", default=None, help="JSONL event path. Defaults to CONTINUITY_HANDOFF_EVENT_LOG, then brain operations/events.")
+    parser.add_argument("--no-event-log", action="store_true", help="Skip continuity handoff event log.")
+    parser.add_argument("--notify-url", default=os.getenv("CONTINUITY_HANDOFF_NOTIFY_URL"), help="Optional Hermes/Mission Control webhook URL.")
+    parser.add_argument("--notify-token", default=os.getenv("CONTINUITY_HANDOFF_NOTIFY_TOKEN"), help="Optional API key for --notify-url.")
+    parser.add_argument("--notify-timeout", type=float, default=5.0, help="Webhook timeout in seconds.")
     return parser.parse_args()
 
 
@@ -223,7 +297,17 @@ def main() -> int:
     args = parse_args()
     try:
         payload = read_payload(args.input)
-        result = capture(payload, resolve_brain_dir(args.brain_dir), args.no_candidate)
+        brain_dir = resolve_brain_dir(args.brain_dir)
+        event_log = None if args.no_event_log else resolve_event_log(args.event_log, brain_dir)
+        result = capture(
+            payload,
+            brain_dir,
+            args.no_candidate,
+            event_log,
+            args.notify_url,
+            args.notify_token,
+            args.notify_timeout,
+        )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except Exception as exc:

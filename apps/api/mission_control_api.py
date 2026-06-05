@@ -31,6 +31,12 @@ EVENT_LOG = Path(
         str(ROOT / "lineage" / "mission_control_events.jsonl"),
     )
 )
+HANDOFF_NOTIFY_LOG = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_HANDOFF_NOTIFY_LOG",
+        str(ROOT / "lineage" / "continuity_handoff_notifications.jsonl"),
+    )
+)
 DEFAULT_STALE_MINUTES = max(1, int(os.getenv("HERMES_MISSION_CONTROL_STALE_MINUTES", "30")))
 STATE_LOCK = Lock()
 
@@ -2492,6 +2498,29 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                 )
                 return self._json(200, ok(run))
 
+            if parsed.path == "/handoff/notify":
+                event = deepcopy(data)
+                event["receivedAt"] = now_iso()
+                append_jsonl(HANDOFF_NOTIFY_LOG, event)
+                log_event(
+                    "continuity-handoff.received",
+                    {
+                        "handoffId": event.get("handoffId"),
+                        "source": event.get("source"),
+                        "goal": event.get("goal"),
+                    },
+                )
+                return self._json(
+                    200,
+                    ok(
+                        {
+                            "received": True,
+                            "handoffId": event.get("handoffId"),
+                            "logPath": str(HANDOFF_NOTIFY_LOG),
+                        }
+                    ),
+                )
+
             if parsed.path.startswith("/runs/") and parsed.path.endswith("/approve"):
                 run_id = parsed.path.split("/")[2]
                 organization_id = str(data.get("organizationId", "")).strip()
@@ -2615,6 +2644,7 @@ class MissionControlHandler(BaseHTTPRequestHandler):
 def serve() -> None:
     ensure_parent(STATE_PATH)
     ensure_parent(EVENT_LOG)
+    ensure_parent(HANDOFF_NOTIFY_LOG)
     server = ThreadingHTTPServer((HOST, PORT), MissionControlHandler)
     print(f"[mission-control-api] listening on http://{HOST}:{PORT}", flush=True)
     try:

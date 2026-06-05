@@ -91,6 +91,38 @@ Candidate:
 operations/candidates/continuity/YYYY-MM-DD/*.md
 ```
 
+Event:
+
+```text
+operations/events/continuity_handoff_events.jsonl
+```
+
+## Desktop Hermes Notification
+
+Default mode writes a JSONL event that desktop Hermes can poll or watch.
+
+```bash
+python3 scripts/capture_continuity_handoff.py \
+  --input handoff.json \
+  --event-log /home/yk/brain/operations/events/continuity_handoff_events.jsonl
+```
+
+Near real-time mode sends the same event to a running Hermes/Mission Control API.
+
+```bash
+CONTINUITY_HANDOFF_NOTIFY_URL=http://DESKTOP_HOST:8791/handoff/notify \
+CONTINUITY_HANDOFF_NOTIFY_TOKEN=$HERMES_MISSION_CONTROL_API_KEY \
+python3 scripts/capture_continuity_handoff.py --input handoff.json
+```
+
+The receiving API stores notifications at:
+
+```text
+lineage/continuity_handoff_notifications.jsonl
+```
+
+Use JSONL first. Turn on HTTP notification only after the desktop API address and token are confirmed.
+
 ## Stop Rules
 
 Do not promote canonical memory automatically.

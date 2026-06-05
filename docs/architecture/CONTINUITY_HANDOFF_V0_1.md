@@ -67,6 +67,19 @@ If `SECOND_BRAIN_DIR` is not set and `~/brain` does not exist, the script falls 
 ops_knowledge/
 ```
 
+Every capture also emits a small event:
+
+```text
+continuity_handoff.captured
+```
+
+The event can be consumed in two ways:
+
+1. Hermes watches or polls the JSONL event log.
+2. Hermes receives `POST /handoff/notify` from the capture script.
+
+This keeps MacBook Codex App work visible to desktop Hermes without granting automatic write access to canonical memory.
+
 ## Promotion Rule
 
 V0 may create raw notes and pending candidate notes.
