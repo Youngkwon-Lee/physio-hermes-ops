@@ -8,6 +8,14 @@ The goal is not to save every chat message.
 
 The goal is to preserve enough state for another agent to continue safely.
 
+## Canonical Run Rule
+
+1. MacBook Codex creates a continuity handoff with the shared schema.
+2. Raw and candidate artifacts write to `SECOND_BRAIN_DIR`, not repo-local fallback, unless explicitly testing fallback.
+3. The same capture sends notify to desktop Hermes via `CONTINUITY_HANDOFF_NOTIFY_URL` when near-real-time delivery is wanted.
+4. Desktop Hermes treats notify as an operational signal only; canonical promotion still requires later curation/approval.
+5. Push continuity artifacts to GitHub at meaningful resume checkpoints, not on every tiny draft edit.
+
 ## Minimal Command
 
 ```bash
@@ -151,6 +159,84 @@ Expected result:
 ```
 
 If `8791` returns `404 page not found`, another service is using that port. Use `8792` for Mission Control API.
+
+## WSL IP Change Recovery
+
+When WSL restarts, the internal IP (for example `172.25.x.x`) may change and break the existing Windows `portproxy` target.
+
+Use the repo script below from an **elevated Administrator PowerShell** on Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File \\wsl.localhost\Ubuntu\home\yk\physio-hermes-ops-wt-handoff\scripts\sync_mission_control_portproxy.ps1
+```
+
+What it does:
+- reads the current WSL IPv4 via `wsl.exe hostname -I`
+- resets `0.0.0.0:8792 -> <current-wsl-ip>:8792`
+- keeps/creates firewall rule `MissionControl-8792`
+- prints the final `netsh interface portproxy show all` table
+
+Dry-run preview without admin write:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File \\wsl.localhost\Ubuntu\home\yk\physio-hermes-ops-wt-handoff\scripts\sync_mission_control_portproxy.ps1 -DryRun
+```
+
+If needed, multiple ports can be synced together:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File \\wsl.localhost\Ubuntu\home\yk\physio-hermes-ops-wt-handoff\scripts\sync_mission_control_portproxy.ps1 -Ports 8787,8791,8792
+```
+
+Recommended verify sequence after running the sync:
+
+```powershell
+netsh interface portproxy show all
+```
+
+Then from MacBook or another host:
+
+```bash
+python3 scripts/continuity_handoff_notify_smoke.py \
+  --base-url http://100.83.147.56:8792 \
+  --token dev-local-mission-control
+```
+
+## MacBook Default Notify Env
+
+`capture_continuity_handoff.py` already reads these env vars by default:
+
+```bash
+export CONTINUITY_HANDOFF_NOTIFY_URL=http://100.83.147.56:8792/handoff/notify
+export CONTINUITY_HANDOFF_NOTIFY_TOKEN=dev-local-mission-control
+```
+
+To keep raw/candidate handoffs out of the local `ops_knowledge/` fallback on MacBook, also set:
+
+```bash
+export SECOND_BRAIN_DIR=/absolute/path/to/your/second-brain
+```
+
+Repo helper snippet:
+
+```bash
+source scripts/macos_continuity_notify_env.sh
+```
+
+Recommended on MacBook for persistence:
+
+```bash
+printf '\n# Desktop Hermes continuity notify\nexport MISSION_CONTROL_BASE_URL="http://100.83.147.56:8792"\nexport MISSION_CONTROL_SHARED_TOKEN="dev-local-mission-control"\nexport CONTINUITY_HANDOFF_NOTIFY_URL="http://100.83.147.56:8792/handoff/notify"\nexport CONTINUITY_HANDOFF_NOTIFY_TOKEN="dev-local-mission-control"\nexport SECOND_BRAIN_DIR="/absolute/path/to/your/second-brain"\n' >> ~/.zshrc
+source ~/.zshrc
+```
+
+For non-interactive zsh runs on MacBook, mirror the same exports into `~/.zshenv` if your Codex/script runner needs them there.
+
+Quick verify on MacBook:
+
+```bash
+env | egrep 'MISSION_CONTROL|CONTINUITY_HANDOFF|SECOND_BRAIN_DIR'
+```
 
 ## Stop Rules
 
