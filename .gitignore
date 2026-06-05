@@ -20,4 +20,5 @@
 .runtime/
 lineage/actions_audit.jsonl
 lineage/mission_control_events.jsonl
+lineage/continuity_handoff_notifications.jsonl
 .vercel
