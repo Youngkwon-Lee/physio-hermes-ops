@@ -10,6 +10,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 DEFAULT_CODEX_BINARY = "/Applications/Codex.app/Contents/Resources/codex"
@@ -149,6 +151,52 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def post_to_mission_control(args: argparse.Namespace, payload: dict[str, Any]) -> None:
+    if not args.mission_control_url and not args.mission_run_id:
+        return
+    if not args.mission_control_url:
+        raise SmokeFailure("artifact_failure", "--mission-control-url is required when --mission-run-id is set")
+    if not args.mission_run_id:
+        raise SmokeFailure("artifact_failure", "--mission-run-id is required when --mission-control-url is set")
+
+    base_url = args.mission_control_url.rstrip("/")
+    url = f"{base_url}/runs/{args.mission_run_id}/codex-bridge/smoke-result"
+    body = {
+        "organizationId": args.organization_id,
+        "result": payload,
+    }
+    headers = {"Content-Type": "application/json"}
+    if args.mission_control_api_key:
+        headers["x-hermes-api-key"] = args.mission_control_api_key
+
+    request = Request(
+        url,
+        method="POST",
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers=headers,
+    )
+    try:
+        with urlopen(request, timeout=args.mission_control_timeout) as response:
+            if response.status < 200 or response.status >= 300:
+                raise SmokeFailure("artifact_failure", f"Mission Control post failed: HTTP {response.status}")
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise SmokeFailure("artifact_failure", f"Mission Control post failed: HTTP {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise SmokeFailure("artifact_failure", f"Mission Control post failed: {exc.reason}") from exc
+
+
+def persist_and_publish(args: argparse.Namespace, payload: dict[str, Any]) -> bool:
+    if args.json_out:
+        write_json(args.json_out, payload)
+    try:
+        post_to_mission_control(args, payload)
+        return True
+    except SmokeFailure as exc:
+        print(json.dumps({"missionControlPost": "fail", "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
+        return False
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Smoke test a local or SSH Codex CLI worker.")
     parser.add_argument("--host", default=os.getenv("CODEX_REMOTE_HOST"), help="SSH host alias, for example macbook.")
@@ -157,6 +205,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workdir", default=os.getenv("CODEX_REMOTE_WORKDIR", DEFAULT_REMOTE_WORKDIR))
     parser.add_argument("--json-out", type=Path, default=None)
     parser.add_argument("--timeout", type=int, default=180)
+    parser.add_argument("--mission-control-url", default=os.getenv("HERMES_MISSION_CONTROL_URL"))
+    parser.add_argument("--mission-run-id", default=os.getenv("HERMES_MISSION_RUN_ID"))
+    parser.add_argument("--organization-id", default=os.getenv("HERMES_ORGANIZATION_ID", "default"))
+    parser.add_argument("--mission-control-api-key", default=os.getenv("HERMES_MISSION_CONTROL_API_KEY"))
+    parser.add_argument("--mission-control-timeout", type=int, default=10)
     parser.add_argument(
         "--health-only",
         action="store_true",
@@ -223,10 +276,9 @@ def main() -> int:
                 raise SmokeFailure("artifact_failure", "result.md did not contain expected marker")
 
         payload = make_result("pass", target, steps, None)
-        if args.json_out:
-            write_json(args.json_out, payload)
+        published = persist_and_publish(args, payload)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-        return 0
+        return 0 if published else 2
     except SmokeFailure as exc:
         payload = make_result(
             "fail",
@@ -238,8 +290,7 @@ def main() -> int:
                 "hint": failure_hint(exc.failure_class, str(exc)),
             },
         )
-        if args.json_out:
-            write_json(args.json_out, payload)
+        persist_and_publish(args, payload)
         print(json.dumps(payload, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
 

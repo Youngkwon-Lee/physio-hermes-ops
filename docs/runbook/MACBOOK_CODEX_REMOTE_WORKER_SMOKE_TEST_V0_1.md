@@ -100,12 +100,25 @@ Write a JSON result:
 python3 scripts/codex_remote_smoke.py --host macbook --json-out .runtime/codex-smoke/macbook.json
 ```
 
+Attach the result to a Mission Control run:
+
+```bash
+python3 scripts/codex_remote_smoke.py \
+  --host macbook \
+  --mission-control-url http://127.0.0.1:8791 \
+  --mission-run-id <run-id> \
+  --organization-id default
+```
+
 ## Environment Overrides
 
 ```bash
 export CODEX_REMOTE_HOST=macbook
 export CODEX_REMOTE_BINARY=/Applications/Codex.app/Contents/Resources/codex
 export CODEX_REMOTE_WORKDIR='~/tmp/codex-smoke'
+export HERMES_MISSION_CONTROL_URL=http://127.0.0.1:8791
+export HERMES_MISSION_RUN_ID=<run-id>
+export HERMES_ORGANIZATION_ID=default
 ```
 
 ## Pass Criteria
@@ -145,7 +158,14 @@ Common transport hints:
 
 ## Follow-up After PASS
 
+Done:
+
 1. Add a Codex bridge task schema.
 2. Store bridge results as Hermes run artifacts.
 3. Keep Mission Control as the visual approval surface.
-4. Only then test a disposable Git repo patch flow.
+
+Next:
+
+1. Show the Codex bridge result in the Mission Control UI.
+2. Add a read-only Codex worker task.
+3. Only then test a disposable Git repo patch flow.
