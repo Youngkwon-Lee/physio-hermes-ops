@@ -123,6 +123,35 @@ lineage/continuity_handoff_notifications.jsonl
 
 Use JSONL first. Turn on HTTP notification only after the desktop API address and token are confirmed.
 
+## Desktop Smoke
+
+Start the receiver on the desktop Hermes host:
+
+```bash
+cd /home/yk/physio-hermes-ops
+git pull
+HERMES_MISSION_CONTROL_HOST=0.0.0.0 \
+HERMES_MISSION_CONTROL_PORT=8792 \
+HERMES_MISSION_CONTROL_API_KEY=dev-local-mission-control \
+python3 apps/api/mission_control_api.py
+```
+
+Then run this from MacBook:
+
+```bash
+python3 scripts/continuity_handoff_notify_smoke.py \
+  --base-url http://100.83.147.56:8792 \
+  --token dev-local-mission-control
+```
+
+Expected result:
+
+```text
+"ok": true
+```
+
+If `8791` returns `404 page not found`, another service is using that port. Use `8792` for Mission Control API.
+
 ## Stop Rules
 
 Do not promote canonical memory automatically.
