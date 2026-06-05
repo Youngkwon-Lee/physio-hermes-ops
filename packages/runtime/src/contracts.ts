@@ -35,6 +35,8 @@ export interface MissionArtifact {
     | 'monitoring-plan'
     | 'production-deploy'
     | 'release-note'
-    | 'ops-brief';
+    | 'ops-brief'
+    | 'codex-bridge-task'
+    | 'codex-bridge-result';
   metadata?: Record<string, string | number | boolean | null>;
 }

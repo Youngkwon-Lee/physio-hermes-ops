@@ -22,3 +22,24 @@ These should be broken into:
 
 - generic Hermes connectors
 - product-specific providers such as a Physio ops signal provider
+
+## Codex bridge
+
+The first connector contract is the Codex bridge.
+
+It does not call Codex directly yet.
+It defines:
+
+- the worker task shape,
+- the remote smoke result shape,
+- the Mission Run artifact shape used by Mission Control.
+
+Current files:
+
+- `src/codex-bridge.ts`
+
+The executable smoke command remains:
+
+```bash
+python3 scripts/codex_remote_smoke.py --host macbook
+```

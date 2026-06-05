@@ -83,3 +83,4 @@ This gives product UIs a single initial Mission Control hydration payload.
 - It should gradually delegate more logic to `packages/runtime`, `packages/workflows`, and `packages/connectors`.
 - It should not own Physio-specific UI or route logic.
 - When the GitHub env is missing, issue and PR publish stays in dry-run and records the reason in Mission Control artifacts and traces.
+- Codex worker execution is outside this API for now. Validate the worker host with `python3 scripts/codex_remote_smoke.py --host macbook` before wiring execution into Mission Control runs.

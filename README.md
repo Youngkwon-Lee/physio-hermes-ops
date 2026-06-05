@@ -25,6 +25,16 @@ Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 - `scripts/` : 집계/리포트 스크립트
 - `dashboard/` : 정적 대시보드
 
+## Codex worker smoke
+
+MacBook Codex bundled CLI를 Hermes worker로 붙이기 전, transport/binary/exec/artifact만 검증한다.
+
+- 설계: `docs/architecture/CODEX_BRIDGE_V0_1.md`
+- runbook: `docs/runbook/MACBOOK_CODEX_REMOTE_WORKER_SMOKE_TEST_V0_1.md`
+- script: `python3 scripts/codex_remote_smoke.py --host macbook`
+- local health: `python3 scripts/codex_remote_smoke.py --local --health-only`
+- if `Connection refused`, enable Remote Login on the MacBook before retrying
+
 ## dashboard read model 생성
 - `python scripts/build_dashboard_read_models.py`
 - 생성 위치: `dashboard/derived/`
