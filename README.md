@@ -35,6 +35,15 @@ MacBook Codex bundled CLI를 Hermes worker로 붙이기 전, transport/binary/ex
 - local health: `python3 scripts/codex_remote_smoke.py --local --health-only`
 - if `Connection refused`, enable Remote Login on the MacBook before retrying
 
+## Continuity handoff
+
+MacBook Codex App, desktop Hermes, Discord, Mission Control이 서로 이어받을 수 있도록 raw/candidate handoff를 남긴다.
+
+- 설계: `docs/architecture/CONTINUITY_HANDOFF_V0_1.md`
+- schema: `docs/specs/continuity_handoff_schema_v0_1.json`
+- runbook: `docs/runbook/CONTINUITY_HANDOFF_RUNBOOK_V0_1.md`
+- script: `python3 scripts/capture_continuity_handoff.py --input handoff.json`
+
 ## dashboard read model 생성
 - `python scripts/build_dashboard_read_models.py`
 - 생성 위치: `dashboard/derived/`
