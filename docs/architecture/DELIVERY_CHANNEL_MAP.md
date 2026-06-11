@@ -34,6 +34,7 @@
 | home-rehab-morning-brief | schedule_brief | `discord/비서/방문재활 일정 관리` | 방문재활 일정 요약 및 실행 준비 | Hermes cron output |
 | home-rehab-lunch-recommendation | recommendation | `discord/비서/맛집 추천 기록` | 동선 기반 점심 추천/기록 | Hermes cron output |
 | weekly-pt-kpi-brief | kpi_brief | `discord/사업/지원사업 회의실` | PT MVP 운영 지표 공유 | Hermes cron output |
+| biz-support-radar-daily | business_radar | `discord/사업/지원사업 레이더 운영 (일일/크론) v2` | 재활·의료AI·스타트업 인접 지원사업 일일 스캔 | Hermes cron output |
 | daily-conversation-curator | curator | `discord/비서/장기기억 기록 도우미` | 장기 기억 후보/큐레이션 | Hermes cron output |
 | daily-discord-digest | digest | `discord/비서/하루 대화 요약 리포터` | 하루 대화 핵심 요약 | Hermes cron output |
 | calendar-auto-classify | maintenance | `local-only` | 사용자-facing delivery 없음 | local runtime only |

@@ -97,6 +97,16 @@ jobs:
     prompt_file: "cron/prompts/weekly-pt-kpi-brief.md"
     enabled_toolsets: [terminal, file]
 
+  - name: biz-support-radar-daily
+    purpose: Daily scan of startup/government support programs relevant to rehabilitation, healthcare AI, and adjacent startup opportunities.
+    schedule: "0 9 * * *"
+    mode: agent
+    status: active
+    deliver_label: "discord/사업/지원사업 레이더 운영 (일일/크론) v2"
+    output_type: business_radar
+    prompt_file: "cron/prompts/biz-support-radar-daily.md"
+    enabled_toolsets: [web, file]
+
   - name: daily-conversation-curator
     purpose: Curate long-term-value conversation items for memory and knowledge promotion.
     schedule: "0 23 * * *"

@@ -109,6 +109,19 @@
       ]
     },
     {
+      "id": "discord:topic:1497727134821650624",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "지원사업 레이더 운영 (일일/크론) v2",
+      "parent_name": "사업",
+      "scope": "discord:자비스brain / #사업 / 지원사업 레이더 운영 (일일/크론) v2 / topic 1497727134821650624",
+      "purpose": ["business", "support-programs", "daily-radar"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #사업 / 지원사업 레이더 운영 (일일/크론) v2 / topic 1497727134821650624"
+      ]
+    },
+    {
       "id": "discord:topic:1490878409625309184",
       "platform": "discord",
       "kind": "thread",
