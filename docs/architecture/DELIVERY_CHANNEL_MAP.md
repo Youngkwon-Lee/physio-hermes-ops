@@ -38,6 +38,7 @@
 | daily-discord-digest | digest | `discord/비서/하루 대화 요약 리포터` | 하루 대화 핵심 요약 | Hermes cron output |
 | calendar-auto-classify | maintenance | `local-only` | 사용자-facing delivery 없음 | local runtime only |
 | ensure-kinelo-8888-server | watchdog | `local-only` | 사용자-facing delivery 없음 | local runtime only |
+| hermes-ops-watchdog | watchdog | `discord/비서/장기기억 기록 도우미` | Hermes gateway/cron 이상만 짧게 알리는 운영 watchdog | Hermes cron output |
 
 ---
 

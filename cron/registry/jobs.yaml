@@ -134,3 +134,16 @@ jobs:
     deliver_label: "local-only"
     output_type: watchdog
     script_file: "cron/scripts/ensure-kinelo-8888.sh"
+
+  - name: hermes-ops-watchdog
+    purpose: Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.
+    schedule: "every 10m"
+    mode: script
+    status: active
+    deliver_label: "discord/비서/장기기억 기록 도우미"
+    output_type: watchdog
+    script_file: "cron/scripts/hermes_ops_watchdog.py"
+    runtime_notes:
+      - silent-by-default; emits output only when an issue is detected
+      - checks gateway state via systemd user unit status
+      - checks active cron jobs for error markers and overdue next_run_at

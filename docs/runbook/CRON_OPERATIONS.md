@@ -143,6 +143,23 @@ hermes cron list
 - `calendar-auto-classify`
 - watchdog jobs
 
+### C. watchdog 운영 메모
+현재 운영에는 `hermes-ops-watchdog` 같은 경량 watchdog job을 둘 수 있다.
+
+권장 역할:
+- `systemctl --user show hermes-gateway` 기준 gateway active/running/PID 이상 감지
+- `~/.hermes/cron/jobs.json` 기준 active cron job의 `last_status`, `last_error`, `last_delivery_error` 확인
+- `next_run_at`이 현재 시각보다 의미 있게 밀린(overdue) job 감지
+
+운영 원칙:
+- watchdog은 **문제가 있을 때만 말하는 silent-by-default** 형태가 적합하다.
+- 정상 시에는 empty stdout으로 끝나고, 비정상 시에만 짧은 경고를 보낸다.
+- watchdog 자체도 `hermes cron run <job_id> --now`로 즉시 검증하고, output artifact가 `silent (empty output)`인지 함께 확인한다.
+
+주의:
+- WSL/host 전체가 꺼져 있으면 watchdog도 같이 멈춘다.
+- 따라서 watchdog은 "호스트가 살아 있는 동안의 gateway/cron 이상" 감시에 적합하고, 전체 호스트 다운 감시는 Windows 측 보완이 별도로 필요하다.
+
 ---
 
 ## 5. 검증 체크리스트
