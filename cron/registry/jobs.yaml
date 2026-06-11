@@ -1,5 +1,5 @@
 version: 0.1
-updated_at: 2026-06-01
+updated_at: 2026-06-11
 owner: Youngkwon-Lee
 purpose: Canonical registry for public-safe Hermes cron job definitions used in physio operations.
 notes:
@@ -16,7 +16,7 @@ jobs:
     deliver_label: "discord/news/AI 뉴스 토론"
     output_type: briefing
     prompt_file: "cron/prompts/daily-ai-news-brief.md"
-    enabled_toolsets: [web, file]
+    enabled_toolsets: [web, terminal, file]
     quality_targets:
       - concise
       - source-linked
@@ -49,7 +49,7 @@ jobs:
     schedule: "5 7 * * 1-5"
     mode: agent
     status: active
-    deliver_label: "discord/research/물리치료·재활 일일 브리핑 토론장"
+    deliver_label: "discord/research/연구 토론방"
     output_type: handoff
     prompt_file: "cron/prompts/overnight-pt-morning-summary.md"
     enabled_toolsets: [session_search, file]

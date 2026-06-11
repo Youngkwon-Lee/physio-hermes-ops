@@ -29,7 +29,7 @@
 | daily-ai-news-briefing | briefing | `discord/news/AI 뉴스 토론` | 매일 아침 AI 뉴스 핵심 브리핑 | Hermes cron output |
 | daily-ai-news-discussion-kickoff | kickoff | `discord/news/AI 뉴스 토론` | 브리핑 이후 질문/실험 킥오프 | Hermes cron output |
 | daily-rehab-ai-research-brief | research_brief | `discord/research/물리치료·재활 일일 브리핑 토론장` | 재활·물리치료·임상 AI 연구 브리핑 | Hermes cron output |
-| overnight-pt-morning-summary | handoff | `discord/research/물리치료·재활 일일 브리핑 토론장` | 밤사이 논의 아침 handoff | Hermes cron output |
+| overnight-pt-morning-summary | handoff | `discord/research/연구 토론방` | 밤사이 논의 아침 handoff | Hermes cron output |
 | daily-calendar-mail-brief | ops_brief | `discord/비서/아침 일정·메일 요약` | 일정/메일 기반 일일 운영 브리핑 | wiki/raw summary, cron output |
 | home-rehab-morning-brief | schedule_brief | `discord/비서/방문재활 일정 관리` | 방문재활 일정 요약 및 실행 준비 | Hermes cron output |
 | home-rehab-lunch-recommendation | recommendation | `discord/비서/맛집 추천 기록` | 동선 기반 점심 추천/기록 | Hermes cron output |
