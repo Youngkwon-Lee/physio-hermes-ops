@@ -118,8 +118,8 @@ python3 scripts/capture_continuity_handoff.py \
 Near real-time mode sends the same event to a running Hermes/Mission Control API.
 
 ```bash
-CONTINUITY_HANDOFF_NOTIFY_URL=http://DESKTOP_HOST:8791/handoff/notify \
-CONTINUITY_HANDOFF_NOTIFY_TOKEN=$HERMES_MISSION_CONTROL_API_KEY \
+CONTINUITY_HANDOFF_NOTIFY_URL=http://DESKTOP_HOST:8792/handoff/notify \
+CONTINUITY_HANDOFF_NOTIFY_TOKEN=$MISSION_CONTROL_SHARED_TOKEN \
 python3 scripts/capture_continuity_handoff.py --input handoff.json
 ```
 
@@ -138,17 +138,29 @@ Start the receiver on the desktop Hermes host:
 ```bash
 cd /home/yk/physio-hermes-ops
 git pull
-HERMES_MISSION_CONTROL_HOST=0.0.0.0 \
-HERMES_MISSION_CONTROL_PORT=8792 \
-HERMES_MISSION_CONTROL_API_KEY=dev-local-mission-control \
-python3 apps/api/mission_control_api.py
+mkdir -p ~/.config/systemd/user ~/.config/physio-hermes-ops
+cp deploy/systemd/ops-control-api.service ~/.config/systemd/user/
+cat > ~/.config/physio-hermes-ops/ops-control-api.env <<'EOF'
+MISSION_CONTROL_SHARED_TOKEN=dev-local-mission-control
+CONTINUITY_HANDOFF_NOTIFY_TOKEN=dev-local-mission-control
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now ops-control-api.service
+systemctl --user status ops-control-api.service --no-pager
 ```
+
+Receiver implementation note:
+- current receiver is `scripts/ops_control_api.py`
+- continuity handoff ingress is `POST /handoff/notify`
+- current desktop bind is `0.0.0.0:8792`
+- direct receiver target is the desktop WSL/Linux Tailscale IP (`http://100.125.26.99:8792` at the time of this runbook update)
+- Windows host Tailscale IP (`http://100.83.147.56:8792`) is a secondary path that depends on Windows `portproxy -> WSL:8792`
 
 Then run this from MacBook:
 
 ```bash
 python3 scripts/continuity_handoff_notify_smoke.py \
-  --base-url http://100.83.147.56:8792 \
+  --base-url http://100.125.26.99:8792 \
   --token dev-local-mission-control
 ```
 
@@ -158,7 +170,7 @@ Expected result:
 "ok": true
 ```
 
-If `8791` returns `404 page not found`, another service is using that port. Use `8792` for Mission Control API.
+If `8791` returns `404 page not found`, do not use it for continuity notify. The current desktop continuity receiver is `ops-control-api.service` on `8792`.
 
 ## WSL IP Change Recovery
 
@@ -202,12 +214,14 @@ python3 scripts/continuity_handoff_notify_smoke.py \
   --token dev-local-mission-control
 ```
 
+Use the Windows-host path above only after confirming `8792` is forwarded from Windows into the current WSL IP.
+
 ## MacBook Default Notify Env
 
 `capture_continuity_handoff.py` already reads these env vars by default:
 
 ```bash
-export CONTINUITY_HANDOFF_NOTIFY_URL=http://100.83.147.56:8792/handoff/notify
+export CONTINUITY_HANDOFF_NOTIFY_URL=http://100.125.26.99:8792/handoff/notify
 export CONTINUITY_HANDOFF_NOTIFY_TOKEN=dev-local-mission-control
 ```
 
@@ -226,7 +240,7 @@ source scripts/macos_continuity_notify_env.sh
 Recommended on MacBook for persistence:
 
 ```bash
-printf '\n# Desktop Hermes continuity notify\nexport MISSION_CONTROL_BASE_URL="http://100.83.147.56:8792"\nexport MISSION_CONTROL_SHARED_TOKEN="dev-local-mission-control"\nexport CONTINUITY_HANDOFF_NOTIFY_URL="http://100.83.147.56:8792/handoff/notify"\nexport CONTINUITY_HANDOFF_NOTIFY_TOKEN="dev-local-mission-control"\nexport SECOND_BRAIN_DIR="/absolute/path/to/your/second-brain"\n' >> ~/.zshrc
+printf '\n# Desktop Hermes continuity notify\nexport MISSION_CONTROL_BASE_URL="http://100.125.26.99:8792"\nexport MISSION_CONTROL_SHARED_TOKEN="dev-local-mission-control"\nexport CONTINUITY_HANDOFF_NOTIFY_URL="http://100.125.26.99:8792/handoff/notify"\nexport CONTINUITY_HANDOFF_NOTIFY_TOKEN="dev-local-mission-control"\nexport SECOND_BRAIN_DIR="/absolute/path/to/your/second-brain"\n' >> ~/.zshrc
 source ~/.zshrc
 ```
 
