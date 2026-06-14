@@ -121,6 +121,15 @@ systemctl --user list-timers mission-control-action-worker.timer --no-pager
 
 MacBook에서 desktop deploy action 생성:
 ```bash
+python3 scripts/create_desktop_deploy_action.py \
+  --base-url http://100.83.147.56:8792 \
+  --token "$MISSION_CONTROL_SHARED_TOKEN"
+```
+
+이 스크립트는 `/mission-actions`가 live이면 action을 만들고, 아직 old code라 `404`이면 bootstrap handoff와 `/handoff/notify`로 자동 fallback한다.
+
+Raw API 예시:
+```bash
 curl -sS -X POST http://100.83.147.56:8792/mission-actions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN" \
