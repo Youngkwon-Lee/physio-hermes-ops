@@ -438,6 +438,7 @@ def build_knowledge_graph(limit=50):
 
 
 HANDOFF_STATUSES = {"waiting_for_codex", "in_progress", "needs_reply", "done", "blocked"}
+MISSION_ITEM_STATUSES = {"backlog", "ready", "assigned", "in_progress", "needs_review", "blocked", "done"}
 
 
 def base_handoff_inbox_state():
@@ -445,6 +446,8 @@ def base_handoff_inbox_state():
         "version": 1,
         "updatedAt": now(),
         "handoffsByOrg": {},
+        "plansByOrg": {},
+        "tasksByOrg": {},
     }
 
 
@@ -459,6 +462,10 @@ def load_handoff_inbox_state():
         return base_handoff_inbox_state()
     if not isinstance(state.get("handoffsByOrg"), dict):
         state["handoffsByOrg"] = {}
+    if not isinstance(state.get("plansByOrg"), dict):
+        state["plansByOrg"] = {}
+    if not isinstance(state.get("tasksByOrg"), dict):
+        state["tasksByOrg"] = {}
     return state
 
 
@@ -470,6 +477,19 @@ def save_handoff_inbox_state(state):
 def normalized_handoff_status(value, default="waiting_for_codex"):
     status = str(value or "").strip()
     return status if status in HANDOFF_STATUSES else default
+
+
+def normalized_mission_item_status(value, default="backlog"):
+    status = str(value or "").strip()
+    return status if status in MISSION_ITEM_STATUSES else default
+
+
+def normalized_priority(value, default=50):
+    try:
+        priority = int(value)
+    except Exception:
+        priority = default
+    return max(0, min(100, priority))
 
 
 def handoff_party(value, default_agent, default_surface):
@@ -562,6 +582,121 @@ def update_handoff_status(payload, handoff_id):
     raise KeyError("Handoff not found")
 
 
+def mission_source_thread(value):
+    return handoff_source_thread(value)
+
+
+def create_plan_item(payload):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+
+    title = str(payload.get("title") or payload.get("goal") or "").strip()
+    if not title:
+        raise ValueError("title is required")
+
+    timestamp = now()
+    plan_id = str(payload.get("id") or payload.get("planId") or f"plan-{uuid.uuid4()}").strip()
+    return organization_id, {
+        "id": plan_id,
+        "kind": "plan",
+        "status": normalized_mission_item_status(payload.get("status"), default="backlog"),
+        "createdAt": str(payload.get("createdAt") or timestamp).strip() or timestamp,
+        "updatedAt": timestamp,
+        "title": compact_text(title, 300),
+        "horizon": str(payload.get("horizon") or "long").strip() or "long",
+        "summary": compact_text(payload.get("summary") or payload.get("context"), 1200),
+        "owner": handoff_party(payload.get("owner"), "youngkwon", "operator"),
+        "sourceThread": mission_source_thread(payload.get("sourceThread") or payload.get("source_thread")),
+        "priority": normalized_priority(payload.get("priority"), default=50),
+        "result": compact_text(payload.get("result"), 1200),
+        "tags": [str(item).strip() for item in payload.get("tags", []) if str(item).strip()] if isinstance(payload.get("tags"), list) else [],
+    }
+
+
+def create_task_item(payload):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+
+    title = str(payload.get("title") or payload.get("goal") or "").strip()
+    if not title:
+        raise ValueError("title is required")
+
+    timestamp = now()
+    task_id = str(payload.get("id") or payload.get("taskId") or f"task-{uuid.uuid4()}").strip()
+    return organization_id, {
+        "id": task_id,
+        "kind": "task",
+        "status": normalized_mission_item_status(payload.get("status"), default="ready"),
+        "createdAt": str(payload.get("createdAt") or timestamp).strip() or timestamp,
+        "updatedAt": timestamp,
+        "planId": str(payload.get("planId") or "").strip() or None,
+        "title": compact_text(title, 300),
+        "context": compact_text(payload.get("context"), 1200),
+        "expectedOutput": compact_text(payload.get("expectedOutput") or payload.get("expected_output"), 800),
+        "assignee": handoff_party(payload.get("assignee") or payload.get("to"), "macbook-codex", "codex-app"),
+        "repo": str(payload.get("repo") or "").strip() or None,
+        "sourceThread": mission_source_thread(payload.get("sourceThread") or payload.get("source_thread")),
+        "priority": normalized_priority(payload.get("priority"), default=50),
+        "result": compact_text(payload.get("result"), 1200),
+        "linkedHandoffId": str(payload.get("linkedHandoffId") or payload.get("handoffId") or "").strip() or None,
+        "tags": [str(item).strip() for item in payload.get("tags", []) if str(item).strip()] if isinstance(payload.get("tags"), list) else [],
+    }
+
+
+def list_mission_items(kind, organization_id, limit=20, status=None, plan_id=None):
+    state = load_handoff_inbox_state()
+    key = "plansByOrg" if kind == "plan" else "tasksByOrg"
+    rows = state.get(key, {}).get(organization_id, [])
+    if not isinstance(rows, list):
+        return []
+    items = [row for row in rows if isinstance(row, dict)]
+    if status:
+        items = [item for item in items if item.get("status") == status]
+    if plan_id:
+        items = [item for item in items if item.get("planId") == plan_id]
+    items.sort(key=lambda item: (normalized_priority(item.get("priority")), str(item.get("updatedAt") or "")))
+    return items[: max(1, limit)]
+
+
+def next_task_item(organization_id):
+    candidates = []
+    for status in ("in_progress", "assigned", "ready", "needs_review", "blocked", "backlog"):
+        candidates.extend(list_mission_items("task", organization_id, limit=100, status=status))
+    return candidates[0] if candidates else None
+
+
+def update_mission_item_status(kind, payload, item_id):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+    next_status = normalized_mission_item_status(payload.get("status"), default="")
+    if not next_status:
+        raise ValueError("valid status is required")
+
+    state = load_handoff_inbox_state()
+    key = "plansByOrg" if kind == "plan" else "tasksByOrg"
+    rows = state.setdefault(key, {}).setdefault(organization_id, [])
+    if not isinstance(rows, list):
+        rows = []
+        state[key][organization_id] = rows
+
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict) or str(item.get("id") or "") != item_id:
+            continue
+        updated = {**item, "status": next_status, "updatedAt": now()}
+        if "result" in payload:
+            updated["result"] = compact_text(payload.get("result"), 1200)
+        if "assignee" in payload and kind == "task":
+            updated["assignee"] = handoff_party(payload.get("assignee"), "macbook-codex", "codex-app")
+        rows[index] = updated
+        save_handoff_inbox_state(state)
+        return organization_id, updated
+
+    raise KeyError(f"{kind.title()} not found")
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -638,7 +773,72 @@ class Handler(BaseHTTPRequestHandler):
                 "continuity_notify_log": str(HANDOFF_NOTIFY_LOG),
                 "handoff_inbox": str(HANDOFF_INBOX_PATH),
                 "handoff_inbox_legacy": str(LEGACY_HANDOFF_INBOX_PATH),
+                "mission_control": {
+                    "plans_enabled": True,
+                    "tasks_enabled": True,
+                    "next_task_enabled": True,
+                    "snapshot_enabled": True,
+                },
             })
+
+        if parsed.path == "/snapshot":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            return self._json(200, {
+                "ok": True,
+                "success": True,
+                "data": {
+                    "plans": list_mission_items("plan", organization_id, limit=30),
+                    "tasks": list_mission_items("task", organization_id, limit=50),
+                    "nextTask": next_task_item(organization_id),
+                    "handoffs": list_handoff_items(organization_id, limit=30),
+                },
+            })
+
+        if parsed.path == "/plans":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            try:
+                limit = max(1, min(100, int((params.get("limit") or ["20"])[0])))
+            except Exception:
+                limit = 20
+            status = (params.get("status") or [""])[0].strip() or None
+            items = list_mission_items("plan", organization_id, limit=limit, status=status)
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
+
+        if parsed.path == "/tasks/next":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            item = next_task_item(organization_id)
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path == "/tasks":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            try:
+                limit = max(1, min(100, int((params.get("limit") or ["20"])[0])))
+            except Exception:
+                limit = 20
+            status = (params.get("status") or [""])[0].strip() or None
+            plan_id = (params.get("planId") or [""])[0].strip() or None
+            items = list_mission_items("task", organization_id, limit=limit, status=status, plan_id=plan_id)
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
 
         if parsed.path == "/handoffs":
             auth_ctx = self._require_auth("read")
@@ -684,8 +884,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         auth_ctx = None
         parsed = urlparse(self.path)
-        if parsed.path in {"/action", "/knowledge/inject", "/handoffs"} or (
+        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks"} or (
             parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status")
+        ) or (
+            parsed.path.startswith("/plans/") and parsed.path.endswith("/status")
+        ) or (
+            parsed.path.startswith("/tasks/") and parsed.path.endswith("/status")
         ):
             auth_ctx = self._require_auth("exec")
             if REQUIRE_TOKEN and not auth_ctx:
@@ -720,6 +924,91 @@ class Handler(BaseHTTPRequestHandler):
                 "storedAt": str(HANDOFF_NOTIFY_LOG),
                 "validationErrors": [],
             })
+
+        if parsed.path == "/plans":
+            try:
+                organization_id, item = create_plan_item(data)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            with RUNTIME_LOCK:
+                state = load_handoff_inbox_state()
+                rows = state.setdefault("plansByOrg", {}).setdefault(organization_id, [])
+                if not isinstance(rows, list):
+                    rows = []
+                    state["plansByOrg"][organization_id] = rows
+                rows.append(item)
+                rows.sort(key=lambda row: (normalized_priority(row.get("priority")), str(row.get("updatedAt") or "")))
+                save_handoff_inbox_state(state)
+            audit({
+                "time": now(),
+                "action": "plan_created",
+                "ok": True,
+                "organizationId": organization_id,
+                "planId": item["id"],
+                "status": item["status"],
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/plans/") and parsed.path.endswith("/status"):
+            plan_id = parsed.path.split("/")[2]
+            try:
+                organization_id, item = update_mission_item_status("plan", data, plan_id)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            except KeyError:
+                return self._json(404, {"ok": False, "error": "plan_not_found"})
+            audit({
+                "time": now(),
+                "action": "plan_status_updated",
+                "ok": True,
+                "organizationId": organization_id,
+                "planId": item["id"],
+                "status": item["status"],
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path == "/tasks":
+            try:
+                organization_id, item = create_task_item(data)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            with RUNTIME_LOCK:
+                state = load_handoff_inbox_state()
+                rows = state.setdefault("tasksByOrg", {}).setdefault(organization_id, [])
+                if not isinstance(rows, list):
+                    rows = []
+                    state["tasksByOrg"][organization_id] = rows
+                rows.append(item)
+                rows.sort(key=lambda row: (normalized_priority(row.get("priority")), str(row.get("updatedAt") or "")))
+                save_handoff_inbox_state(state)
+            audit({
+                "time": now(),
+                "action": "task_created",
+                "ok": True,
+                "organizationId": organization_id,
+                "taskId": item["id"],
+                "status": item["status"],
+                "planId": item.get("planId"),
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/tasks/") and parsed.path.endswith("/status"):
+            task_id = parsed.path.split("/")[2]
+            try:
+                organization_id, item = update_mission_item_status("task", data, task_id)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            except KeyError:
+                return self._json(404, {"ok": False, "error": "task_not_found"})
+            audit({
+                "time": now(),
+                "action": "task_status_updated",
+                "ok": True,
+                "organizationId": organization_id,
+                "taskId": item["id"],
+                "status": item["status"],
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
 
         if parsed.path == "/handoffs":
             try:
