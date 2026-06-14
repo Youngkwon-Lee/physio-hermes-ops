@@ -92,6 +92,12 @@
     .status-chip.done{border-color:#2a5f44;color:#8fe3b3}
     .status-chip.blocked,.status-chip.failed{border-color:#8a2f2f;color:#ff9b9b}
     .mission-actions-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+    .mission-actions-row .btn{width:auto}
+    .mission-control-form{display:grid;grid-template-columns:1fr;gap:8px;margin-top:10px}
+    .mission-control-form textarea{width:100%;min-height:64px;resize:vertical;background:#0f1726;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px}
+    .mission-control-form textarea:focus{outline:none;border-color:#7170ff;box-shadow:0 0 0 1px rgba(113,112,255,.35)}
+    .mission-control-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+    .mission-control-meta .pill{font-size:10px;padding:3px 7px}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     @keyframes agentFloat{0%{transform:translateY(0px)}50%{transform:translateY(-4px)}100%{transform:translateY(0px)}}
     @keyframes stageStep{0%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + 1px),calc(-50% - 3px))}100%{transform:translate(-50%,-50%)}}
@@ -280,7 +286,17 @@
           <div class="mission-actions-row">
             <button class="btn" id="mc-refresh">Mission Control 새로고침</button>
             <button class="btn" id="mc-start-next">다음 작업 시작</button>
+            <button class="btn" id="mc-ready-next">blocked 해제</button>
+            <button class="btn" id="mc-block-next">blocked 유지</button>
             <button class="btn" id="mc-done-next">다음 작업 완료</button>
+          </div>
+          <div class="mission-control-form">
+            <textarea id="mc-result-note" placeholder="완료/blocked 결과 메모. 비워두면 dashboard 기본 문구가 들어갑니다."></textarea>
+          </div>
+          <div class="mission-control-meta">
+            <span class="pill" id="mc-api-pill">API: -</span>
+            <span class="pill" id="mc-org-pill">org: -</span>
+            <span class="pill" id="mc-exec-pill">exec: -</span>
           </div>
           <div class="cmdbox" id="mc-feedback">대기 중</div>
         </div>
@@ -523,6 +539,7 @@
       execOperatorToken: localStorage.getItem('opsCtlExecOperatorToken') || '',
       execRoleMode: localStorage.getItem('opsCtlExecRoleMode') || 'operator',
     };
+    const MISSION_CONTROL_STATE = {nextTask: null};
 
     function getExecToken(){
       return OPS_API.execRoleMode === 'admin' ? OPS_API.execAdminToken : OPS_API.execOperatorToken;
@@ -1617,6 +1634,38 @@
       if(el) el.textContent = msg;
     }
 
+    function missionResultNote(){
+      return (document.getElementById('mc-result-note')?.value || '').trim();
+    }
+
+    function defaultMissionResult(status, task){
+      if(status === 'in_progress') return `Started from dashboard at ${new Date().toISOString()}.`;
+      if(status === 'ready') return `Unblocked from dashboard at ${new Date().toISOString()}.`;
+      if(status === 'blocked') return missionResultNote() || `Still blocked from dashboard at ${new Date().toISOString()}.`;
+      if(status === 'done') return missionResultNote() || `Completed from dashboard at ${new Date().toISOString()}.`;
+      return missionResultNote() || `Updated to ${status} from dashboard at ${new Date().toISOString()}.`;
+    }
+
+    function syncMissionControls(next){
+      MISSION_CONTROL_STATE.nextTask = next || null;
+      const status = String(next?.status || '');
+      const hasNext = Boolean(next?.id);
+      const startBtn = document.getElementById('mc-start-next');
+      const readyBtn = document.getElementById('mc-ready-next');
+      const blockBtn = document.getElementById('mc-block-next');
+      const doneBtn = document.getElementById('mc-done-next');
+      if(startBtn) startBtn.disabled = !hasNext || status === 'blocked' || status === 'done';
+      if(readyBtn) readyBtn.disabled = !hasNext || status !== 'blocked';
+      if(blockBtn) blockBtn.disabled = !hasNext || status === 'done';
+      if(doneBtn) doneBtn.disabled = !hasNext;
+      const apiPill = document.getElementById('mc-api-pill');
+      const orgPill = document.getElementById('mc-org-pill');
+      const execPill = document.getElementById('mc-exec-pill');
+      if(apiPill) apiPill.textContent = `API: ${OPS_API.source} · ${OPS_API.baseUrl}`;
+      if(orgPill) orgPill.textContent = `org: ${MISSION_CONTROL_ORG}`;
+      if(execPill) execPill.textContent = `exec: ${OPS_API.execRoleMode}${getExecToken() ? ' token set' : ' token missing'}`;
+    }
+
     function statusChip(status){
       const raw = String(status || '-');
       const cls = raw.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -1666,6 +1715,7 @@
         const actions = data.actions || [];
         const handoffs = data.handoffs || [];
         const next = data.nextTask || null;
+        syncMissionControls(next);
 
         document.getElementById('mc-count-plans').textContent = String(plans.length);
         document.getElementById('mc-count-tasks').textContent = String(tasks.length);
@@ -1686,25 +1736,32 @@
         document.getElementById('mc-handoffs').innerHTML = handoffs.slice(0, 4).map(h => missionItemHtml(h, 'handoff')).join('') || '<div class="muted">handoffs empty</div>';
         setMissionFeedback(`snapshot ok · org=${MISSION_CONTROL_ORG} · ${new Date().toLocaleTimeString()}`);
       }catch(err){
+        syncMissionControls(null);
         setMissionFeedback(`Mission Control load 실패: ${err.message}`);
       }
     }
 
     async function updateNextTaskStatus(status){
-      const taskId = document.getElementById('mc-next-title')?.dataset?.taskId || '';
+      const task = MISSION_CONTROL_STATE.nextTask || {};
+      const taskId = task.id || document.getElementById('mc-next-title')?.dataset?.taskId || '';
       if(!taskId){
         setMissionFeedback('다음 작업이 없습니다.');
         return;
       }
+      if(status === 'done' && !confirm(`Mission Control task를 done으로 바꿀까요?\n\n${task.title || taskId}`)) return;
+      if(status === 'ready' && !confirm(`blocked task를 ready로 풀까요?\n\n${task.title || taskId}`)) return;
       const headers = {'Content-Type':'application/json', ...apiHeaders('exec')};
+      const result = defaultMissionResult(status, task);
       const res = await fetch(`${OPS_API.baseUrl}/tasks/${encodeURIComponent(taskId)}/status`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({organizationId: MISSION_CONTROL_ORG, status})
+        body: JSON.stringify({organizationId: MISSION_CONTROL_ORG, status, result})
       });
       const payload = await res.json().catch(()=>({}));
       if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
       setMissionFeedback(`task ${taskId} -> ${status}`);
+      const noteEl = document.getElementById('mc-result-note');
+      if(noteEl && (status === 'done' || status === 'blocked')) noteEl.value = '';
       await loadMissionControl();
     }
 
@@ -1796,6 +1853,14 @@
       document.getElementById('mc-start-next')?.addEventListener('click', async () => {
         try{ await updateNextTaskStatus('in_progress'); }
         catch(err){ setMissionFeedback(`next task start 실패: ${err.message}`); }
+      });
+      document.getElementById('mc-ready-next')?.addEventListener('click', async () => {
+        try{ await updateNextTaskStatus('ready'); }
+        catch(err){ setMissionFeedback(`next task ready 실패: ${err.message}`); }
+      });
+      document.getElementById('mc-block-next')?.addEventListener('click', async () => {
+        try{ await updateNextTaskStatus('blocked'); }
+        catch(err){ setMissionFeedback(`next task blocked 실패: ${err.message}`); }
       });
       document.getElementById('mc-done-next')?.addEventListener('click', async () => {
         try{ await updateNextTaskStatus('done'); }
