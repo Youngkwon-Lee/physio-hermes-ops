@@ -75,6 +75,23 @@
     .feed-col{border:1px solid var(--line);border-radius:12px;background:#101a2d;padding:10px}
     .feed-item{border:1px solid #23324d;border-radius:8px;padding:7px;margin-bottom:6px;background:#0f1726;font-size:12px}
     .feed-item .muted{font-size:11px}
+    .mission-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:12px;margin-bottom:14px}
+    .mission-hero{border:1px solid #2d4268;border-radius:12px;background:linear-gradient(135deg,#12213a,#0f1726);padding:14px}
+    .mission-title{font-size:18px;font-weight:800;margin-bottom:4px}
+    .mission-counts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+    .mission-count{border:1px solid var(--line);border-radius:10px;background:#0f1726;padding:8px}
+    .mission-count strong{display:block;font-size:20px}
+    .mission-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    .mission-col{border:1px solid var(--line);border-radius:12px;background:#101a2d;padding:10px;min-height:120px}
+    .mission-item{border:1px solid #263858;border-radius:10px;background:#0f1726;padding:8px;margin-bottom:8px}
+    .mission-item-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+    .mission-item-title{font-size:12px;font-weight:700;color:#eaf1ff}
+    .status-chip{font-size:10px;border:1px solid var(--line);border-radius:999px;padding:2px 6px;color:#c8d8f7;white-space:nowrap}
+    .status-chip.ready,.status-chip.queued{border-color:#395c95;color:#9fc1ff}
+    .status-chip.in_progress,.status-chip.running{border-color:#8a6d3b;color:#f6c453}
+    .status-chip.done{border-color:#2a5f44;color:#8fe3b3}
+    .status-chip.blocked,.status-chip.failed{border-color:#8a2f2f;color:#ff9b9b}
+    .mission-actions-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
     @keyframes pulse{0%{transform:scale(.8);opacity:.5}50%{transform:scale(1.4);opacity:1}100%{transform:scale(.8);opacity:.5}}
     @keyframes agentFloat{0%{transform:translateY(0px)}50%{transform:translateY(-4px)}100%{transform:translateY(0px)}}
     @keyframes stageStep{0%{transform:translate(-50%,-50%)}50%{transform:translate(calc(-50% + 1px),calc(-50% - 3px))}100%{transform:translate(-50%,-50%)}}
@@ -128,6 +145,7 @@
     body.simple-mode #ops-history,
     body.simple-mode #fsm-section,
     body.simple-mode #queue{display:none}
+    body.simple-mode #mission-control-section{display:block}
     body.simple-mode .layout{grid-template-columns:1fr 420px}
 
     @media (max-width:1200px){
@@ -137,6 +155,8 @@
       .team-grid{grid-template-columns:1fr 1fr}
       .workspace-map{grid-template-columns:1fr 1fr}
       .stream-feed{grid-template-columns:1fr}
+      .mission-grid{grid-template-columns:1fr}
+      .mission-board{grid-template-columns:1fr}
       .layout{grid-template-columns:1fr}
       .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
       .two-col{grid-template-columns:1fr}
@@ -175,6 +195,7 @@
     <div class="side-brand navbar-brand">Agent Control</div>
     <nav class="side-nav navbar-nav">
       <a class="nav-link" href="#kpi-section">요약 지표</a>
+      <a class="nav-link" href="#mission-control-section">미션 컨트롤</a>
       <a class="nav-link" href="#timeline-section">라인리지 타임라인</a>
       <a class="nav-link" href="#profile-section">프로필 상태</a>
       <a class="nav-link" href="#detail-section">이벤트 상세</a>
@@ -249,6 +270,43 @@
     </section>
 
     <section class="stream-feed" id="stream-feed-section"></section>
+
+    <section class="card" id="mission-control-section">
+      <div class="section-title">Mission Control</div>
+      <div class="mission-grid">
+        <div class="mission-hero">
+          <div class="mission-title" id="mc-next-title">다음 작업: -</div>
+          <div class="muted" id="mc-next-meta">Mission Control snapshot을 불러오는 중...</div>
+          <div class="mission-actions-row">
+            <button class="btn" id="mc-refresh">Mission Control 새로고침</button>
+            <button class="btn" id="mc-start-next">다음 작업 시작</button>
+            <button class="btn" id="mc-done-next">다음 작업 완료</button>
+          </div>
+          <div class="cmdbox" id="mc-feedback">대기 중</div>
+        </div>
+        <div class="mission-counts">
+          <div class="mission-count"><span class="muted">Plans</span><strong id="mc-count-plans">-</strong></div>
+          <div class="mission-count"><span class="muted">Tasks</span><strong id="mc-count-tasks">-</strong></div>
+          <div class="mission-count"><span class="muted">Actions</span><strong id="mc-count-actions">-</strong></div>
+          <div class="mission-count"><span class="muted">Handoffs</span><strong id="mc-count-handoffs">-</strong></div>
+        </div>
+      </div>
+      <div class="mission-board">
+        <div class="mission-col">
+          <div class="zone-head"><div class="zone-title">Plans</div><div class="zone-meta" id="mc-plan-meta">-</div></div>
+          <div id="mc-plans"></div>
+        </div>
+        <div class="mission-col">
+          <div class="zone-head"><div class="zone-title">Tasks</div><div class="zone-meta" id="mc-task-meta">-</div></div>
+          <div id="mc-tasks"></div>
+        </div>
+        <div class="mission-col">
+          <div class="zone-head"><div class="zone-title">Actions / Handoffs</div><div class="zone-meta" id="mc-action-meta">-</div></div>
+          <div id="mc-actions"></div>
+          <div id="mc-handoffs"></div>
+        </div>
+      </div>
+    </section>
 
     <section class="layout">
       <aside class="card" id="profile-section">
@@ -455,6 +513,7 @@
     const URL_API_OVERRIDE = new URLSearchParams(location.search).get('api') || '';
     const RESOLVED_API_BASE = (URL_API_OVERRIDE || NAUTILUS_CONFIG.opsApiBaseUrl || DEFAULT_LOCAL_API).trim();
     const RESOLVED_API_SOURCE = URL_API_OVERRIDE ? 'query' : (NAUTILUS_CONFIG.opsApiBaseUrl ? 'config' : 'default-local');
+    const MISSION_CONTROL_ORG = (NAUTILUS_CONFIG.organizationId || 'org-smoke').trim();
 
     const OPS_API = {
       baseUrl: RESOLVED_API_BASE,
@@ -467,6 +526,13 @@
 
     function getExecToken(){
       return OPS_API.execRoleMode === 'admin' ? OPS_API.execAdminToken : OPS_API.execOperatorToken;
+    }
+
+    function apiHeaders(scope='read'){
+      const headers = {};
+      const token = scope === 'exec' ? getExecToken() : OPS_API.readToken;
+      if(token) headers.Authorization = `Bearer ${token}`;
+      return headers;
     }
 
     function setToken(scope){
@@ -703,6 +769,7 @@
     async function selectEvent(i){
       const e = FILTERED_EVENTS[i];
       if(!e) return;
+      const isGenClose = String(e.run_id || '').startsWith('generation-close-');
       SELECTED_EVENT_INDEX = i;
       document.querySelectorAll('.timeline-item').forEach(el => el.classList.remove('active'));
       const target = [...document.querySelectorAll('.timeline-item')].find(el => Number(el.dataset.index) === i);
@@ -740,7 +807,6 @@
           const report = await getJson(`../${reportPath}`);
           document.getElementById('d-report').textContent = JSON.stringify(report, null, 2);
 
-          const isGenClose = String(e.run_id || '').startsWith('generation-close-');
           if (isGenClose) {
             const breakdown = report.status_breakdown || {};
             const failN = Number(breakdown.FAIL ?? 0);
@@ -1527,6 +1593,7 @@
         await loadKnowledgeRecent();
         await loadKnowledgeGraph();
         await loadFsmState();
+        await loadMissionControl();
       }catch(err){
         document.getElementById('timeline').innerHTML = `<div class="muted">load error: ${err.message}<br/>repo root에서 <code>python -m http.server 8787</code> 후 접속</div>`;
       }
@@ -1543,6 +1610,102 @@
     function setActionFeedback(msg){
       const el = document.getElementById('action-feedback');
       if(el) el.textContent = msg;
+    }
+
+    function setMissionFeedback(msg){
+      const el = document.getElementById('mc-feedback');
+      if(el) el.textContent = msg;
+    }
+
+    function statusChip(status){
+      const raw = String(status || '-');
+      const cls = raw.replace(/[^a-zA-Z0-9_-]/g, '_');
+      return `<span class="status-chip ${cls}">${escapeHtml(raw)}</span>`;
+    }
+
+    function escapeHtml(value){
+      return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[ch]));
+    }
+
+    function missionItemHtml(item, type='item'){
+      const title = item?.title || item?.goal || item?.actionType || item?.id || '-';
+      const meta = [
+        item?.assignee?.agent || item?.target?.agent || item?.to?.agent || '',
+        item?.updatedAt || item?.finishedAt || item?.createdAt || '',
+      ].filter(Boolean).join(' · ');
+      const detail = item?.summary || item?.context || item?.result || item?.expectedOutput || '';
+      return `<div class="mission-item" data-${type}-id="${escapeHtml(item?.id || '')}">
+        <div class="mission-item-head">
+          <div class="mission-item-title">${escapeHtml(title)}</div>
+          ${statusChip(item?.status)}
+        </div>
+        <div class="muted">${escapeHtml(meta || item?.id || '-')}</div>
+        <div class="muted">${escapeHtml(String(detail || '').slice(0, 220) || '-')}</div>
+      </div>`;
+    }
+
+    async function loadMissionControl(){
+      const root = document.getElementById('mission-control-section');
+      if(!root) return;
+      try{
+        const res = await fetch(`${OPS_API.baseUrl}/snapshot?organizationId=${encodeURIComponent(MISSION_CONTROL_ORG)}`, {
+          cache: 'no-store',
+          headers: apiHeaders('read')
+        });
+        const payload = await res.json().catch(()=>({}));
+        if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
+        const data = payload.data || {};
+        const plans = data.plans || [];
+        const tasks = data.tasks || [];
+        const actions = data.actions || [];
+        const handoffs = data.handoffs || [];
+        const next = data.nextTask || null;
+
+        document.getElementById('mc-count-plans').textContent = String(plans.length);
+        document.getElementById('mc-count-tasks').textContent = String(tasks.length);
+        document.getElementById('mc-count-actions').textContent = String(actions.length);
+        document.getElementById('mc-count-handoffs').textContent = String(handoffs.length);
+        document.getElementById('mc-next-title').textContent = next ? `다음 작업: ${next.title || next.id}` : '다음 작업: 없음';
+        document.getElementById('mc-next-meta').textContent = next
+          ? `${next.status || '-'} · ${next.assignee?.agent || '-'} · ${next.expectedOutput || next.context || '-'}`
+          : 'ready/assigned/in_progress 작업이 없습니다.';
+        document.getElementById('mc-next-title').dataset.taskId = next?.id || '';
+
+        document.getElementById('mc-plan-meta').textContent = `${plans.length}개`;
+        document.getElementById('mc-task-meta').textContent = `${tasks.length}개`;
+        document.getElementById('mc-action-meta').textContent = `${actions.length} actions · ${handoffs.length} handoffs`;
+        document.getElementById('mc-plans').innerHTML = plans.slice(0, 5).map(p => missionItemHtml(p, 'plan')).join('') || '<div class="muted">plans empty</div>';
+        document.getElementById('mc-tasks').innerHTML = tasks.slice(0, 8).map(t => missionItemHtml(t, 'task')).join('') || '<div class="muted">tasks empty</div>';
+        document.getElementById('mc-actions').innerHTML = actions.slice(0, 4).map(a => missionItemHtml(a, 'action')).join('') || '<div class="muted">actions empty</div>';
+        document.getElementById('mc-handoffs').innerHTML = handoffs.slice(0, 4).map(h => missionItemHtml(h, 'handoff')).join('') || '<div class="muted">handoffs empty</div>';
+        setMissionFeedback(`snapshot ok · org=${MISSION_CONTROL_ORG} · ${new Date().toLocaleTimeString()}`);
+      }catch(err){
+        setMissionFeedback(`Mission Control load 실패: ${err.message}`);
+      }
+    }
+
+    async function updateNextTaskStatus(status){
+      const taskId = document.getElementById('mc-next-title')?.dataset?.taskId || '';
+      if(!taskId){
+        setMissionFeedback('다음 작업이 없습니다.');
+        return;
+      }
+      const headers = {'Content-Type':'application/json', ...apiHeaders('exec')};
+      const res = await fetch(`${OPS_API.baseUrl}/tasks/${encodeURIComponent(taskId)}/status`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({organizationId: MISSION_CONTROL_ORG, status})
+      });
+      const payload = await res.json().catch(()=>({}));
+      if(!res.ok || !payload.ok) throw new Error(payload.error || `status ${res.status}`);
+      setMissionFeedback(`task ${taskId} -> ${status}`);
+      await loadMissionControl();
     }
 
     function confirmAction(actionKey, label){
@@ -1628,6 +1791,15 @@
           const ok = await copyToClipboard(ACTION_PREVIEW.finalize_once);
           setActionFeedback(ok ? `action 실패(${err.message}) · fallback 명령 복사` : `action 실패(${err.message})\n${ACTION_PREVIEW.finalize_once}`);
         }
+      });
+      document.getElementById('mc-refresh')?.addEventListener('click', loadMissionControl);
+      document.getElementById('mc-start-next')?.addEventListener('click', async () => {
+        try{ await updateNextTaskStatus('in_progress'); }
+        catch(err){ setMissionFeedback(`next task start 실패: ${err.message}`); }
+      });
+      document.getElementById('mc-done-next')?.addEventListener('click', async () => {
+        try{ await updateNextTaskStatus('done'); }
+        catch(err){ setMissionFeedback(`next task done 실패: ${err.message}`); }
       });
     }
 
