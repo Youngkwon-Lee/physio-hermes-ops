@@ -17,6 +17,7 @@ import ingest_discord_meeting_to_mission_control as ingest
 DEFAULT_THREAD_ID = "1515296585410416931"
 DEFAULT_THREAD_NAME = "맥북코덱스소통채널"
 DEFAULT_CHANNEL_NAME = "second_memory"
+DEFAULT_STATE_FILE = Path.home() / ".local" / "state" / "physio-hermes-ops" / "mission_control" / "discord_thread_ingest_state.json"
 
 
 def first_env(*names: str) -> str | None:
@@ -66,6 +67,51 @@ def message_identity(message: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def load_state(path: str | None) -> dict[str, Any]:
+    if not path:
+        return {"processedMessageIds": []}
+    state_path = Path(path).expanduser()
+    if not state_path.exists():
+        return {"processedMessageIds": []}
+    raw = state_path.read_text(encoding="utf-8").strip()
+    if not raw:
+        return {"processedMessageIds": []}
+    payload = json.loads(raw)
+    if not isinstance(payload, dict):
+        return {"processedMessageIds": []}
+    if not isinstance(payload.get("processedMessageIds"), list):
+        payload["processedMessageIds"] = []
+    return payload
+
+
+def save_state(path: str | None, state: dict[str, Any]) -> None:
+    if not path:
+        return
+    state_path = Path(path).expanduser()
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def mark_processed(state: dict[str, Any], source_message: dict[str, Any], result: dict[str, Any]) -> None:
+    message_id = str(source_message.get("messageId") or "").strip()
+    if not message_id:
+        return
+    processed = [str(value) for value in state.get("processedMessageIds", []) if str(value).strip()]
+    if message_id not in processed:
+        processed.append(message_id)
+    state["processedMessageIds"] = processed[-500:]
+    state["lastProcessedMessageId"] = message_id
+    state["lastResult"] = {
+        "ok": bool(result.get("ok")),
+        "planId": (result.get("plan") or {}).get("id") if isinstance(result.get("plan"), dict) else None,
+        "taskIds": [
+            task.get("id")
+            for task in result.get("tasks", [])
+            if isinstance(task, dict) and task.get("id")
+        ],
+    }
+
+
 def extract_marker_block(text: str) -> str | None:
     match = re.search(
         r"MISSION_CONTROL_INGEST_BEGIN\s*(.*?)\s*MISSION_CONTROL_INGEST_END",
@@ -90,14 +136,23 @@ def extract_fenced_block(text: str) -> str | None:
     return (preferred or fallback or [None])[0]
 
 
-def extract_payload(messages: list[dict[str, Any]], *, message_id: str | None, allow_plain: bool) -> tuple[str, dict[str, Any]]:
+def extract_payload(
+    messages: list[dict[str, Any]],
+    *,
+    message_id: str | None,
+    allow_plain: bool,
+    processed_message_ids: set[str] | None = None,
+) -> tuple[str, dict[str, Any]]:
     ordered = messages
     if message_id:
         ordered = [row for row in messages if str(row.get("id") or "") == message_id]
         if not ordered:
             raise ValueError(f"message id not found: {message_id}")
+    processed_message_ids = processed_message_ids or set()
 
     for message in ordered:
+        if str(message.get("id") or "") in processed_message_ids:
+            continue
         content = str(message.get("content") or "").strip()
         if not content:
             continue
@@ -183,6 +238,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo", default="Youngkwon-Lee/physio-hermes-ops")
     parser.add_argument("--default-owner", default="youngkwon")
     parser.add_argument("--default-assignee", default="desktop-hermes")
+    parser.add_argument("--state-file", default=str(DEFAULT_STATE_FILE), help="Processed message state path. Use empty string with --no-state.")
+    parser.add_argument("--no-state", action="store_true", help="Disable duplicate prevention state.")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -190,9 +247,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        state_path = None if args.no_state else args.state_file
+        state = load_state(state_path)
+        processed = {str(value) for value in state.get("processedMessageIds", []) if str(value).strip()}
         messages = load_messages(args.messages_json, thread_id=args.thread_id, limit=args.limit, discord_token=args.discord_token)
-        raw, source_message = extract_payload(messages, message_id=args.message_id, allow_plain=args.allow_plain)
+        raw, source_message = extract_payload(
+            messages,
+            message_id=args.message_id,
+            allow_plain=args.allow_plain,
+            processed_message_ids=processed,
+        )
         result = run_ingest(raw, args, source_message)
+        if result.get("ok") and not args.dry_run:
+            mark_processed(state, source_message, result)
+            save_state(state_path, state)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result.get("ok") else 1
     except Exception as error:

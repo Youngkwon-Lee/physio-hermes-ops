@@ -240,6 +240,22 @@ python3 scripts/ingest_discord_thread_to_mission_control.py \
   --dry-run
 ```
 
+중복 방지 state:
+```text
+~/.local/state/physio-hermes-ops/mission_control/discord_thread_ingest_state.json
+```
+
+desktop timer 설치:
+```bash
+cp deploy/systemd/mission-control-discord-thread-ingest.service ~/.config/systemd/user/
+cp deploy/systemd/mission-control-discord-thread-ingest.timer ~/.config/systemd/user/
+
+# ~/.config/physio-hermes-ops/ops-control-api.env 에 HERMES_DISCORD_BOT_TOKEN 설정 필요
+systemctl --user daemon-reload
+systemctl --user enable --now mission-control-discord-thread-ingest.timer
+systemctl --user list-timers mission-control-discord-thread-ingest.timer --no-pager
+```
+
 ## 7) 토큰 회전(rotate)
 ```bash
 # 1) 새 토큰 생성

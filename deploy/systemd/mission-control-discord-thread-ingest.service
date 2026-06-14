@@ -1,0 +1,13 @@
+[Unit]
+Description=Ingest bounded Discord thread meeting payloads into Mission Control
+After=network.target ops-control-api.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/physio-hermes-ops
+Environment=MISSION_CONTROL_BASE_URL=http://127.0.0.1:8792
+EnvironmentFile=%h/.config/physio-hermes-ops/ops-control-api.env
+ExecStart=/usr/bin/python3 %h/physio-hermes-ops/scripts/ingest_discord_thread_to_mission_control.py --base-url http://127.0.0.1:8792 --thread-id 1515296585410416931
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
