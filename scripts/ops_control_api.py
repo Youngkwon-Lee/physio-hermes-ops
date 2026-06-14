@@ -25,8 +25,21 @@ LOCK_PATH = Path(os.getenv("OPS_CTL_LOCK_FILE", str(ROOT / ".runtime" / "ops_con
 HANDOFF_NOTIFY_LOG = Path(
     os.getenv("OPS_CTL_HANDOFF_NOTIFY_LOG", str(ROOT / "lineage" / "continuity_handoff_notifications.jsonl"))
 )
+MISSION_CONTROL_STATE_DIR = Path(
+    os.getenv(
+        "OPS_CTL_STATE_DIR",
+        os.getenv(
+            "HERMES_MISSION_CONTROL_STATE_DIR",
+            str(Path.home() / ".local" / "state" / "physio-hermes-ops" / "mission_control"),
+        ),
+    )
+)
+LEGACY_HANDOFF_INBOX_PATH = ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"
 HANDOFF_INBOX_PATH = Path(
-    os.getenv("OPS_CTL_HANDOFF_INBOX_PATH", str(ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"))
+    os.getenv(
+        "OPS_CTL_HANDOFF_INBOX_PATH",
+        os.getenv("HERMES_MISSION_CONTROL_HANDOFF_INBOX_PATH", str(MISSION_CONTROL_STATE_DIR / "handoff_inbox.json")),
+    )
 )
 MAX_RETRIES = max(1, int(os.getenv("OPS_CTL_MAX_RETRIES", "2")))
 RETRY_DELAY = float(os.getenv("OPS_CTL_RETRY_DELAY_SEC", "1.0"))
@@ -436,7 +449,12 @@ def base_handoff_inbox_state():
 
 
 def load_handoff_inbox_state():
-    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state())
+    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state()) if HANDOFF_INBOX_PATH.exists() else None
+    if state is None and HANDOFF_INBOX_PATH != LEGACY_HANDOFF_INBOX_PATH:
+        legacy_state = read_json(LEGACY_HANDOFF_INBOX_PATH, None)
+        if isinstance(legacy_state, dict):
+            state = legacy_state
+            write_json(HANDOFF_INBOX_PATH, state)
     if not isinstance(state, dict):
         return base_handoff_inbox_state()
     if not isinstance(state.get("handoffsByOrg"), dict):
@@ -619,6 +637,7 @@ class Handler(BaseHTTPRequestHandler):
                 "continuity_notify_enabled": True,
                 "continuity_notify_log": str(HANDOFF_NOTIFY_LOG),
                 "handoff_inbox": str(HANDOFF_INBOX_PATH),
+                "handoff_inbox_legacy": str(LEGACY_HANDOFF_INBOX_PATH),
             })
 
         if parsed.path == "/handoffs":

@@ -55,10 +55,17 @@ A2A_AUTO_ACTION_LOG = Path(
         str(ROOT / "lineage" / "continuity_handoff_auto_actions.jsonl"),
     )
 )
+MISSION_CONTROL_STATE_DIR = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_STATE_DIR",
+        str(Path.home() / ".local" / "state" / "physio-hermes-ops" / "mission_control"),
+    )
+)
+LEGACY_HANDOFF_INBOX_PATH = ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"
 HANDOFF_INBOX_PATH = Path(
     os.getenv(
         "HERMES_MISSION_CONTROL_HANDOFF_INBOX_PATH",
-        str(ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"),
+        str(MISSION_CONTROL_STATE_DIR / "handoff_inbox.json"),
     )
 )
 DEFAULT_STALE_MINUTES = max(1, int(os.getenv("HERMES_MISSION_CONTROL_STALE_MINUTES", "30")))
@@ -498,7 +505,12 @@ def base_handoff_inbox_state() -> dict[str, Any]:
 
 
 def load_handoff_inbox_state() -> dict[str, Any]:
-    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state())
+    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state()) if HANDOFF_INBOX_PATH.exists() else None
+    if state is None and HANDOFF_INBOX_PATH != LEGACY_HANDOFF_INBOX_PATH:
+        legacy_state = read_json(LEGACY_HANDOFF_INBOX_PATH, None)
+        if isinstance(legacy_state, dict):
+            state = legacy_state
+            write_json(HANDOFF_INBOX_PATH, state)
     if not isinstance(state, dict):
         return base_handoff_inbox_state()
     if "handoffsByOrg" not in state or not isinstance(state["handoffsByOrg"], dict):
@@ -2797,6 +2809,8 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                             "apiKeyRequired": bool(API_KEY),
                             "statePath": str(STATE_PATH),
                             "eventLog": str(EVENT_LOG),
+                            "handoffInbox": str(HANDOFF_INBOX_PATH),
+                            "handoffInboxLegacy": str(LEGACY_HANDOFF_INBOX_PATH),
                         }
                     ),
                 )

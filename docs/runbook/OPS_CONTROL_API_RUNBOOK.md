@@ -27,6 +27,8 @@ export OPS_CTL_REQUIRE_TOKEN=1
 export OPS_CTL_READ_TOKEN='READ_LONG_RANDOM_TOKEN'
 export OPS_CTL_EXEC_ADMIN_TOKEN='EXEC_ADMIN_LONG_RANDOM_TOKEN'
 export OPS_CTL_EXEC_OPERATOR_TOKEN='EXEC_OPERATOR_LONG_RANDOM_TOKEN'
+# 선택: temp worktree와 canonical repo 사이에서 handoff 상태를 공유
+export OPS_CTL_STATE_DIR="$HOME/.local/state/physio-hermes-ops/mission_control"
 python3 scripts/ops_control_api.py
 ```
 
@@ -74,7 +76,17 @@ curl -s -X POST http://127.0.0.1:8788/action \
 - 실행락: `.runtime/ops_control.lock`
 - 동시 실행 요청 시 HTTP `409 busy` 반환
 
-## 6-1) Ops Knowledge (신규)
+## 6-1) Mission Control handoff inbox
+- 기본 저장 경로: `~/.local/state/physio-hermes-ops/mission_control/handoff_inbox.json`
+- override:
+  - `OPS_CTL_STATE_DIR`
+  - `OPS_CTL_HANDOFF_INBOX_PATH`
+  - 호환 env: `HERMES_MISSION_CONTROL_STATE_DIR`, `HERMES_MISSION_CONTROL_HANDOFF_INBOX_PATH`
+- legacy repo-local 경로: `.runtime/mission_control/handoff_inbox.json`
+- stable inbox가 없고 legacy 파일이 있으면 첫 load 때 stable 경로로 자동 복사된다.
+- `/health`에서 `handoff_inbox`와 `handoff_inbox_legacy`를 확인한다.
+
+## 6-2) Ops Knowledge (신규)
 - 자동 지식화 저장 경로: `ops_knowledge/`
   - raw: `ops_knowledge/00_raw/YYYY-MM-DD/*.md`
   - wiki: `ops_knowledge/10_wiki/decisions/*.md`

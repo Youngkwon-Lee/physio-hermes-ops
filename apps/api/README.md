@@ -23,6 +23,8 @@ Optional env:
 - `HERMES_MISSION_CONTROL_API_KEY`
 - `HERMES_MISSION_CONTROL_STATE_PATH`
 - `HERMES_MISSION_CONTROL_EVENT_LOG`
+- `HERMES_MISSION_CONTROL_STATE_DIR`
+- `HERMES_MISSION_CONTROL_HANDOFF_INBOX_PATH`
 
 GitHub publish env:
 
@@ -37,6 +39,11 @@ State is file-backed for now:
 
 - runtime state: `.runtime/mission_control/state.json`
 - append-only events: `lineage/mission_control_events.jsonl`
+- durable handoff inbox: `~/.local/state/physio-hermes-ops/mission_control/handoff_inbox.json`
+
+The handoff inbox intentionally defaults outside the repo worktree so Mission Control handoffs survive switching
+between the canonical repo and temporary worktrees. If the stable inbox does not exist yet, the API migrates the
+legacy repo-local `.runtime/mission_control/handoff_inbox.json` on first load.
 
 `POST /runs` optional source context:
 
