@@ -164,6 +164,46 @@ curl -sS "http://100.83.147.56:8792/mission-actions?organizationId=org-smoke&lim
   -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
 ```
 
+## 6-4) Discord/Hermes 회의 요약 -> Mission Control
+목적: Discord/Hermes 회의에서 나온 결론을 prose-only 메시지로 흘려보내지 않고, Mission Control `/plans`와 `/tasks`에 구조화해 다음 작업으로 보이게 한다.
+
+권장 입력은 bounded JSON이다:
+```json
+{
+  "title": "회의에서 합의한 큰 목표",
+  "summary": "결정 배경과 범위",
+  "horizon": "short",
+  "sourceThread": {
+    "channelName": "second_memory",
+    "threadName": "맥북코덱스소통채널",
+    "threadId": "1515296585410416931"
+  },
+  "tasks": [
+    {
+      "title": "다음 실행 작업",
+      "context": "왜 필요한지",
+      "expectedOutput": "완료 기준",
+      "assignee": {"agent": "desktop-hermes", "surface": "discord", "host": "desktop-wsl"},
+      "priority": 10
+    }
+  ]
+}
+```
+
+Hermes/desktop에서 ingest:
+```bash
+python3 scripts/ingest_discord_meeting_to_mission_control.py \
+  --base-url http://127.0.0.1:8792 \
+  --token "$MISSION_CONTROL_SHARED_TOKEN" \
+  --input meeting_summary.json
+```
+
+MacBook에서 외부 검증:
+```bash
+curl -sS "http://100.83.147.56:8792/tasks/next?organizationId=org-smoke" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
+```
+
 ## 7) 토큰 회전(rotate)
 ```bash
 # 1) 새 토큰 생성
