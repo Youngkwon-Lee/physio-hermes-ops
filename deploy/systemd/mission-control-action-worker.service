@@ -1,0 +1,18 @@
+[Unit]
+Description=Physio Hermes Mission Control Action Worker
+After=network.target ops-control-api.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/physio-hermes-ops
+Environment=MISSION_CONTROL_BASE_URL=http://127.0.0.1:8792
+Environment=MISSION_CONTROL_ORGANIZATION_ID=org-smoke
+Environment=MISSION_CONTROL_WORKER_AGENT=desktop-hermes
+Environment=MISSION_CONTROL_WORKER_HOST=desktop-wsl
+Environment=MISSION_CONTROL_WORKER_ID=desktop-hermes-action-worker
+EnvironmentFile=%h/.config/physio-hermes-ops/ops-control-api.env
+ExecStart=/usr/bin/python3 %h/physio-hermes-ops/scripts/mission_control_action_worker.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+

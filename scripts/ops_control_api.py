@@ -439,6 +439,8 @@ def build_knowledge_graph(limit=50):
 
 HANDOFF_STATUSES = {"waiting_for_codex", "in_progress", "needs_reply", "done", "blocked"}
 MISSION_ITEM_STATUSES = {"backlog", "ready", "assigned", "in_progress", "needs_review", "blocked", "done"}
+MISSION_ACTION_STATUSES = {"queued", "running", "done", "failed", "blocked", "cancelled"}
+MISSION_ACTION_TYPES = {"desktop_repo_sync_restart_smoke"}
 
 
 def base_handoff_inbox_state():
@@ -448,6 +450,7 @@ def base_handoff_inbox_state():
         "handoffsByOrg": {},
         "plansByOrg": {},
         "tasksByOrg": {},
+        "actionsByOrg": {},
     }
 
 
@@ -466,6 +469,8 @@ def load_handoff_inbox_state():
         state["plansByOrg"] = {}
     if not isinstance(state.get("tasksByOrg"), dict):
         state["tasksByOrg"] = {}
+    if not isinstance(state.get("actionsByOrg"), dict):
+        state["actionsByOrg"] = {}
     return state
 
 
@@ -482,6 +487,11 @@ def normalized_handoff_status(value, default="waiting_for_codex"):
 def normalized_mission_item_status(value, default="backlog"):
     status = str(value or "").strip()
     return status if status in MISSION_ITEM_STATUSES else default
+
+
+def normalized_mission_action_status(value, default="queued"):
+    status = str(value or "").strip()
+    return status if status in MISSION_ACTION_STATUSES else default
 
 
 def normalized_priority(value, default=50):
@@ -645,6 +655,47 @@ def create_task_item(payload):
     }
 
 
+def mission_action_target(value):
+    return handoff_party(value, "desktop-hermes", "hermes-gateway")
+
+
+def create_mission_action_item(payload):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+
+    action_type = str(payload.get("actionType") or payload.get("type") or "").strip()
+    if action_type not in MISSION_ACTION_TYPES:
+        raise ValueError(f"valid actionType is required: {', '.join(sorted(MISSION_ACTION_TYPES))}")
+
+    title = str(payload.get("title") or payload.get("goal") or action_type).strip()
+    timestamp = now()
+    action_id = str(payload.get("id") or payload.get("actionId") or f"action-{uuid.uuid4()}").strip()
+    params = payload.get("params") if isinstance(payload.get("params"), dict) else {}
+    return organization_id, {
+        "id": action_id,
+        "kind": "mission_action",
+        "status": normalized_mission_action_status(payload.get("status"), default="queued"),
+        "actionType": action_type,
+        "createdAt": str(payload.get("createdAt") or timestamp).strip() or timestamp,
+        "updatedAt": timestamp,
+        "startedAt": None,
+        "finishedAt": None,
+        "attempts": 0,
+        "title": compact_text(title, 300),
+        "target": mission_action_target(payload.get("target") or payload.get("to")),
+        "repo": str(payload.get("repo") or params.get("repo") or "").strip() or None,
+        "sourceThread": mission_source_thread(payload.get("sourceThread") or payload.get("source_thread")),
+        "priority": normalized_priority(payload.get("priority"), default=50),
+        "params": params,
+        "result": compact_text(payload.get("result"), 2000),
+        "claimedBy": None,
+        "linkedHandoffId": str(payload.get("linkedHandoffId") or payload.get("handoffId") or "").strip() or None,
+        "linkedTaskId": str(payload.get("linkedTaskId") or payload.get("taskId") or "").strip() or None,
+        "tags": [str(item).strip() for item in payload.get("tags", []) if str(item).strip()] if isinstance(payload.get("tags"), list) else [],
+    }
+
+
 def list_mission_items(kind, organization_id, limit=20, status=None, plan_id=None):
     state = load_handoff_inbox_state()
     key = "plansByOrg" if kind == "plan" else "tasksByOrg"
@@ -664,6 +715,33 @@ def next_task_item(organization_id):
     candidates = []
     for status in ("in_progress", "assigned", "ready", "needs_review", "blocked", "backlog"):
         candidates.extend(list_mission_items("task", organization_id, limit=100, status=status))
+    return candidates[0] if candidates else None
+
+
+def list_mission_action_items(organization_id, limit=20, status=None, target_agent=None, target_host=None):
+    state = load_handoff_inbox_state()
+    rows = state.get("actionsByOrg", {}).get(organization_id, [])
+    if not isinstance(rows, list):
+        return []
+    items = [row for row in rows if isinstance(row, dict)]
+    if status:
+        items = [item for item in items if item.get("status") == status]
+    if target_agent:
+        items = [item for item in items if ((item.get("target") or {}).get("agent") == target_agent)]
+    if target_host:
+        items = [item for item in items if ((item.get("target") or {}).get("host") in {None, "", target_host})]
+    items.sort(key=lambda item: (normalized_priority(item.get("priority")), str(item.get("createdAt") or "")))
+    return items[: max(1, limit)]
+
+
+def next_mission_action_item(organization_id, target_agent=None, target_host=None):
+    candidates = list_mission_action_items(
+        organization_id,
+        limit=100,
+        status="queued",
+        target_agent=target_agent,
+        target_host=target_host,
+    )
     return candidates[0] if candidates else None
 
 
@@ -697,6 +775,73 @@ def update_mission_item_status(kind, payload, item_id):
     raise KeyError(f"{kind.title()} not found")
 
 
+def update_mission_action_status(payload, action_id):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+    next_status = normalized_mission_action_status(payload.get("status"), default="")
+    if not next_status:
+        raise ValueError("valid status is required")
+
+    state = load_handoff_inbox_state()
+    rows = state.setdefault("actionsByOrg", {}).setdefault(organization_id, [])
+    if not isinstance(rows, list):
+        rows = []
+        state["actionsByOrg"][organization_id] = rows
+
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict) or str(item.get("id") or "") != action_id:
+            continue
+        timestamp = now()
+        updated = {**item, "status": next_status, "updatedAt": timestamp}
+        if next_status in {"done", "failed", "blocked", "cancelled"}:
+            updated["finishedAt"] = timestamp
+        if "result" in payload:
+            updated["result"] = compact_text(payload.get("result"), 2000)
+        if "resultData" in payload:
+            updated["resultData"] = payload.get("resultData")
+        rows[index] = updated
+        save_handoff_inbox_state(state)
+        return organization_id, updated
+
+    raise KeyError("Mission action not found")
+
+
+def claim_mission_action(payload, action_id):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+    worker_id = str(payload.get("workerId") or "").strip()
+    if not worker_id:
+        raise ValueError("workerId is required")
+
+    state = load_handoff_inbox_state()
+    rows = state.setdefault("actionsByOrg", {}).setdefault(organization_id, [])
+    if not isinstance(rows, list):
+        rows = []
+        state["actionsByOrg"][organization_id] = rows
+
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict) or str(item.get("id") or "") != action_id:
+            continue
+        if item.get("status") != "queued":
+            return organization_id, None, item
+        timestamp = now()
+        updated = {
+            **item,
+            "status": "running",
+            "updatedAt": timestamp,
+            "startedAt": item.get("startedAt") or timestamp,
+            "attempts": int(item.get("attempts") or 0) + 1,
+            "claimedBy": worker_id,
+        }
+        rows[index] = updated
+        save_handoff_inbox_state(state)
+        return organization_id, updated, item
+
+    raise KeyError("Mission action not found")
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -719,11 +864,11 @@ class Handler(BaseHTTPRequestHandler):
         header_key = self.headers.get("x-hermes-api-key", "").strip()
 
         if scope == "read":
-            expected = READ_TOKEN
-            if not expected:
+            read_candidates = [value for value in {READ_TOKEN, EXEC_ADMIN_TOKEN, EXEC_OPERATOR_TOKEN} if value]
+            if not read_candidates:
                 self._json(500, {"ok": False, "error": "server_read_token_not_configured"})
                 return None
-            if token != expected and header_key != expected:
+            if token not in read_candidates and header_key not in read_candidates:
                 self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
                 return None
             return {"scope": "read", "role": "viewer"}
@@ -777,6 +922,8 @@ class Handler(BaseHTTPRequestHandler):
                     "plans_enabled": True,
                     "tasks_enabled": True,
                     "next_task_enabled": True,
+                    "actions_enabled": True,
+                    "next_action_enabled": True,
                     "snapshot_enabled": True,
                 },
             })
@@ -795,6 +942,8 @@ class Handler(BaseHTTPRequestHandler):
                     "plans": list_mission_items("plan", organization_id, limit=30),
                     "tasks": list_mission_items("task", organization_id, limit=50),
                     "nextTask": next_task_item(organization_id),
+                    "actions": list_mission_action_items(organization_id, limit=50),
+                    "nextAction": next_mission_action_item(organization_id),
                     "handoffs": list_handoff_items(organization_id, limit=30),
                 },
             })
@@ -838,6 +987,41 @@ class Handler(BaseHTTPRequestHandler):
             status = (params.get("status") or [""])[0].strip() or None
             plan_id = (params.get("planId") or [""])[0].strip() or None
             items = list_mission_items("task", organization_id, limit=limit, status=status, plan_id=plan_id)
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
+
+        if parsed.path == "/mission-actions/next":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            target_agent = (params.get("targetAgent") or [""])[0].strip() or None
+            target_host = (params.get("targetHost") or [""])[0].strip() or None
+            item = next_mission_action_item(organization_id, target_agent=target_agent, target_host=target_host)
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path == "/mission-actions":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            try:
+                limit = max(1, min(100, int((params.get("limit") or ["20"])[0])))
+            except Exception:
+                limit = 20
+            status = (params.get("status") or [""])[0].strip() or None
+            target_agent = (params.get("targetAgent") or [""])[0].strip() or None
+            target_host = (params.get("targetHost") or [""])[0].strip() or None
+            items = list_mission_action_items(
+                organization_id,
+                limit=limit,
+                status=status,
+                target_agent=target_agent,
+                target_host=target_host,
+            )
             return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
 
         if parsed.path == "/handoffs":
@@ -884,12 +1068,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         auth_ctx = None
         parsed = urlparse(self.path)
-        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks"} or (
+        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks", "/mission-actions"} or (
             parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status")
         ) or (
             parsed.path.startswith("/plans/") and parsed.path.endswith("/status")
         ) or (
             parsed.path.startswith("/tasks/") and parsed.path.endswith("/status")
+        ) or (
+            parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/status")
+        ) or (
+            parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/claim")
         ):
             auth_ctx = self._require_auth("exec")
             if REQUIRE_TOKEN and not auth_ctx:
@@ -1006,6 +1194,74 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": True,
                 "organizationId": organization_id,
                 "taskId": item["id"],
+                "status": item["status"],
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path == "/mission-actions":
+            try:
+                organization_id, item = create_mission_action_item(data)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            with RUNTIME_LOCK:
+                state = load_handoff_inbox_state()
+                rows = state.setdefault("actionsByOrg", {}).setdefault(organization_id, [])
+                if not isinstance(rows, list):
+                    rows = []
+                    state["actionsByOrg"][organization_id] = rows
+                rows.append(item)
+                rows.sort(key=lambda row: (normalized_priority(row.get("priority")), str(row.get("createdAt") or "")))
+                save_handoff_inbox_state(state)
+            audit({
+                "time": now(),
+                "action": "mission_action_created",
+                "ok": True,
+                "organizationId": organization_id,
+                "missionActionId": item["id"],
+                "actionType": item["actionType"],
+                "status": item["status"],
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/claim"):
+            action_id = parsed.path.split("/")[2]
+            try:
+                organization_id, item, previous = claim_mission_action(data, action_id)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            except KeyError:
+                return self._json(404, {"ok": False, "error": "mission_action_not_found"})
+            if item is None:
+                return self._json(409, {
+                    "ok": False,
+                    "error": "mission_action_not_queued",
+                    "item": previous,
+                    "data": previous,
+                })
+            audit({
+                "time": now(),
+                "action": "mission_action_claimed",
+                "ok": True,
+                "organizationId": organization_id,
+                "missionActionId": item["id"],
+                "workerId": item.get("claimedBy"),
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/status"):
+            action_id = parsed.path.split("/")[2]
+            try:
+                organization_id, item = update_mission_action_status(data, action_id)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            except KeyError:
+                return self._json(404, {"ok": False, "error": "mission_action_not_found"})
+            audit({
+                "time": now(),
+                "action": "mission_action_status_updated",
+                "ok": True,
+                "organizationId": organization_id,
+                "missionActionId": item["id"],
                 "status": item["status"],
             })
             return self._json(200, {"ok": True, "success": True, "item": item, "data": item})

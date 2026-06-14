@@ -96,6 +96,65 @@ curl -s -X POST http://127.0.0.1:8788/action \
   - `GET /knowledge/recent`
   - `GET /knowledge/graph`
 
+## 6-3) Mission Control action worker
+목적: MacBook Codex가 GitHub에 push한 뒤 사람이 Discord/복붙으로 desktop `pull + restart + smoke`를 중계하지 않도록 한다.
+
+흐름:
+- MacBook Codex: `POST /mission-actions`로 bounded action 생성
+- desktop worker: `/mission-actions/next` 조회
+- desktop worker: `/mission-actions/<id>/claim` 후 허용된 action만 실행
+- desktop worker: `/mission-actions/<id>/status`에 `done|failed|blocked`와 smoke 결과 기록
+- MacBook Codex: `/mission-actions`와 live endpoint를 검증하고 handoff를 닫음
+
+현재 허용 action type:
+- `desktop_repo_sync_restart_smoke`: canonical repo에서 `git pull --ff-only`, `ops-control-api.service` restart, smoke endpoint 검증
+
+systemd(user) worker 활성화:
+```bash
+mkdir -p ~/.config/systemd/user
+cp deploy/systemd/mission-control-action-worker.service ~/.config/systemd/user/
+cp deploy/systemd/mission-control-action-worker.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now mission-control-action-worker.timer
+systemctl --user list-timers mission-control-action-worker.timer --no-pager
+```
+
+MacBook에서 desktop deploy action 생성:
+```bash
+curl -sS -X POST http://100.83.147.56:8792/mission-actions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN" \
+  -d '{
+    "organizationId": "org-smoke",
+    "actionType": "desktop_repo_sync_restart_smoke",
+    "title": "Deploy latest physio-hermes-ops main to desktop live",
+    "target": {"agent": "desktop-hermes", "surface": "hermes-gateway", "host": "desktop-wsl"},
+    "repo": "Youngkwon-Lee/physio-hermes-ops",
+    "priority": 10,
+    "params": {
+      "repoPath": "/home/yk/physio-hermes-ops",
+      "remote": "origin",
+      "branch": "main",
+      "serviceName": "ops-control-api.service",
+      "smokeBaseUrl": "http://127.0.0.1:8792",
+      "smokePaths": [
+        "/health",
+        "/plans?organizationId=org-smoke",
+        "/tasks?organizationId=org-smoke",
+        "/tasks/next?organizationId=org-smoke",
+        "/snapshot?organizationId=org-smoke",
+        "/mission-actions?organizationId=org-smoke"
+      ]
+    }
+  }'
+```
+
+상태 확인:
+```bash
+curl -sS "http://100.83.147.56:8792/mission-actions?organizationId=org-smoke&limit=5" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
+```
+
 ## 7) 토큰 회전(rotate)
 ```bash
 # 1) 새 토큰 생성
