@@ -8,7 +8,7 @@
 - 장문의 운영 로그나 일별 worklog는 여기에 누적하지 않는다.
 
 ## Current goal
-- 
+-
 
 ## Working surface
 - Repo: `/home/yk/physio-hermes-ops`

@@ -4,10 +4,12 @@ import os
 import re
 import subprocess
 import time
+import uuid
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = os.getenv("OPS_CTL_HOST", "127.0.0.1")
@@ -20,6 +22,12 @@ EXEC_OPERATOR_TOKEN = os.getenv("OPS_CTL_EXEC_OPERATOR_TOKEN", "")
 REQUIRE_TOKEN = os.getenv("OPS_CTL_REQUIRE_TOKEN", "1") == "1"
 AUDIT_LOG = Path(os.getenv("OPS_CTL_AUDIT_LOG", str(ROOT / "lineage" / "actions_audit.jsonl")))
 LOCK_PATH = Path(os.getenv("OPS_CTL_LOCK_FILE", str(ROOT / ".runtime" / "ops_control.lock")))
+HANDOFF_NOTIFY_LOG = Path(
+    os.getenv("OPS_CTL_HANDOFF_NOTIFY_LOG", str(ROOT / "lineage" / "continuity_handoff_notifications.jsonl"))
+)
+HANDOFF_INBOX_PATH = Path(
+    os.getenv("OPS_CTL_HANDOFF_INBOX_PATH", str(ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"))
+)
 MAX_RETRIES = max(1, int(os.getenv("OPS_CTL_MAX_RETRIES", "2")))
 RETRY_DELAY = float(os.getenv("OPS_CTL_RETRY_DELAY_SEC", "1.0"))
 KNOWLEDGE_DIR = Path(os.getenv("OPS_KNOWLEDGE_DIR", str(ROOT / "ops_knowledge")))
@@ -99,10 +107,28 @@ def read_jsonl(path: Path):
     return out
 
 
+def write_json(path: Path, payload):
+    _ensure_parent(path)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def audit(entry: dict):
     _ensure_parent(AUDIT_LOG)
     with AUDIT_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def append_jsonl(path: Path, entry: dict):
+    _ensure_parent(path)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def compact_text(value, limit=500):
+    text = str(value or "").strip().replace("\n", " ")
+    if not text:
+        return None
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def append_markdown(path: Path, text: str):
@@ -398,6 +424,126 @@ def build_knowledge_graph(limit=50):
     return {"ok": True, "nodes": nodes[:200], "edges": edges[:300]}
 
 
+HANDOFF_STATUSES = {"waiting_for_codex", "in_progress", "needs_reply", "done", "blocked"}
+
+
+def base_handoff_inbox_state():
+    return {
+        "version": 1,
+        "updatedAt": now(),
+        "handoffsByOrg": {},
+    }
+
+
+def load_handoff_inbox_state():
+    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state())
+    if not isinstance(state, dict):
+        return base_handoff_inbox_state()
+    if not isinstance(state.get("handoffsByOrg"), dict):
+        state["handoffsByOrg"] = {}
+    return state
+
+
+def save_handoff_inbox_state(state):
+    state["updatedAt"] = now()
+    write_json(HANDOFF_INBOX_PATH, state)
+
+
+def normalized_handoff_status(value, default="waiting_for_codex"):
+    status = str(value or "").strip()
+    return status if status in HANDOFF_STATUSES else default
+
+
+def handoff_party(value, default_agent, default_surface):
+    row = value if isinstance(value, dict) else {}
+    return {
+        "agent": str(row.get("agent") or default_agent).strip() or default_agent,
+        "surface": str(row.get("surface") or default_surface).strip() or default_surface,
+        "host": str(row.get("host") or "").strip() or None,
+    }
+
+
+def handoff_source_thread(value):
+    row = value if isinstance(value, dict) else {}
+    return {
+        "channelId": str(row.get("channelId") or "").strip() or None,
+        "threadId": str(row.get("threadId") or "").strip() or None,
+        "channelName": str(row.get("channelName") or "").strip() or None,
+        "threadName": str(row.get("threadName") or "").strip() or None,
+        "url": str(row.get("url") or "").strip() or None,
+    }
+
+
+def create_handoff_item(payload):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+
+    goal = str(payload.get("goal") or "").strip()
+    if not goal:
+        raise ValueError("goal is required")
+
+    handoff_id = str(payload.get("id") or payload.get("handoffId") or f"handoff-{uuid.uuid4()}").strip()
+    timestamp = now()
+    return organization_id, {
+        "id": handoff_id,
+        "kind": str(payload.get("kind") or "handoff_request").strip() or "handoff_request",
+        "status": normalized_handoff_status(payload.get("status")),
+        "createdAt": str(payload.get("createdAt") or timestamp).strip() or timestamp,
+        "updatedAt": timestamp,
+        "from": handoff_party(payload.get("from"), "desktop-hermes", "discord"),
+        "to": handoff_party(payload.get("to"), "macbook-codex", "codex-app"),
+        "repo": str(payload.get("repo") or "").strip() or None,
+        "goal": compact_text(goal, 500),
+        "context": compact_text(payload.get("context"), 1200),
+        "expectedOutput": compact_text(payload.get("expectedOutput") or payload.get("expected_output"), 800),
+        "sourceThread": handoff_source_thread(payload.get("sourceThread") or payload.get("source_thread")),
+        "result": compact_text(payload.get("result"), 1200),
+        "linkedRunId": str(payload.get("linkedRunId") or payload.get("runId") or "").strip() or None,
+        "linkedConversationId": str(payload.get("linkedConversationId") or payload.get("conversationId") or "").strip() or None,
+        "tags": [str(item).strip() for item in payload.get("tags", []) if str(item).strip()] if isinstance(payload.get("tags"), list) else [],
+    }
+
+
+def list_handoff_items(organization_id, limit=20, status=None):
+    state = load_handoff_inbox_state()
+    rows = state.get("handoffsByOrg", {}).get(organization_id, [])
+    if not isinstance(rows, list):
+        return []
+    items = [row for row in rows if isinstance(row, dict)]
+    if status:
+        items = [item for item in items if item.get("status") == status]
+    items.sort(key=lambda item: str(item.get("updatedAt") or item.get("createdAt") or ""), reverse=True)
+    return items[: max(1, limit)]
+
+
+def update_handoff_status(payload, handoff_id):
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+    next_status = normalized_handoff_status(payload.get("status"), default="")
+    if not next_status:
+        raise ValueError("valid status is required")
+
+    state = load_handoff_inbox_state()
+    rows = state.setdefault("handoffsByOrg", {}).setdefault(organization_id, [])
+    if not isinstance(rows, list):
+        rows = []
+        state["handoffsByOrg"][organization_id] = rows
+
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict) or str(item.get("id") or "") != handoff_id:
+            continue
+        updated = {**item, "status": next_status, "updatedAt": now()}
+        if "result" in payload:
+            updated["result"] = compact_text(payload.get("result"), 1200)
+        rows[index] = updated
+        save_handoff_inbox_state(state)
+        return organization_id, updated
+
+    raise KeyError("Handoff not found")
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -417,13 +563,14 @@ class Handler(BaseHTTPRequestHandler):
 
         auth = self.headers.get("Authorization", "")
         token = auth.replace("Bearer ", "", 1) if auth.startswith("Bearer ") else ""
+        header_key = self.headers.get("x-hermes-api-key", "").strip()
 
         if scope == "read":
             expected = READ_TOKEN
             if not expected:
                 self._json(500, {"ok": False, "error": "server_read_token_not_configured"})
                 return None
-            if token != expected:
+            if token != expected and header_key != expected:
                 self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
                 return None
             return {"scope": "read", "role": "viewer"}
@@ -434,9 +581,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json(500, {"ok": False, "error": "server_exec_token_not_configured"})
             return None
 
-        if admin and token == admin:
+        if admin and (token == admin or header_key == admin):
             return {"scope": "exec", "role": "admin"}
-        if operator and token == operator:
+        if operator and (token == operator or header_key == operator):
             return {"scope": "exec", "role": "operator"}
 
         self._json(401, {"ok": False, "error": "unauthorized", "scope": scope})
@@ -450,7 +597,10 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path.startswith("/health"):
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+
+        if parsed.path == "/health":
             return self._json(200, {
                 "ok": True,
                 "time": now(),
@@ -466,9 +616,27 @@ class Handler(BaseHTTPRequestHandler):
                 "knowledge_dir": str(KNOWLEDGE_DIR),
                 "knowledge_autogit": KNOWLEDGE_AUTOGIT,
                 "lock_file": str(LOCK_PATH),
+                "continuity_notify_enabled": True,
+                "continuity_notify_log": str(HANDOFF_NOTIFY_LOG),
+                "handoff_inbox": str(HANDOFF_INBOX_PATH),
             })
 
-        if self.path.startswith("/actions/recent"):
+        if parsed.path == "/handoffs":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            try:
+                limit = max(1, min(100, int((params.get("limit") or ["20"])[0])))
+            except Exception:
+                limit = 20
+            status = (params.get("status") or [""])[0].strip() or None
+            items = list_handoff_items(organization_id, limit=limit, status=status)
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
+
+        if parsed.path.startswith("/actions/recent"):
             auth_ctx = self._require_auth("read")
             if REQUIRE_TOKEN and not auth_ctx:
                 return
@@ -496,8 +664,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         auth_ctx = None
-        if self.path in {"/action", "/knowledge/inject"}:
+        parsed = urlparse(self.path)
+        if parsed.path in {"/action", "/knowledge/inject", "/handoffs"} or (
+            parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status")
+        ):
             auth_ctx = self._require_auth("exec")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+        elif parsed.path == "/handoff/notify":
+            auth_ctx = self._require_auth("read")
             if REQUIRE_TOKEN and not auth_ctx:
                 return
 
@@ -508,7 +683,69 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return self._json(400, {"ok": False, "error": "invalid_json"})
 
-        if self.path == "/knowledge/inject":
+        if parsed.path == "/handoff/notify":
+            event = dict(data) if isinstance(data, dict) else {"payload": data}
+            event["receivedAt"] = now()
+            append_jsonl(HANDOFF_NOTIFY_LOG, event)
+            audit({
+                "time": now(),
+                "action": "continuity_handoff_notify",
+                "ok": True,
+                "handoffId": event.get("handoffId"),
+                "runId": event.get("runId")
+                or ((event.get("source") or {}).get("runId") if isinstance(event.get("source"), dict) else None),
+            })
+            return self._json(200, {
+                "ok": True,
+                "receivedAt": event["receivedAt"],
+                "storedAt": str(HANDOFF_NOTIFY_LOG),
+                "validationErrors": [],
+            })
+
+        if parsed.path == "/handoffs":
+            try:
+                organization_id, item = create_handoff_item(data)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            with RUNTIME_LOCK:
+                state = load_handoff_inbox_state()
+                rows = state.setdefault("handoffsByOrg", {}).setdefault(organization_id, [])
+                if not isinstance(rows, list):
+                    rows = []
+                    state["handoffsByOrg"][organization_id] = rows
+                rows.append(item)
+                rows.sort(key=lambda row: str(row.get("updatedAt") or row.get("createdAt") or ""), reverse=True)
+                save_handoff_inbox_state(state)
+            audit({
+                "time": now(),
+                "action": "handoff_created",
+                "ok": True,
+                "organizationId": organization_id,
+                "handoffId": item["id"],
+                "status": item["status"],
+                "repo": item.get("repo"),
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status"):
+            handoff_id = parsed.path.split("/")[2]
+            try:
+                organization_id, item = update_handoff_status(data, handoff_id)
+            except ValueError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            except KeyError:
+                return self._json(404, {"ok": False, "error": "handoff_not_found"})
+            audit({
+                "time": now(),
+                "action": "handoff_status_updated",
+                "ok": True,
+                "organizationId": organization_id,
+                "handoffId": item["id"],
+                "status": item["status"],
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path == "/knowledge/inject":
             role = (auth_ctx or {}).get("role", "admin")
             title = str(data.get("title", "")).strip() or "untitled"
             content = str(data.get("content", "")).strip()
@@ -553,7 +790,7 @@ class Handler(BaseHTTPRequestHandler):
                 "autogit": autogit,
             })
 
-        if self.path != "/action":
+        if parsed.path != "/action":
             return self._json(404, {"ok": False, "error": "not_found"})
 
         action = str(data.get("action", "")).strip()
