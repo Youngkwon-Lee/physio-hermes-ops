@@ -204,6 +204,42 @@ curl -sS "http://100.83.147.56:8792/tasks/next?organizationId=org-smoke" \
   -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
 ```
 
+### 6-5) Discord thread -> ingest trigger
+목적: `#second_memory / 맥북코덱스소통채널`에 Hermes가 남긴 bounded meeting payload를 사람이 다시 복사하지 않고 Mission Control로 넣는다.
+
+Discord 메시지 형식은 fence 또는 marker를 사용한다:
+````markdown
+```mission-control-json
+{
+  "title": "회의에서 합의한 큰 목표",
+  "summary": "결정 배경과 범위",
+  "tasks": [
+    {
+      "title": "다음 실행 작업",
+      "context": "왜 필요한지",
+      "expectedOutput": "완료 기준"
+    }
+  ]
+}
+```
+````
+
+desktop/Hermes에서 thread 최신 메시지 ingest:
+```bash
+HERMES_DISCORD_BOT_TOKEN="$HERMES_DISCORD_BOT_TOKEN" \
+python3 scripts/ingest_discord_thread_to_mission_control.py \
+  --base-url http://127.0.0.1:8792 \
+  --token "$MISSION_CONTROL_SHARED_TOKEN" \
+  --thread-id 1515296585410416931
+```
+
+토큰 없이 fixture smoke:
+```bash
+python3 scripts/ingest_discord_thread_to_mission_control.py \
+  --messages-json /tmp/discord-meeting-messages.json \
+  --dry-run
+```
+
 ## 7) 토큰 회전(rotate)
 ```bash
 # 1) 새 토큰 생성
