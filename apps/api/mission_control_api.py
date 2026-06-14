@@ -37,7 +37,33 @@ HANDOFF_NOTIFY_LOG = Path(
         str(ROOT / "lineage" / "continuity_handoff_notifications.jsonl"),
     )
 )
+A2A_STATE_DIR = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_A2A_STATE_DIR",
+        str(ROOT / ".runtime" / "continuity_a2a_lite"),
+    )
+)
+A2A_MESSAGE_LOG = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_A2A_MESSAGE_LOG",
+        str(ROOT / "lineage" / "continuity_a2a_lite_messages.jsonl"),
+    )
+)
+A2A_AUTO_ACTION_LOG = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_A2A_AUTO_ACTION_LOG",
+        str(ROOT / "lineage" / "continuity_handoff_auto_actions.jsonl"),
+    )
+)
+HANDOFF_INBOX_PATH = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_HANDOFF_INBOX_PATH",
+        str(ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"),
+    )
+)
 DEFAULT_STALE_MINUTES = max(1, int(os.getenv("HERMES_MISSION_CONTROL_STALE_MINUTES", "30")))
+DEFAULT_A2A_LIMIT = max(1, int(os.getenv("HERMES_MISSION_CONTROL_A2A_LIMIT", "20")))
+DEFAULT_HANDOFF_LIMIT = max(1, int(os.getenv("HERMES_MISSION_CONTROL_HANDOFF_LIMIT", "20")))
 STATE_LOCK = Lock()
 
 
@@ -145,6 +171,23 @@ def write_json(path: Path, payload: Any) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            rows.append(parsed)
+    return rows
+
+
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
     ensure_parent(path)
     with path.open("a", encoding="utf-8") as handle:
@@ -157,6 +200,13 @@ def ok(data: Any) -> dict[str, Any]:
 
 def err(message: str, code: str = "INTERNAL_ERROR") -> dict[str, Any]:
     return {"success": False, "error": message, "code": code}
+
+
+def compact_text(value: Any, limit: int = 180) -> str | None:
+    text = str(value or "").strip().replace("\n", " ")
+    if not text:
+        return None
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def is_enabled(value: str | None) -> bool:
@@ -245,6 +295,320 @@ def approval_label(gate: str) -> str:
 
 def default_approval_agent(gate: str) -> str:
     return DEFAULT_APPROVAL_AGENTS.get(gate, "orchestrator")
+
+
+def delivery_status(payload: Any) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    status_code = payload.get("status_code")
+    return {
+        "attempted": bool(payload.get("attempted")),
+        "ok": bool(payload.get("ok")),
+        "statusCode": int(status_code) if isinstance(status_code, int) else None,
+        "url": str(payload.get("url") or "").strip() or None,
+        "error": compact_text(payload.get("error"), 200),
+    }
+
+
+def summarize_a2a_conversation(
+    state: str,
+    callback: dict[str, Any] | None,
+    question: dict[str, Any] | None,
+    result: dict[str, Any] | None,
+) -> str:
+    callback_ok = bool(callback and callback.get("ok"))
+    if state == "waiting_for_answer":
+        if question and callback_ok:
+            return "Desktop sent a clarification question and is waiting for a reply."
+        if question:
+            return "Desktop generated a clarification question, but callback delivery did not confirm success."
+        return "Conversation is waiting for an answer."
+    if state == "done":
+        if result and callback_ok:
+            return "Conversation completed and the final result callback was delivered."
+        if result:
+            return "Conversation completed and produced a final result."
+        return "Conversation completed."
+    if state == "blocked":
+        return "Conversation is blocked and needs operator attention."
+    if state == "cancelled":
+        return "Conversation was cancelled."
+    if state == "request_received":
+        return "Conversation was received and is waiting for desktop processing."
+    return compact_text(f"Conversation state is {state}.", 120) or "Conversation state is unknown."
+
+
+def link_a2a_runs(runs: list[dict[str, Any]], thread_id: str | None) -> list[str]:
+    if not thread_id:
+        return []
+    linked: list[str] = []
+    for run in runs:
+        source = run.get("source") if isinstance(run.get("source"), dict) else {}
+        if str(source.get("threadId") or "").strip() == thread_id:
+            linked.append(str(run.get("id")))
+    return linked
+
+
+def list_a2a_lite_conversations(
+    *,
+    limit: int = DEFAULT_A2A_LIMIT,
+    runs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    state_rows: dict[str, dict[str, Any]] = {}
+    if A2A_STATE_DIR.exists():
+        for path in sorted(A2A_STATE_DIR.glob("*.json")):
+            row = read_json(path, {})
+            if not isinstance(row, dict):
+                continue
+            conversation_id = str(row.get("conversationId") or "").strip()
+            if conversation_id:
+                state_rows[conversation_id] = row
+
+    payload_rows: dict[str, list[dict[str, Any]]] = {}
+    for row in read_jsonl(HANDOFF_NOTIFY_LOG):
+        if str(row.get("schema") or "").strip() != "continuity_a2a_lite_v0_1":
+            continue
+        conversation_id = str(row.get("conversationId") or "").strip()
+        if not conversation_id:
+            continue
+        payload_rows.setdefault(conversation_id, []).append(row)
+
+    message_rows: dict[str, list[dict[str, Any]]] = {}
+    for row in read_jsonl(A2A_MESSAGE_LOG):
+        conversation_id = str(row.get("conversationId") or "").strip()
+        if not conversation_id:
+            continue
+        message_rows.setdefault(conversation_id, []).append(row)
+
+    action_rows: dict[str, list[dict[str, Any]]] = {}
+    for row in read_jsonl(A2A_AUTO_ACTION_LOG):
+        conversation_id = str(row.get("conversation_id") or "").strip()
+        if not conversation_id:
+            continue
+        action_rows.setdefault(conversation_id, []).append(row)
+
+    all_ids = set(state_rows) | set(payload_rows) | set(message_rows) | set(action_rows)
+    items: list[dict[str, Any]] = []
+    known_runs = runs or []
+    for conversation_id in all_ids:
+        state_row = state_rows.get(conversation_id, {})
+        payloads = payload_rows.get(conversation_id, [])
+        messages = message_rows.get(conversation_id, [])
+        actions = action_rows.get(conversation_id, [])
+
+        request_payload = next((row for row in payloads if str(row.get("role") or "").strip() == "request"), payloads[0] if payloads else {})
+        latest_payload = payloads[-1] if payloads else {}
+        latest_action = actions[-1] if actions else {}
+        last_question = next((row for row in reversed(actions) if str(row.get("reply_role") or "").strip() == "question"), None)
+        last_result = next((row for row in reversed(actions) if str(row.get("reply_role") or "").strip() == "result"), None)
+        latest_request_payload = next((row for row in reversed(payloads) if str(row.get("role") or "").strip() == "request"), None)
+        latest_answer_payload = next((row for row in reversed(payloads) if str(row.get("role") or "").strip() == "answer"), None)
+        latest_callback = delivery_status(state_row.get("lastCallbackDelivery")) or delivery_status(latest_action.get("callback_delivery"))
+
+        context = latest_payload.get("context") if isinstance(latest_payload.get("context"), dict) else {}
+        if not context and isinstance(request_payload.get("context"), dict):
+            context = request_payload.get("context")
+        source_from = latest_payload.get("from") if isinstance(latest_payload.get("from"), dict) else {}
+        if not source_from and isinstance(request_payload.get("from"), dict):
+            source_from = request_payload.get("from")
+        target_to = latest_payload.get("to") if isinstance(latest_payload.get("to"), dict) else {}
+        if not target_to and isinstance(request_payload.get("to"), dict):
+            target_to = request_payload.get("to")
+
+        state_name = str(state_row.get("state") or latest_action.get("conversation_state") or "unknown").strip()
+        updated_at = (
+            str(state_row.get("updatedAt") or "").strip()
+            or str(latest_action.get("timestamp") or "").strip()
+            or str(latest_payload.get("receivedAt") or "").strip()
+            or str(request_payload.get("receivedAt") or "").strip()
+        )
+        inbound_count = sum(1 for row in messages if str(row.get("direction") or "").startswith("inbound"))
+        outbound_count = sum(1 for row in messages if str(row.get("direction") or "") == "outbound")
+        thread_id = str(context.get("threadId") or "").strip() or None
+
+        items.append(
+            {
+                "conversationId": conversation_id,
+                "state": state_name,
+                "updatedAt": updated_at,
+                "latestRole": str(state_row.get("latestRole") or latest_payload.get("role") or "").strip() or None,
+                "latestMessageId": str(state_row.get("latestMessageId") or latest_payload.get("messageId") or "").strip() or None,
+                "latestReplyTo": str(state_row.get("latestReplyTo") or latest_payload.get("replyTo") or "").strip() or None,
+                "goal": compact_text(latest_payload.get("goal") or request_payload.get("goal"), 200),
+                "summary": summarize_a2a_conversation(state_name, latest_callback, last_question, last_result),
+                "from": {
+                    "agent": str(source_from.get("agent") or "").strip() or None,
+                    "surface": str(source_from.get("surface") or "").strip() or None,
+                    "host": str(source_from.get("host") or "").strip() or None,
+                },
+                "to": {
+                    "agent": str(target_to.get("agent") or "").strip() or None,
+                    "surface": str(target_to.get("surface") or "").strip() or None,
+                    "host": str(target_to.get("host") or "").strip() or None,
+                },
+                "context": {
+                    "repo": str(context.get("repo") or "").strip() or None,
+                    "branch": str(context.get("branch") or "").strip() or None,
+                    "threadId": thread_id,
+                },
+                "callback": latest_callback,
+                "counts": {
+                    "payloads": len(payloads),
+                    "messageRows": len(messages),
+                    "inbound": inbound_count,
+                    "outbound": outbound_count,
+                    "autoActions": len(actions),
+                },
+                "latestRequestText": compact_text(((latest_request_payload or {}).get("message") or {}).get("text"), 200),
+                "latestAnswerText": compact_text(((latest_answer_payload or {}).get("message") or {}).get("text"), 200),
+                "lastQuestion": (
+                    {
+                        "timestamp": str(last_question.get("timestamp") or "").strip() or None,
+                        "text": compact_text(last_question.get("reply_text"), 240),
+                    }
+                    if last_question
+                    else None
+                ),
+                "lastResult": (
+                    {
+                        "timestamp": str(last_result.get("timestamp") or "").strip() or None,
+                        "text": compact_text(last_result.get("reply_text"), 240),
+                    }
+                    if last_result
+                    else None
+                ),
+                "reportPath": str(latest_action.get("report_path") or "").strip() or None,
+                "linkedRunIds": link_a2a_runs(known_runs, thread_id),
+            }
+        )
+
+    items.sort(key=lambda item: item.get("updatedAt") or "", reverse=True)
+    return items[: max(1, limit)]
+
+
+HANDOFF_STATUSES = {"waiting_for_codex", "in_progress", "needs_reply", "done", "blocked"}
+
+
+def base_handoff_inbox_state() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "updatedAt": now_iso(),
+        "handoffsByOrg": {},
+    }
+
+
+def load_handoff_inbox_state() -> dict[str, Any]:
+    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state())
+    if not isinstance(state, dict):
+        return base_handoff_inbox_state()
+    if "handoffsByOrg" not in state or not isinstance(state["handoffsByOrg"], dict):
+        state["handoffsByOrg"] = {}
+    return state
+
+
+def save_handoff_inbox_state(state: dict[str, Any]) -> None:
+    state["updatedAt"] = now_iso()
+    write_json(HANDOFF_INBOX_PATH, state)
+
+
+def normalized_handoff_status(value: Any, default: str = "waiting_for_codex") -> str:
+    status = str(value or "").strip()
+    return status if status in HANDOFF_STATUSES else default
+
+
+def handoff_party(value: Any, *, default_agent: str, default_surface: str) -> dict[str, str | None]:
+    row = value if isinstance(value, dict) else {}
+    return {
+        "agent": str(row.get("agent") or default_agent).strip() or default_agent,
+        "surface": str(row.get("surface") or default_surface).strip() or default_surface,
+        "host": str(row.get("host") or "").strip() or None,
+    }
+
+
+def handoff_source_thread(value: Any) -> dict[str, str | None]:
+    row = value if isinstance(value, dict) else {}
+    return {
+        "channelId": str(row.get("channelId") or "").strip() or None,
+        "threadId": str(row.get("threadId") or "").strip() or None,
+        "channelName": str(row.get("channelName") or "").strip() or None,
+        "threadName": str(row.get("threadName") or "").strip() or None,
+        "url": str(row.get("url") or "").strip() or None,
+    }
+
+
+def create_handoff_item(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+
+    goal = str(payload.get("goal") or "").strip()
+    if not goal:
+        raise ValueError("goal is required")
+
+    timestamp = now_iso()
+    handoff_id = str(payload.get("id") or payload.get("handoffId") or f"handoff-{uuid.uuid4()}").strip()
+    item = {
+        "id": handoff_id,
+        "kind": str(payload.get("kind") or "handoff_request").strip() or "handoff_request",
+        "status": normalized_handoff_status(payload.get("status")),
+        "createdAt": str(payload.get("createdAt") or timestamp).strip() or timestamp,
+        "updatedAt": timestamp,
+        "from": handoff_party(payload.get("from"), default_agent="desktop-hermes", default_surface="discord"),
+        "to": handoff_party(payload.get("to"), default_agent="macbook-codex", default_surface="codex-app"),
+        "repo": str(payload.get("repo") or "").strip() or None,
+        "goal": compact_text(goal, 500),
+        "context": compact_text(payload.get("context"), 1200),
+        "expectedOutput": compact_text(payload.get("expectedOutput") or payload.get("expected_output"), 800),
+        "sourceThread": handoff_source_thread(payload.get("sourceThread") or payload.get("source_thread")),
+        "result": compact_text(payload.get("result"), 1200),
+        "linkedRunId": str(payload.get("linkedRunId") or payload.get("runId") or "").strip() or None,
+        "linkedConversationId": str(payload.get("linkedConversationId") or payload.get("conversationId") or "").strip() or None,
+        "tags": [str(item).strip() for item in payload.get("tags", []) if str(item).strip()] if isinstance(payload.get("tags"), list) else [],
+    }
+    return organization_id, item
+
+
+def list_handoff_items(organization_id: str, *, limit: int = DEFAULT_HANDOFF_LIMIT, status: str | None = None) -> list[dict[str, Any]]:
+    state = load_handoff_inbox_state()
+    rows = state.get("handoffsByOrg", {}).get(organization_id, [])
+    if not isinstance(rows, list):
+        return []
+    items = [row for row in rows if isinstance(row, dict)]
+    if status:
+        items = [item for item in items if item.get("status") == status]
+    items.sort(key=lambda item: str(item.get("updatedAt") or item.get("createdAt") or ""), reverse=True)
+    return items[: max(1, limit)]
+
+
+def update_handoff_status(payload: dict[str, Any], handoff_id: str) -> tuple[str, dict[str, Any]]:
+    organization_id = str(payload.get("organizationId") or "").strip()
+    if not organization_id:
+        raise ValueError("organizationId is required")
+    next_status = normalized_handoff_status(payload.get("status"), default="")
+    if not next_status:
+        raise ValueError("valid status is required")
+
+    state = load_handoff_inbox_state()
+    rows = state.setdefault("handoffsByOrg", {}).setdefault(organization_id, [])
+    if not isinstance(rows, list):
+        rows = []
+        state["handoffsByOrg"][organization_id] = rows
+
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict) or str(item.get("id") or "") != handoff_id:
+            continue
+        updated = {
+            **item,
+            "status": next_status,
+            "updatedAt": now_iso(),
+        }
+        if "result" in payload:
+            updated["result"] = compact_text(payload.get("result"), 1200)
+        rows[index] = updated
+        save_handoff_inbox_state(state)
+        return organization_id, updated
+
+    raise KeyError("Handoff not found")
 
 
 def make_trace(agent_id: str, title: str, summary: str, tone: str) -> dict[str, Any]:
@@ -2444,6 +2808,21 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                 state = load_state()
                 runs = get_runs_for_org(state, organization_id)[:limit]
                 return self._json(200, ok(runs))
+            if parsed.path == "/a2a-lite/conversations":
+                limit_value = (params.get("limit") or [str(DEFAULT_A2A_LIMIT)])[0]
+                limit = max(1, min(100, int(limit_value)))
+                runs: list[dict[str, Any]] = []
+                if organization_id:
+                    state = load_state()
+                    runs = get_runs_for_org(state, organization_id)
+                return self._json(200, ok(list_a2a_lite_conversations(limit=limit, runs=runs)))
+            if parsed.path == "/handoffs":
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                limit_value = (params.get("limit") or [str(DEFAULT_HANDOFF_LIMIT)])[0]
+                limit = max(1, min(100, int(limit_value)))
+                status = (params.get("status") or [""])[0].strip() or None
+                return self._json(200, ok(list_handoff_items(organization_id, limit=limit, status=status)))
             if parsed.path == "/readiness":
                 return self._json(200, ok(get_mission_control_readiness()))
             if parsed.path == "/heartbeat/control":
@@ -2452,8 +2831,11 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                 if not organization_id:
                     return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
                 state = load_state()
+                runs = get_runs_for_org(state, organization_id)[:30]
                 snapshot = {
-                    "runs": get_runs_for_org(state, organization_id)[:30],
+                    "runs": runs,
+                    "a2aLiteConversations": list_a2a_lite_conversations(runs=runs),
+                    "handoffs": list_handoff_items(organization_id),
                     "readiness": get_mission_control_readiness(),
                     "heartbeatControl": get_heartbeat_control_state(),
                 }
@@ -2520,6 +2902,44 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                         }
                     ),
                 )
+
+            if parsed.path == "/handoffs":
+                organization_id, item = create_handoff_item(data)
+                with STATE_LOCK:
+                    state = load_handoff_inbox_state()
+                    rows = state.setdefault("handoffsByOrg", {}).setdefault(organization_id, [])
+                    if not isinstance(rows, list):
+                        rows = []
+                        state["handoffsByOrg"][organization_id] = rows
+                    rows.append(item)
+                    rows.sort(key=lambda row: str(row.get("updatedAt") or row.get("createdAt") or ""), reverse=True)
+                    save_handoff_inbox_state(state)
+                log_event(
+                    "handoff.created",
+                    {
+                        "organizationId": organization_id,
+                        "handoffId": item["id"],
+                        "status": item["status"],
+                        "repo": item.get("repo"),
+                    },
+                )
+                return self._json(200, ok(item))
+
+            if parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status"):
+                handoff_id = parsed.path.split("/")[2]
+                try:
+                    organization_id, item = update_handoff_status(data, handoff_id)
+                except KeyError:
+                    return self._json(404, err("Handoff not found", "NOT_FOUND"))
+                log_event(
+                    "handoff.status_updated",
+                    {
+                        "organizationId": organization_id,
+                        "handoffId": item["id"],
+                        "status": item["status"],
+                    },
+                )
+                return self._json(200, ok(item))
 
             if parsed.path.startswith("/runs/") and parsed.path.endswith("/approve"):
                 run_id = parsed.path.split("/")[2]

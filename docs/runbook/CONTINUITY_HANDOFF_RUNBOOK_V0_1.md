@@ -110,10 +110,15 @@ python3 scripts/capture_continuity_handoff.py \
 Near real-time mode sends the same event to a running Hermes/Mission Control API.
 
 ```bash
-CONTINUITY_HANDOFF_NOTIFY_URL=http://DESKTOP_HOST:8791/handoff/notify \
-CONTINUITY_HANDOFF_NOTIFY_TOKEN=$HERMES_MISSION_CONTROL_API_KEY \
+CONTINUITY_HANDOFF_NOTIFY_URL=http://100.83.147.56:8792/handoff/notify \
+CONTINUITY_HANDOFF_NOTIFY_TOKEN="$MISSION_CONTROL_SHARED_TOKEN" \
 python3 scripts/capture_continuity_handoff.py --input handoff.json
 ```
+
+The sender now includes both auth headers:
+
+- `Authorization: Bearer <token>`
+- `x-hermes-api-key: <token>`
 
 The receiving API stores notifications at:
 
@@ -122,6 +127,27 @@ lineage/continuity_handoff_notifications.jsonl
 ```
 
 Use JSONL first. Turn on HTTP notification only after the desktop API address and token are confirmed.
+
+## MacBook Canonical Env
+
+Until the direct WSL path is made reliable again, use the Windows host path as the default external smoke route.
+
+```bash
+export MISSION_CONTROL_BASE_URL="http://100.83.147.56:8792"
+export MISSION_CONTROL_SHARED_TOKEN="<shared-token>"
+export CONTINUITY_HANDOFF_NOTIFY_URL="http://100.83.147.56:8792/handoff/notify"
+export CONTINUITY_HANDOFF_NOTIFY_TOKEN="$MISSION_CONTROL_SHARED_TOKEN"
+```
+
+These work for:
+
+- `scripts/continuity_handoff_notify_smoke.py`
+- `scripts/capture_continuity_handoff.py`
+
+Compatibility env still supported:
+
+- `HERMES_DESKTOP_MISSION_CONTROL_URL`
+- `HERMES_MISSION_CONTROL_API_KEY`
 
 ## Desktop Smoke
 
@@ -132,7 +158,7 @@ cd /home/yk/physio-hermes-ops
 git pull
 HERMES_MISSION_CONTROL_HOST=0.0.0.0 \
 HERMES_MISSION_CONTROL_PORT=8792 \
-HERMES_MISSION_CONTROL_API_KEY=dev-local-mission-control \
+HERMES_MISSION_CONTROL_API_KEY="$MISSION_CONTROL_SHARED_TOKEN" \
 python3 apps/api/mission_control_api.py
 ```
 
@@ -141,7 +167,7 @@ Then run this from MacBook:
 ```bash
 python3 scripts/continuity_handoff_notify_smoke.py \
   --base-url http://100.83.147.56:8792 \
-  --token dev-local-mission-control
+  --token "$MISSION_CONTROL_SHARED_TOKEN"
 ```
 
 Expected result:
@@ -151,6 +177,73 @@ Expected result:
 ```
 
 If `8791` returns `404 page not found`, another service is using that port. Use `8792` for Mission Control API.
+
+## Delayed Callback Smoke
+
+Use this when you want to verify the full loop:
+
+```text
+MacBook -> desktop /handoff/notify -> desktop delayed callback -> MacBook receiver
+```
+
+First start a callback receiver on MacBook and keep it alive for at least 3 minutes.
+
+```bash
+python3 scripts/continuity_callback_capture_server.py \
+  --host 0.0.0.0 \
+  --port 8891 \
+  --output /tmp/continuity_callback_capture.json
+```
+
+Then find the current MacBook Tailscale IPv4 address:
+
+```bash
+/Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4
+```
+
+Then run the direct desktop Tailscale smoke from MacBook:
+
+```bash
+python3 scripts/continuity_handoff_notify_smoke.py \
+  --base-url http://100.125.26.99:8792 \
+  --token "$MISSION_CONTROL_SHARED_TOKEN" \
+  --callback-url http://<macbook-ip>:8891/ack \
+  --surface macbook-codex \
+  --run-id cross-device-callback-smoke-2 \
+  --goal "Verify MacBook -> desktop continuity handoff plus delayed callback reply" \
+  --verbose
+```
+
+Notes:
+
+- The callback is not the immediate `POST /handoff/notify` response.
+- Desktop sends the callback later through the `continuity-handoff-notifier` cron path.
+- Do not stop the MacBook callback receiver immediately after the smoke command returns.
+
+Success criteria:
+
+- `scripts/continuity_handoff_notify_smoke.py` returns `"ok": true`
+- `/tmp/continuity_callback_capture.json` is created on MacBook
+- the callback payload includes:
+  - `kind: "continuity_handoff_ack"`
+  - `status: "ack"`
+  - `runId: "cross-device-callback-smoke-2"`
+
+Verified on June 13, 2026:
+
+- direct desktop path `http://100.125.26.99:8792` returned `GET /health -> 200`
+- `POST /handoff/notify -> 200`
+- delayed callback reached the MacBook receiver at `/ack`
+
+## June 13, 2026 Incident Note
+
+- Symptom: MacBook smoke reached `GET /health` but failed `POST /handoff/notify` with `401 unauthorized`.
+- Verified good path: `http://100.83.147.56:8792`.
+- Direct WSL path `http://100.125.26.99:8792` remained unstable from MacBook during this incident.
+- Root cause: MacBook scripts sent only `x-hermes-api-key`, while the active receiver path accepted `Authorization: Bearer`.
+- Fix: send both `Authorization: Bearer` and `x-hermes-api-key` from the MacBook continuity scripts.
+- Result: MacBook smoke returned `"ok": true`.
+- Follow-up verification: delayed callback smoke later succeeded end-to-end with `http://100.125.26.99:8792` plus a live MacBook callback receiver.
 
 ## Stop Rules
 

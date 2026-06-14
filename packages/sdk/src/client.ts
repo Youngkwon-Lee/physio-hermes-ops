@@ -1,5 +1,6 @@
 import type { MissionRun } from '../../runtime/src/index';
 import type {
+  A2aLiteConversationSummary,
   AgentOsHeartbeatControlState,
   AgentOsHeartbeatResult,
   AgentOsIntegrationHealthReport,
@@ -7,10 +8,13 @@ import type {
   CreateMissionRunInput,
   DailyOpsRunInput,
   HeartbeatCronRequestInput,
+  CreateHandoffInboxItemInput,
+  HandoffInboxItem,
   IntegrationHealthInput,
   ListMissionRunsInput,
   MissionControlSnapshot,
   MissionRunGateInput,
+  UpdateHandoffInboxStatusInput,
 } from './contracts';
 import type { ActionResult } from './result';
 
@@ -24,6 +28,10 @@ export interface MissionControlClientOptions {
 
 export interface MissionControlClient {
   getSnapshot(input: { organizationId: string }): Promise<ActionResult<MissionControlSnapshot>>;
+  listA2aLiteConversations(input?: { organizationId?: string; limit?: number }): Promise<ActionResult<A2aLiteConversationSummary[]>>;
+  listHandoffs(input: { organizationId: string; limit?: number; status?: string }): Promise<ActionResult<HandoffInboxItem[]>>;
+  createHandoff(input: CreateHandoffInboxItemInput): Promise<ActionResult<HandoffInboxItem>>;
+  updateHandoffStatus(input: UpdateHandoffInboxStatusInput): Promise<ActionResult<HandoffInboxItem>>;
   listRuns(input: ListMissionRunsInput): Promise<ActionResult<MissionRun[]>>;
   createRun(input: CreateMissionRunInput): Promise<ActionResult<MissionRun>>;
   approveGate(input: MissionRunGateInput): Promise<ActionResult<MissionRun>>;
@@ -103,6 +111,41 @@ export function createMissionControlClient(options: MissionControlClientOptions)
         query: {
           organizationId: input.organizationId,
         },
+      });
+    },
+    listA2aLiteConversations(input) {
+      return request<A2aLiteConversationSummary[]>({
+        path: '/a2a-lite/conversations',
+        method: 'GET',
+        query: {
+          organizationId: input?.organizationId,
+          limit: input?.limit,
+        },
+      });
+    },
+    listHandoffs(input) {
+      return request<HandoffInboxItem[]>({
+        path: '/handoffs',
+        method: 'GET',
+        query: {
+          organizationId: input.organizationId,
+          limit: input.limit,
+          status: input.status,
+        },
+      });
+    },
+    createHandoff(input) {
+      return request<HandoffInboxItem>({
+        path: '/handoffs',
+        method: 'POST',
+        body: input,
+      });
+    },
+    updateHandoffStatus(input) {
+      return request<HandoffInboxItem>({
+        path: `/handoffs/${input.handoffId}/status`,
+        method: 'POST',
+        body: input,
       });
     },
     listRuns(input) {

@@ -18,6 +18,14 @@ ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "continuity_handoff_v0_1"
 
 
+def first_env(*names: str) -> str | None:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return None
+
+
 def now_iso() -> str:
     return datetime.now().isoformat(timespec="seconds")
 
@@ -83,6 +91,9 @@ def normalize(payload: dict[str, Any]) -> dict[str, Any]:
         "artifacts": payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else [],
         "memoryCandidates": payload.get("memoryCandidates") if isinstance(payload.get("memoryCandidates"), list) else [],
     }
+    callback_url = str(payload.get("callbackUrl") or payload.get("callback_url") or "").strip()
+    if callback_url:
+        normalized["callbackUrl"] = callback_url
     if not normalized["done"] and not normalized["next"]:
         raise ValueError("at least one done or next item is required")
     return normalized
@@ -112,6 +123,7 @@ def bullet(items: list[str]) -> str:
 
 def raw_markdown(payload: dict[str, Any], raw_json_path: Path, brain_dir: Path) -> str:
     source = payload["source"]
+    callback_url = payload.get("callbackUrl") or "-"
     return "\n".join(
         [
             f"# Continuity Handoff: {payload['goal']}",
@@ -122,6 +134,7 @@ def raw_markdown(payload: dict[str, Any], raw_json_path: Path, brain_dir: Path) 
             f"- thread_id: {source.get('threadId', '-')}",
             f"- repo: {source.get('repo', '-')}",
             f"- branch: {source.get('branch', '-')}",
+            f"- callback_url: {callback_url}",
             f"- raw_json: {raw_json_path.relative_to(brain_dir)}",
             "",
             "## Goal",
@@ -196,23 +209,41 @@ def resolve_event_log(value: str | None, brain_dir: Path) -> Path:
     return brain_dir / "operations" / "events" / "continuity_handoff_events.jsonl"
 
 
+def default_notify_url() -> str | None:
+    explicit = first_env("CONTINUITY_HANDOFF_NOTIFY_URL")
+    if explicit:
+        return explicit
+    mission_control_base_url = first_env("MISSION_CONTROL_BASE_URL", "HERMES_DESKTOP_MISSION_CONTROL_URL")
+    if mission_control_base_url:
+        return mission_control_base_url.rstrip("/") + "/handoff/notify"
+    return None
+
+
 def build_event(result: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
-    return {
+    event = {
         "timestamp": now_iso(),
         "eventType": "continuity_handoff.captured",
         "schema": SCHEMA,
         "handoffId": result["handoffId"],
+        "runId": payload["source"].get("runId"),
+        "surface": payload["source"].get("surface"),
         "source": payload["source"],
         "goal": payload["goal"],
         "rawJsonPath": result["rawJsonPath"],
         "rawMarkdownPath": result["rawMarkdownPath"],
         "candidatePaths": result["candidatePaths"],
     }
+    callback_url = str(payload.get("callbackUrl") or "").strip()
+    if callback_url:
+        event["callbackUrl"] = callback_url
+        event["callback_url"] = callback_url
+    return event
 
 
 def notify(url: str, token: str | None, event: dict[str, Any], timeout: float) -> dict[str, Any]:
     headers = {"Content-Type": "application/json"}
     if token:
+        headers["Authorization"] = f"Bearer {token}"
         headers["x-hermes-api-key"] = token
     request = Request(
         url,
@@ -287,8 +318,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-candidate", action="store_true", help="Write raw only.")
     parser.add_argument("--event-log", default=None, help="JSONL event path. Defaults to CONTINUITY_HANDOFF_EVENT_LOG, then brain operations/events.")
     parser.add_argument("--no-event-log", action="store_true", help="Skip continuity handoff event log.")
-    parser.add_argument("--notify-url", default=os.getenv("CONTINUITY_HANDOFF_NOTIFY_URL"), help="Optional Hermes/Mission Control webhook URL.")
-    parser.add_argument("--notify-token", default=os.getenv("CONTINUITY_HANDOFF_NOTIFY_TOKEN"), help="Optional API key for --notify-url.")
+    parser.add_argument(
+        "--notify-url",
+        default=default_notify_url(),
+        help="Optional Hermes/Mission Control webhook URL. Falls back to MISSION_CONTROL_BASE_URL + /handoff/notify.",
+    )
+    parser.add_argument(
+        "--notify-token",
+        default=first_env("CONTINUITY_HANDOFF_NOTIFY_TOKEN", "MISSION_CONTROL_SHARED_TOKEN", "HERMES_MISSION_CONTROL_API_KEY"),
+        help="Optional shared API token for --notify-url.",
+    )
     parser.add_argument("--notify-timeout", type=float, default=5.0, help="Webhook timeout in seconds.")
     return parser.parse_args()
 
