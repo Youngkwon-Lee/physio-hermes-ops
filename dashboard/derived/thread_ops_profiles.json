@@ -1,0 +1,542 @@
+{
+  "generated_at": "2026-06-14T18:32:43+09:00",
+  "source": {
+    "channel_registry": "dashboard/derived/channel_registry.json",
+    "cron_registry": "cron/registry/jobs.yaml",
+    "events": "lineage/events.jsonl"
+  },
+  "items": [
+    {
+      "id": "discord:1490334925411454976",
+      "name": "비서",
+      "parent_name": null,
+      "scope": "home-channel",
+      "delivery_keys": [],
+      "purpose": [
+        "ops",
+        "general"
+      ],
+      "status": "check",
+      "status_label": "확인",
+      "summary": "ops · general",
+      "cron_jobs": [
+        {
+          "name": "daily-calendar-mail-brief",
+          "purpose": "Combine calendar context and important unread mail into a single operational morning brief.",
+          "schedule": "30 7 * * 1-5",
+          "status": "active",
+          "mode": "script",
+          "output_type": "ops_brief"
+        },
+        {
+          "name": "home-rehab-morning-brief",
+          "purpose": "Present today's home-rehab schedule in a compact action-ready morning format.",
+          "schedule": "0 9 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "schedule_brief"
+        },
+        {
+          "name": "home-rehab-lunch-recommendation",
+          "purpose": "Recommend lunch options based on the day's home-rehab route and prior preferences.",
+          "schedule": "0 8 * * *",
+          "status": "needs_review",
+          "mode": "agent",
+          "output_type": "recommendation"
+        },
+        {
+          "name": "daily-conversation-curator",
+          "purpose": "Curate long-term-value conversation items for memory and knowledge promotion.",
+          "schedule": "0 23 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "curator"
+        },
+        {
+          "name": "daily-discord-digest",
+          "purpose": "Produce an end-of-day digest of meaningful Discord conversations and decisions.",
+          "schedule": "35 23 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "digest"
+        },
+        {
+          "name": "hermes-ops-watchdog",
+          "purpose": "Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.",
+          "schedule": "every 10m",
+          "status": "active",
+          "mode": "script",
+          "output_type": "watchdog"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        },
+        {
+          "id": "physio-backend",
+          "label": "백엔드"
+        },
+        {
+          "id": "physio-orchestrator",
+          "label": "총괄"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1510472054044885174",
+      "name": "장기기억_기록_도우미",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 장기기억_기록_도우미 / topic 1510472054044885174",
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 장기기억_기록_도우미 / topic 1510472054044885174"
+      ],
+      "purpose": [
+        "memory",
+        "curation"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "memory · curation",
+      "cron_jobs": [
+        {
+          "name": "daily-conversation-curator",
+          "purpose": "Curate long-term-value conversation items for memory and knowledge promotion.",
+          "schedule": "0 23 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "curator"
+        },
+        {
+          "name": "hermes-ops-watchdog",
+          "purpose": "Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.",
+          "schedule": "every 10m",
+          "status": "active",
+          "mode": "script",
+          "output_type": "watchdog"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-orchestrator",
+          "label": "총괄"
+        },
+        {
+          "id": "physio-backend",
+          "label": "백엔드"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1510472141664030832",
+      "name": "하루 대화 요약 리포터",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 하루 대화 요약 리포터 / topic 1510472141664030832",
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 하루 대화 요약 리포터 / topic 1510472141664030832"
+      ],
+      "purpose": [
+        "digest",
+        "conversation"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "digest · conversation",
+      "cron_jobs": [
+        {
+          "name": "daily-discord-digest",
+          "purpose": "Produce an end-of-day digest of meaningful Discord conversations and decisions.",
+          "schedule": "35 23 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "digest"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-orchestrator",
+          "label": "총괄"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1515296585410416931",
+      "name": "맥북코덱스소통채널",
+      "parent_name": "second_memory",
+      "scope": "discord:자비스brain / #second_memory / 맥북코덱스소통채널 / topic 1515296585410416931",
+      "delivery_keys": [
+        "discord:자비스brain / #second_memory / 맥북코덱스소통채널 / topic 1515296585410416931"
+      ],
+      "purpose": [
+        "ops",
+        "codex",
+        "handoff"
+      ],
+      "status": "idle",
+      "status_label": "대기",
+      "summary": "ops · codex · handoff",
+      "cron_jobs": [],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1490386250031431772",
+      "name": "아침 일정·메일 요약",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 아침 일정·메일 요약 / topic 1490386250031431772",
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 아침 일정·메일 요약 / topic 1490386250031431772"
+      ],
+      "purpose": [
+        "calendar",
+        "mail",
+        "briefing"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "calendar · mail · briefing",
+      "cron_jobs": [
+        {
+          "name": "daily-calendar-mail-brief",
+          "purpose": "Combine calendar context and important unread mail into a single operational morning brief.",
+          "schedule": "30 7 * * 1-5",
+          "status": "active",
+          "mode": "script",
+          "output_type": "ops_brief"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        },
+        {
+          "id": "physio-backend",
+          "label": "백엔드"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1495573191152898078",
+      "name": "방문재활 일정 관리",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 방문재활 일정 관리 / topic 1495573191152898078",
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 방문재활 일정 관리 / topic 1495573191152898078"
+      ],
+      "purpose": [
+        "clinical",
+        "calendar",
+        "home-rehab"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "clinical · calendar · home-rehab",
+      "cron_jobs": [
+        {
+          "name": "home-rehab-morning-brief",
+          "purpose": "Present today's home-rehab schedule in a compact action-ready morning format.",
+          "schedule": "0 9 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "schedule_brief"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1496052252601749514",
+      "name": "맛집 추천 기록",
+      "parent_name": "비서",
+      "scope": "discord:자비스brain / #비서 / 맛집 추천 기록 / topic 1496052252601749514",
+      "delivery_keys": [
+        "discord:자비스brain / #비서 / 맛집 추천 기록 / topic 1496052252601749514"
+      ],
+      "purpose": [
+        "personal",
+        "recommendation"
+      ],
+      "status": "check",
+      "status_label": "확인",
+      "summary": "personal · recommendation",
+      "cron_jobs": [
+        {
+          "name": "home-rehab-lunch-recommendation",
+          "purpose": "Recommend lunch options based on the day's home-rehab route and prior preferences.",
+          "schedule": "0 8 * * *",
+          "status": "needs_review",
+          "mode": "agent",
+          "output_type": "recommendation"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1493405253738041486",
+      "name": "물리치료·재활 일일 브리핑 토론장",
+      "parent_name": "research",
+      "scope": "discord:자비스brain / #research / 물리치료·재활 일일 브리핑 토론장 / topic 1493405253738041486",
+      "delivery_keys": [
+        "discord:자비스brain / #research / 물리치료·재활 일일 브리핑 토론장 / topic 1493405253738041486"
+      ],
+      "purpose": [
+        "research",
+        "briefing",
+        "rehab"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "research · briefing · rehab",
+      "cron_jobs": [
+        {
+          "name": "daily-rehab-ai-research-brief",
+          "purpose": "Deliver a daily research brief focused on physical therapy, rehabilitation, multimodal AI, and clinical relevance.",
+          "schedule": "0 6 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "research_brief"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1491018394424705124",
+      "name": "지원사업 회의실 (DB운영)",
+      "parent_name": "사업",
+      "scope": "discord:자비스brain / #사업 / 지원사업 회의실 (DB운영) / topic 1491018394424705124",
+      "delivery_keys": [
+        "discord:자비스brain / #사업 / 지원사업 회의실 (DB운영) / topic 1491018394424705124"
+      ],
+      "purpose": [
+        "business",
+        "kpi",
+        "db-ops"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "business · kpi · db-ops",
+      "cron_jobs": [
+        {
+          "name": "weekly-pt-kpi-brief",
+          "purpose": "Weekly KPI summary for PT MVP operations.",
+          "schedule": "0 9 * * 1",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "kpi_brief"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1497727134821650624",
+      "name": "지원사업 레이더 운영 (일일/크론) v2",
+      "parent_name": "사업",
+      "scope": "discord:자비스brain / #사업 / 지원사업 레이더 운영 (일일/크론) v2 / topic 1497727134821650624",
+      "delivery_keys": [
+        "discord:자비스brain / #사업 / 지원사업 레이더 운영 (일일/크론) v2 / topic 1497727134821650624"
+      ],
+      "purpose": [
+        "business",
+        "support-programs",
+        "daily-radar"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "business · support-programs · daily-radar",
+      "cron_jobs": [
+        {
+          "name": "biz-support-radar-daily",
+          "purpose": "Daily scan of startup/government support programs relevant to rehabilitation, healthcare AI, and adjacent startup opportunities.",
+          "schedule": "0 9 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "business_radar"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "discord:topic:1490878409625309184",
+      "name": "AI 뉴스 토론",
+      "parent_name": "news",
+      "scope": "discord:자비스brain / #news / AI 뉴스 토론 / topic 1490878409625309184",
+      "delivery_keys": [
+        "discord:자비스brain / #news / AI 뉴스 토론 / topic 1490878409625309184"
+      ],
+      "purpose": [
+        "news",
+        "ai",
+        "briefing"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "news · ai · briefing",
+      "cron_jobs": [
+        {
+          "name": "daily-ai-news-briefing",
+          "purpose": "Summarize high-signal AI news relevant to rehab, clinical AI, agent operations, and knowledge workflows.",
+          "schedule": "30 5 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "briefing"
+        },
+        {
+          "name": "daily-ai-news-discussion-kickoff",
+          "purpose": "Convert the morning AI news brief into actionable discussion questions and experiment prompts.",
+          "schedule": "30 7 * * *",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "kickoff"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-planner",
+          "label": "기획자"
+        },
+        {
+          "id": "physio-orchestrator",
+          "label": "총괄"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    },
+    {
+      "id": "local",
+      "name": "Local only",
+      "parent_name": null,
+      "scope": "scheduler-local-output",
+      "delivery_keys": [
+        "local"
+      ],
+      "purpose": [
+        "ops",
+        "script-only"
+      ],
+      "status": "active",
+      "status_label": "정상",
+      "summary": "ops · script-only",
+      "cron_jobs": [
+        {
+          "name": "calendar-auto-classify",
+          "purpose": "Apply lightweight automated classification to calendar items.",
+          "schedule": "10 23 * * *",
+          "status": "active",
+          "mode": "script",
+          "output_type": "maintenance"
+        },
+        {
+          "name": "ensure-kinelo-8888-server",
+          "purpose": "Watchdog job to keep the local Kinelo service on port 8888 alive.",
+          "schedule": "every 5m",
+          "status": "active",
+          "mode": "script",
+          "output_type": "watchdog"
+        }
+      ],
+      "agents": [
+        {
+          "id": "physio-ops-reporter",
+          "label": "운영 리포터"
+        },
+        {
+          "id": "physio-backend",
+          "label": "백엔드"
+        },
+        {
+          "id": "physio-orchestrator",
+          "label": "총괄"
+        }
+      ],
+      "recent_events": [],
+      "help_items": []
+    }
+  ]
+}

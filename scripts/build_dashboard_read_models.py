@@ -5,10 +5,14 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LINEAGE_DIR = ROOT / "lineage"
 OUT_DIR = ROOT / "dashboard" / "derived"
+CRON_REGISTRY_PATH = ROOT / "cron" / "registry" / "jobs.yaml"
+CHANNEL_REGISTRY_PATH = OUT_DIR / "channel_registry.json"
 
 PROFILE_LABELS = {
     "physio-orchestrator": "오케스트레이터",
@@ -67,6 +71,13 @@ def read_jsonl(path: Path):
         except Exception:
             continue
     return out
+
+
+def read_yaml(path: Path, default):
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8")) or default
+    except Exception:
+        return default
 
 
 def parse_ts(value):
@@ -275,6 +286,178 @@ def build_feed(events):
     return {"generated_at": now_iso(), "items": items}
 
 
+def normalize_text(value):
+    return str(value or "").strip().lower()
+
+
+def normalize_key(value):
+    return "".join(ch for ch in normalize_text(value) if ch.isalnum())
+
+
+def name_without_parenthetical(value):
+    return str(value or "").split("(", 1)[0].strip()
+
+
+def compact_agent_label(profile_id):
+    label = PROFILE_LABELS.get(profile_id, profile_id)
+    return label.replace("오케스트레이터", "총괄")
+
+
+def infer_job_agents(job):
+    name = normalize_text(job.get("name"))
+    output_type = normalize_text(job.get("output_type"))
+    toolsets = {normalize_text(value) for value in job.get("enabled_toolsets") or []}
+
+    agents = ["physio-ops-reporter"]
+    if "news" in name or "brief" in name or "research" in name:
+        agents.append("physio-planner")
+    if "watchdog" in name or output_type == "watchdog":
+        agents.append("physio-orchestrator")
+    if "kpi" in name or "radar" in name:
+        agents.append("physio-planner")
+    if "session_search" in toolsets or "memory" in toolsets or "digest" in output_type or "curator" in output_type:
+        agents.append("physio-orchestrator")
+    if job.get("mode") == "script":
+        agents.append("physio-backend")
+
+    seen = set()
+    return [agent for agent in agents if not (agent in seen or seen.add(agent))]
+
+
+def delivery_matches_channel(job, channel):
+    label = normalize_text(job.get("deliver_label"))
+    if not label:
+        return False
+    if label == "local-only":
+        return normalize_text(channel.get("id")) == "local" or normalize_text(channel.get("name")) == "local only"
+
+    if channel.get("kind") == "home":
+        candidates = [channel.get("name"), channel.get("scope"), *(channel.get("delivery_keys") or [])]
+    else:
+        candidates = [
+            channel.get("name"),
+            name_without_parenthetical(channel.get("name")),
+            channel.get("scope"),
+            *(channel.get("delivery_keys") or []),
+        ]
+
+    normalized_candidates = [normalize_text(value) for value in candidates if value]
+    if any(candidate and (candidate in label or label in candidate) for candidate in normalized_candidates):
+        return True
+
+    label_key = normalize_key(label)
+    candidate_keys = [normalize_key(value) for value in candidates if value]
+    return any(candidate and (candidate in label_key or label_key in candidate) for candidate in candidate_keys)
+
+
+def build_thread_ops_profiles(events):
+    registry = read_json(CHANNEL_REGISTRY_PATH, {})
+    cron_registry = read_yaml(CRON_REGISTRY_PATH, {})
+    channels = [
+        item for item in registry.get("items", [])
+        if item.get("active") and item.get("kind") in {"thread", "home", "local"}
+    ]
+    jobs = cron_registry.get("jobs", []) if isinstance(cron_registry, dict) else []
+    help_queue = build_help_queue(events).get("items", [])
+
+    items = []
+    for channel in channels:
+        matched_jobs = [job for job in jobs if delivery_matches_channel(job, channel)]
+        matched_agents = []
+        for job in matched_jobs:
+            matched_agents.extend(infer_job_agents(job))
+        if channel.get("purpose") and not matched_agents:
+            purpose = " ".join(channel.get("purpose") or [])
+            if "research" in purpose or "briefing" in purpose:
+                matched_agents.append("physio-planner")
+            if "memory" in purpose or "curation" in purpose:
+                matched_agents.append("physio-orchestrator")
+        if not matched_agents and channel.get("platform") == "discord":
+            matched_agents.append("physio-ops-reporter")
+
+        seen_agents = set()
+        agents = [
+            {
+                "id": agent,
+                "label": compact_agent_label(agent),
+            }
+            for agent in matched_agents
+            if not (agent in seen_agents or seen_agents.add(agent))
+        ]
+
+        thread_name = channel.get("name") or ""
+        parent_name = channel.get("parent_name") or channel.get("name") or ""
+        related_events = [
+            event for event in reversed(events)
+            if normalize_text(event.get("stream_id")) in {
+                normalize_text(thread_name),
+                normalize_text(parent_name),
+            }
+        ][:5]
+
+        related_help = [
+            item for item in help_queue
+            if normalize_text(item.get("stream_label")) in {normalize_text(thread_name), normalize_text(parent_name)}
+        ][:3]
+
+        active_jobs = sum(1 for job in matched_jobs if job.get("status") == "active")
+        needs_review_jobs = sum(1 for job in matched_jobs if job.get("status") == "needs_review")
+        if related_help or needs_review_jobs:
+            status = "check"
+        elif active_jobs:
+            status = "active"
+        else:
+            status = "idle"
+
+        items.append(
+            {
+                "id": channel.get("id"),
+                "name": channel.get("name"),
+                "parent_name": channel.get("parent_name"),
+                "scope": channel.get("scope"),
+                "delivery_keys": channel.get("delivery_keys") or [],
+                "purpose": channel.get("purpose") or [],
+                "status": status,
+                "status_label": {"active": "정상", "check": "확인", "idle": "대기"}.get(status, "대기"),
+                "summary": " · ".join(channel.get("purpose") or []) or "운영",
+                "cron_jobs": [
+                    {
+                        "name": job.get("name"),
+                        "purpose": job.get("purpose"),
+                        "schedule": job.get("schedule"),
+                        "status": job.get("status"),
+                        "mode": job.get("mode"),
+                        "output_type": job.get("output_type"),
+                    }
+                    for job in matched_jobs
+                ],
+                "agents": agents,
+                "recent_events": [
+                    {
+                        "id": event.get("event_id"),
+                        "agent_id": event.get("profile_id"),
+                        "agent_label": PROFILE_LABELS.get(event.get("profile_id"), event.get("profile_id")),
+                        "status": event.get("status"),
+                        "summary": event.get("notes") or "",
+                        "timestamp": event.get("timestamp"),
+                    }
+                    for event in related_events
+                ],
+                "help_items": related_help,
+            }
+        )
+
+    return {
+        "generated_at": now_iso(),
+        "source": {
+            "channel_registry": str(CHANNEL_REGISTRY_PATH.relative_to(ROOT)),
+            "cron_registry": str(CRON_REGISTRY_PATH.relative_to(ROOT)),
+            "events": "lineage/events.jsonl",
+        },
+        "items": items,
+    }
+
+
 def build_kpis(events, latest_wave_id):
     counts = Counter(str(event.get("status") or "").upper() for event in events)
     avg_score = 0.0
@@ -366,6 +549,7 @@ def main():
     write_json(OUT_DIR / "ops_snapshot.json", build_ops_snapshot(events))
     write_json(OUT_DIR / "feed.json", build_feed(events))
     write_json(OUT_DIR / "kpis.json", build_kpis(events, latest_wave_id))
+    write_json(OUT_DIR / "thread_ops_profiles.json", build_thread_ops_profiles(events))
     print(str(OUT_DIR))
 
 

@@ -44,6 +44,19 @@
       ]
     },
     {
+      "id": "discord:topic:1515296585410416931",
+      "platform": "discord",
+      "kind": "thread",
+      "name": "맥북코덱스소통채널",
+      "parent_name": "second_memory",
+      "scope": "discord:자비스brain / #second_memory / 맥북코덱스소통채널 / topic 1515296585410416931",
+      "purpose": ["ops", "codex", "handoff"],
+      "active": true,
+      "delivery_keys": [
+        "discord:자비스brain / #second_memory / 맥북코덱스소통채널 / topic 1515296585410416931"
+      ]
+    },
+    {
       "id": "discord:topic:1490386250031431772",
       "platform": "discord",
       "kind": "thread",
