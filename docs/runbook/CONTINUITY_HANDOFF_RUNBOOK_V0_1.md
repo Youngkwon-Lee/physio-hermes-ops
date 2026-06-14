@@ -149,6 +149,106 @@ Compatibility env still supported:
 - `HERMES_DESKTOP_MISSION_CONTROL_URL`
 - `HERMES_MISSION_CONTROL_API_KEY`
 
+## MacBook Codex <-> desktop Hermes Operating Loop
+
+Use this loop when MacBook Codex needs desktop Hermes to act, verify, or report back without the user manually copying state between surfaces.
+
+Canonical surfaces:
+
+- live discussion: Discord `#second_memory / 맥북코덱스소통채널`
+- durable state: Mission Control `/handoffs`
+- code history: GitHub `main` or a named branch
+- live verification: MacBook direct API checks against `http://100.83.147.56:8792`
+- durable rationale: second memory, only when the result is worth keeping
+
+Do not use unrelated domain threads such as `방문재활 일정 관리` for MacBook/Hermes coordination unless the operator explicitly selects them.
+
+### 1) Create a Mission Control handoff
+
+From MacBook:
+
+```bash
+curl -sS -X POST "$MISSION_CONTROL_BASE_URL/handoffs" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN" \
+  -d @- <<'JSON'
+{
+  "organizationId": "org-smoke",
+  "from": {"agent": "macbook-codex", "surface": "codex-app", "host": "macbook"},
+  "to": {"agent": "desktop-hermes", "surface": "discord", "host": "desktop"},
+  "repo": "/home/yk/physio-hermes-ops",
+  "goal": "Pull the pushed main commit, restart ops-control-api.service, and verify live health.",
+  "context": "MacBook Codex pushed a change that desktop Hermes must apply on the live service.",
+  "expectedOutput": "Reply with HEAD, service status, /health fields, and /handoffs smoke result.",
+  "sourceThread": {"channelName": "second_memory", "threadName": "맥북코덱스소통채널"},
+  "status": "waiting_for_codex",
+  "tags": ["macbook-codex", "desktop-hermes", "mission-control"]
+}
+JSON
+```
+
+Record the returned `handoff-...` id.
+
+### 2) Notify the Discord thread
+
+Post a bounded instruction to `#second_memory / 맥북코덱스소통채널` after the operator approves the exact message or a clearly bounded summary.
+
+Include:
+
+- `[FROM: macbook-codex] [TO: desktop-hermes]`
+- the repo path
+- the target commit or branch
+- the exact command-level intent
+- expected evidence
+- the Mission Control handoff id
+
+If desktop Hermes replies before a draft is sent, delete the stale draft instead of sending it.
+
+### 3) Verify from MacBook
+
+After desktop replies, verify live state directly from MacBook:
+
+```bash
+curl -sS --max-time 8 "$MISSION_CONTROL_BASE_URL/health"
+curl -sS --max-time 8 "$MISSION_CONTROL_BASE_URL/handoffs?organizationId=org-smoke&limit=5" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
+```
+
+For the stable handoff inbox fix, the expected `/health` fields are:
+
+```text
+handoff_inbox: /home/yk/.local/state/physio-hermes-ops/mission_control/handoff_inbox.json
+handoff_inbox_legacy: /home/yk/physio-hermes-ops/.runtime/mission_control/handoff_inbox.json
+```
+
+### 4) Close the handoff
+
+Only close the handoff after MacBook verification succeeds.
+
+```bash
+curl -sS -X POST "$MISSION_CONTROL_BASE_URL/handoffs/<handoff-id>/status" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN" \
+  -d @- <<'JSON'
+{
+  "organizationId": "org-smoke",
+  "status": "done",
+  "result": "MacBook verified live /health and /handoffs after desktop Hermes applied the requested change."
+}
+JSON
+```
+
+Use `blocked` instead of `done` when desktop cannot apply the change, and include the concrete blocker in `result`.
+
+### Verified June 14, 2026 closeout
+
+- MacBook pushed `e26d5a5` to `origin/main`.
+- desktop Hermes pulled `main`, restarted `ops-control-api.service`, and reported active/running.
+- MacBook verified `http://100.83.147.56:8792/health`.
+- `/health` showed stable `handoff_inbox` under `/home/yk/.local/state/...`.
+- `/health` also exposed `handoff_inbox_legacy` under the canonical repo `.runtime` path.
+- Mission Control handoff `handoff-73664534-3a56-480e-9ea2-5b2870f9921e` was marked `done` after MacBook verification.
+
 ## Desktop Smoke
 
 Start the receiver on the desktop Hermes host:
