@@ -48,6 +48,79 @@ STREAM_LABELS = {
     "mem": "메모리/기록실",
 }
 
+TRACKED_EXTERNAL_AUTOMATIONS = [
+    {
+        "name": "mission-control-action-worker",
+        "purpose": "Execute bounded Mission Control desktop actions, including repo sync and smoke checks.",
+        "schedule": "systemd timer: every 60s",
+        "status": "active",
+        "mode": "systemd",
+        "output_type": "action_worker",
+        "surface": "desktop Hermes",
+        "source": "deploy/systemd/mission-control-action-worker.timer",
+        "criticality": "core",
+        "runtime_notes": [
+            "claims /mission-actions/next for desktop-hermes",
+            "status updates use retry and bounded action types",
+        ],
+    },
+    {
+        "name": "mission-control-discord-thread-ingest",
+        "purpose": "Poll the coordination Discord thread and ingest structured tasks into Mission Control.",
+        "schedule": "systemd timer",
+        "status": "active",
+        "mode": "systemd",
+        "output_type": "mission_control_ingest",
+        "surface": "desktop Hermes",
+        "source": "deploy/systemd/mission-control-discord-thread-ingest.timer",
+        "criticality": "core",
+    },
+    {
+        "name": "macbook-second-brain-safe-pull",
+        "purpose": "Pull second-brain into the MacBook checkout twice daily when the tree is clean.",
+        "schedule": "LaunchAgent: 10:00, 18:00",
+        "status": "active",
+        "mode": "launchagent",
+        "output_type": "sync_watchdog",
+        "surface": "MacBook",
+        "source": "com.youngkwon.second-brain-safe-pull",
+        "criticality": "support",
+    },
+    {
+        "name": "macbook-zotero-snapshot-sync",
+        "purpose": "Export MacBook Zotero local API snapshot and copy it to desktop for ingest fallback.",
+        "schedule": "LaunchAgent: 08:30 daily",
+        "status": "active",
+        "mode": "launchagent",
+        "output_type": "zotero_snapshot",
+        "surface": "MacBook",
+        "source": "com.youngkwon.zotero-snapshot-sync",
+        "criticality": "support",
+    },
+    {
+        "name": "notion-brain-candidate-exporter",
+        "purpose": "Export Notion-derived candidate notes into second-brain candidate files.",
+        "schedule": "Hermes cron: 20 6 * * *",
+        "status": "active",
+        "mode": "script",
+        "output_type": "candidate_export",
+        "surface": "desktop Hermes",
+        "source": "desktop Hermes cron registry",
+        "criticality": "support",
+    },
+    {
+        "name": "second-brain-candidate-git-sync",
+        "purpose": "Push Notion candidate files from second-brain to GitHub using a safe sync path.",
+        "schedule": "Hermes cron: 35 6 * * *",
+        "status": "active",
+        "mode": "script",
+        "output_type": "candidate_git_sync",
+        "surface": "desktop Hermes",
+        "source": "desktop Hermes cron registry",
+        "criticality": "support",
+    },
+]
+
 
 def now_iso():
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -631,6 +704,99 @@ def build_thread_ops_profiles(events, discord_probe=None):
     }
 
 
+def automation_surface(job):
+    if job.get("surface"):
+        return job.get("surface")
+    label = normalize_text(job.get("deliver_label"))
+    notes = " ".join(str(item) for item in job.get("runtime_notes") or [])
+    if job.get("mode") == "launchagent":
+        return "MacBook"
+    if "desktop" in normalize_text(notes) or "discord" in label or label == "local-only":
+        return "desktop Hermes"
+    return "Hermes"
+
+
+def automation_health(job):
+    status = normalize_text(job.get("status"))
+    output_type = normalize_text(job.get("output_type"))
+    if status == "active":
+        return "watch" if output_type == "watchdog" or "watchdog" in normalize_text(job.get("name")) else "pass"
+    if status in {"needs_review", "paused", "blocked"}:
+        return "check"
+    return "idle"
+
+
+def automation_health_label(value):
+    return {
+        "pass": "정상",
+        "watch": "감시",
+        "check": "확인",
+        "idle": "대기",
+        "fail": "장애",
+    }.get(value, "대기")
+
+
+def build_automation_health():
+    cron_registry = read_yaml(CRON_REGISTRY_PATH, {})
+    jobs = cron_registry.get("jobs", []) if isinstance(cron_registry, dict) else []
+    combined = []
+    for job in jobs:
+        item = dict(job)
+        item.setdefault("source", "cron/registry/jobs.yaml")
+        item.setdefault("surface", automation_surface(item))
+        item.setdefault("criticality", "core" if item.get("output_type") in {"watchdog", "maintenance"} else "routine")
+        combined.append(item)
+    combined.extend(TRACKED_EXTERNAL_AUTOMATIONS)
+
+    items = []
+    for job in combined:
+        health = automation_health(job)
+        notes = job.get("runtime_notes") or []
+        if isinstance(notes, str):
+            notes = [notes]
+        items.append(
+            {
+                "id": normalize_key(job.get("name")),
+                "name": job.get("name"),
+                "purpose": job.get("purpose"),
+                "schedule": job.get("schedule"),
+                "status": job.get("status"),
+                "health": health,
+                "health_label": automation_health_label(health),
+                "mode": job.get("mode"),
+                "output_type": job.get("output_type"),
+                "surface": automation_surface(job),
+                "deliver_label": job.get("deliver_label"),
+                "source": job.get("source") or "cron/registry/jobs.yaml",
+                "criticality": job.get("criticality") or "routine",
+                "depends_on": job.get("depends_on") or [],
+                "notes": notes[:3],
+            }
+        )
+
+    order = {"fail": 0, "check": 1, "watch": 2, "pass": 3, "idle": 4}
+    items.sort(key=lambda item: (order.get(item["health"], 9), item.get("surface") or "", item.get("name") or ""))
+    counts = Counter(item["health"] for item in items)
+    surfaces = Counter(item.get("surface") or "unknown" for item in items)
+    return {
+        "generated_at": now_iso(),
+        "source": {
+            "cron_registry": str(CRON_REGISTRY_PATH.relative_to(ROOT)),
+            "external_tracking": "TRACKED_EXTERNAL_AUTOMATIONS",
+        },
+        "summary": {
+            "total": len(items),
+            "pass": counts.get("pass", 0),
+            "watch": counts.get("watch", 0),
+            "check": counts.get("check", 0),
+            "fail": counts.get("fail", 0),
+            "idle": counts.get("idle", 0),
+            "surfaces": dict(sorted(surfaces.items())),
+        },
+        "items": items,
+    }
+
+
 def build_kpis(events, latest_wave_id):
     counts = Counter(str(event.get("status") or "").upper() for event in events)
     avg_score = 0.0
@@ -724,6 +890,7 @@ def main():
     write_json(OUT_DIR / "feed.json", build_feed(events))
     write_json(OUT_DIR / "kpis.json", build_kpis(events, latest_wave_id))
     write_json(OUT_DIR / "thread_ops_profiles.json", build_thread_ops_profiles(events, discord_probe))
+    write_json(OUT_DIR / "automation_health.json", build_automation_health())
     print(str(OUT_DIR))
 
 

@@ -208,6 +208,66 @@
         font-weight: 800;
       }
 
+      .automation-panel {
+        grid-column: 1 / -1;
+        padding: 18px;
+      }
+
+      .automation-summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .automation-list {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .automation-card {
+        display: grid;
+        gap: 10px;
+        min-height: 150px;
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(98, 71, 39, 0.09);
+        background: rgba(255, 251, 244, 0.76);
+      }
+
+      .automation-card-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .automation-name {
+        font-family: "Sora", sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
+
+      .automation-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .health-watch {
+        color: #155b4e;
+        background: rgba(30, 119, 116, 0.12);
+        border-color: rgba(30, 119, 116, 0.22);
+      }
+
+      .health-idle {
+        color: #6c5d4e;
+        background: rgba(108, 93, 78, 0.1);
+        border-color: rgba(108, 93, 78, 0.18);
+      }
+
       .layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 380px;
@@ -1030,6 +1090,10 @@
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
+        .automation-list {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
         .overview-grid {
           grid-template-columns: 1fr;
         }
@@ -1041,6 +1105,8 @@
         }
 
         .status-strip,
+        .automation-summary,
+        .automation-list,
         .cafe-strip,
         .stage-grid,
         .activity-lane,
@@ -1104,6 +1170,19 @@
             <div class="stat-label">평균 점수</div>
             <div class="stat-value" id="statScore">-</div>
           </article>
+        </section>
+
+        <section class="panel automation-panel">
+          <div class="panel-head">
+            <div>
+              <p class="section-eyebrow">Automation Health</p>
+              <h2>자동화 루프 상태</h2>
+              <p>desktop Hermes, MacBook LaunchAgent, second-brain/Zotero/Discord 루프를 한 화면에서 확인합니다.</p>
+            </div>
+            <span class="small-pill score-pill" id="automationGenerated">-</span>
+          </div>
+          <div class="automation-summary" id="automationSummary"></div>
+          <div class="automation-list" id="automationList"></div>
         </section>
       </section>
 
@@ -1300,6 +1379,7 @@
         helpQueue: [],
         showcase: [],
         feed: [],
+        automation: null,
         kpis: null,
         ops: null,
         selectedSeatId: null
@@ -1352,6 +1432,15 @@
         if (normalized === "FAIL") return "status-fail";
         if (normalized === "CHECK") return "status-check";
         return normalized === "PASSSTAR" ? "status-passstar" : "status-pass";
+      }
+
+      function healthClass(status) {
+        const normalized = String(status || "").toLowerCase();
+        if (normalized === "fail") return "status-fail";
+        if (normalized === "check") return "status-check";
+        if (normalized === "watch") return "health-watch";
+        if (normalized === "idle") return "health-idle";
+        return "status-pass";
       }
 
       function formatDate(value) {
@@ -1461,6 +1550,42 @@
         setText("passWaveCode", summary.latest_wave_id || "wave-");
         setText("passStatusBadge", ops.fsm ? ops.fsm.state : "OPEN");
         applyChangeHighlights();
+      }
+
+      function renderAutomationHealth() {
+        const summaryRoot = document.getElementById("automationSummary");
+        const listRoot = document.getElementById("automationList");
+        const model = appState.automation || { summary: {}, items: [] };
+        const summary = model.summary || {};
+        setText("automationGenerated", model.generated_at ? formatDate(model.generated_at) : "-");
+        summaryRoot.innerHTML = `
+          <div class="mini-box"><span class="muted">전체 루프</span><strong>${summary.total || 0}</strong></div>
+          <div class="mini-box"><span class="muted">정상</span><strong>${summary.pass || 0}</strong></div>
+          <div class="mini-box"><span class="muted">감시</span><strong>${summary.watch || 0}</strong></div>
+          <div class="mini-box"><span class="muted">확인</span><strong>${(summary.check || 0) + (summary.fail || 0)}</strong></div>
+        `;
+        const items = model.items || [];
+        if (!items.length) {
+          listRoot.innerHTML = `<div class="empty-state">자동화 상태 데이터가 아직 없습니다.</div>`;
+          return;
+        }
+        listRoot.innerHTML = items.slice(0, 12).map((item) => `
+          <article class="automation-card">
+            <div class="automation-card-head">
+              <div>
+                <div class="automation-name">${escapeHtml(item.name || "-")}</div>
+                <div class="muted">${escapeHtml(item.surface || "-")} · ${escapeHtml(item.mode || "-")}</div>
+              </div>
+              <span class="status-pill ${healthClass(item.health)}">${escapeHtml(item.health_label || item.health || "-")}</span>
+            </div>
+            <div class="muted">${escapeHtml(item.purpose || "-")}</div>
+            <div class="automation-meta">
+              <span class="small-pill score-pill">${escapeHtml(item.schedule || "-")}</span>
+              <span class="small-pill ${healthClass(item.health)}">${escapeHtml(item.status || "-")}</span>
+              <span class="small-pill score-pill">${escapeHtml(item.output_type || "loop")}</span>
+            </div>
+          </article>
+        `).join("");
       }
 
       function renderRooms() {
@@ -2040,14 +2165,15 @@
         if (isBooting) return;
         isBooting = true;
         try {
-          const [rooms, seats, helpQueue, showcase, feed, kpis, ops] = await Promise.all([
+          const [rooms, seats, helpQueue, showcase, feed, kpis, ops, automation] = await Promise.all([
             fetchJson("rooms.json"),
             fetchJson("seats.json"),
             fetchJson("help_queue.json"),
             fetchJson("showcase.json"),
             fetchJson("feed.json"),
             fetchJson("kpis.json"),
-            fetchJson("ops_snapshot.json")
+            fetchJson("ops_snapshot.json"),
+            fetchJson("automation_health.json")
           ]);
           appState.rooms = rooms.items || [];
           appState.seats = seats.items || [];
@@ -2056,11 +2182,13 @@
           appState.feed = feed.items || [];
           appState.kpis = kpis;
           appState.ops = ops;
+          appState.automation = automation;
           updateChangedKeys();
           if (!appState.selectedSeatId && appState.seats[0]) {
             appState.selectedSeatId = appState.seats[0].seat_id;
           }
           renderTopbar();
+          renderAutomationHealth();
           renderRoomDirectory();
           renderWorkshopMap();
           renderRooms();
