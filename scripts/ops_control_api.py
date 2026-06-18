@@ -440,7 +440,7 @@ def build_knowledge_graph(limit=50):
 HANDOFF_STATUSES = {"waiting_for_codex", "in_progress", "needs_reply", "done", "blocked"}
 MISSION_ITEM_STATUSES = {"backlog", "ready", "assigned", "in_progress", "needs_review", "blocked", "done"}
 MISSION_ACTION_STATUSES = {"queued", "running", "done", "failed", "blocked", "cancelled"}
-MISSION_ACTION_TYPES = {"desktop_repo_sync_restart_smoke"}
+MISSION_ACTION_TYPES = {"desktop_hermes_prompt", "desktop_repo_sync_restart_smoke"}
 
 
 def base_handoff_inbox_state():

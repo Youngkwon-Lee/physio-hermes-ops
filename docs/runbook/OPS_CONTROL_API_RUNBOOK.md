@@ -108,6 +108,7 @@ curl -s -X POST http://127.0.0.1:8788/action \
 
 현재 허용 action type:
 - `desktop_repo_sync_restart_smoke`: canonical repo에서 `git pull --ff-only`, `ops-control-api.service` restart, smoke endpoint 검증
+- `desktop_hermes_prompt`: desktop worker가 로컬 `hermes -z`로 bounded prompt를 실행하고 결과를 action status에 기록
 
 systemd(user) worker 활성화:
 ```bash
@@ -162,6 +163,30 @@ curl -sS -X POST http://100.83.147.56:8792/mission-actions \
 ```bash
 curl -sS "http://100.83.147.56:8792/mission-actions?organizationId=org-smoke&limit=5" \
   -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
+```
+
+Desktop Hermes prompt action 예시:
+```bash
+curl -sS -X POST http://100.83.147.56:8792/mission-actions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN" \
+  -d '{
+    "organizationId": "org-smoke",
+    "actionType": "desktop_hermes_prompt",
+    "title": "Ask desktop Hermes to summarize runtime status",
+    "target": {"agent": "desktop-hermes", "surface": "hermes-gateway", "host": "desktop-wsl"},
+    "priority": 20,
+    "params": {
+      "cwd": "/home/yk/physio-hermes-ops",
+      "timeoutSec": 600,
+      "prompt": "현재 desktop Hermes 상태를 5줄 이내로 요약하고 다음 조치 1개를 제안해."
+    },
+    "sourceThread": {
+      "channelName": "second_memory",
+      "threadName": "맥북코덱스소통채널",
+      "threadId": "1515296585410416931"
+    }
+  }'
 ```
 
 ## 6-4) Discord/Hermes 회의 요약 -> Mission Control
