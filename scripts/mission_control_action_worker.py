@@ -95,8 +95,8 @@ def run_cmd(cmd: list[str], cwd: Path | None = None, timeout_sec: int = 180) -> 
         }
 
 
-def smoke_url(url: str, token: str | None) -> dict[str, Any]:
-    status, body = request_json(url, token, timeout_sec=8)
+def smoke_url(url: str, token: str | None, timeout_sec: int = 30) -> dict[str, Any]:
+    status, body = request_json(url, token, timeout_sec=timeout_sec)
     return {
         "url": url,
         "status": status,
@@ -202,6 +202,7 @@ def execute_repo_sync_restart_smoke(action: dict[str, Any], token: str | None) -
     service_name = str(params.get("serviceName") or "ops-control-api.service")
     expected_head = str(params.get("expectedHead") or "").strip()
     smoke_base_url = str(params.get("smokeBaseUrl") or "http://127.0.0.1:8792").rstrip("/")
+    smoke_timeout_sec = bounded_timeout(params.get("smokeTimeoutSec"), default=30)
     smoke_paths = params.get("smokePaths")
     if not isinstance(smoke_paths, list) or not smoke_paths:
         smoke_paths = [
@@ -238,7 +239,7 @@ def execute_repo_sync_restart_smoke(action: dict[str, Any], token: str | None) -
 
     command_ok = all(item.get("exitCode") == 0 for item in results)
     time.sleep(float(params.get("restartDelaySec") or 1.0))
-    smoke = [smoke_url(f"{smoke_base_url}{path}", token) for path in smoke_paths]
+    smoke = [smoke_url(f"{smoke_base_url}{path}", token, timeout_sec=smoke_timeout_sec) for path in smoke_paths]
     smoke_ok = all(item["ok"] for item in smoke)
 
     return {
@@ -247,6 +248,7 @@ def execute_repo_sync_restart_smoke(action: dict[str, Any], token: str | None) -
         "remote": remote,
         "branch": branch,
         "serviceName": service_name,
+        "smokeTimeoutSec": smoke_timeout_sec,
         "commands": results,
         "smoke": smoke,
     }
