@@ -27,7 +27,13 @@ def first_env(*names: str) -> str | None:
     return None
 
 
-def request_json(url: str, token: str | None, method: str = "GET", payload: dict[str, Any] | None = None) -> tuple[int, dict[str, Any] | str]:
+def request_json(
+    url: str,
+    token: str | None,
+    method: str = "GET",
+    payload: dict[str, Any] | None = None,
+    timeout_sec: int = 10,
+) -> tuple[int, dict[str, Any] | str]:
     headers = {"Accept": "application/json"}
     data = None
     if token:
@@ -38,7 +44,7 @@ def request_json(url: str, token: str | None, method: str = "GET", payload: dict
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = Request(url, headers=headers, data=data, method=method)
     try:
-        with urlopen(request, timeout=10) as response:
+        with urlopen(request, timeout=timeout_sec) as response:
             body = response.read().decode("utf-8", errors="replace")
             try:
                 return response.status, json.loads(body) if body else {}
@@ -50,8 +56,12 @@ def request_json(url: str, token: str | None, method: str = "GET", payload: dict
             return error.code, json.loads(body) if body else {}
         except json.JSONDecodeError:
             return error.code, body
+    except TimeoutError as error:
+        return 0, f"timeout: {error}"
     except URLError as error:
         return 0, str(error.reason)
+    except OSError as error:
+        return 0, f"{type(error).__name__}: {error}"
 
 
 def compact(value: str, limit: int = 4000) -> str:
@@ -86,7 +96,7 @@ def run_cmd(cmd: list[str], cwd: Path | None = None, timeout_sec: int = 180) -> 
 
 
 def smoke_url(url: str, token: str | None) -> dict[str, Any]:
-    status, body = request_json(url, token)
+    status, body = request_json(url, token, timeout_sec=8)
     return {
         "url": url,
         "status": status,
@@ -200,7 +210,7 @@ def execute_repo_sync_restart_smoke(action: dict[str, Any], token: str | None) -
             "/tasks?organizationId=org-smoke",
             "/tasks/next?organizationId=org-smoke",
             "/snapshot?organizationId=org-smoke",
-            "/mission-actions?organizationId=org-smoke",
+            "/mission-actions?organizationId=org-smoke&limit=1",
         ]
 
     commands = [
@@ -257,6 +267,25 @@ def mark_status(base_url: str, token: str | None, organization_id: str, action_i
     )
 
 
+def mark_status_with_retry(
+    base_url: str,
+    token: str | None,
+    organization_id: str,
+    action_id: str,
+    status: str,
+    result: dict[str, Any],
+    attempts: int = 6,
+) -> tuple[int, dict[str, Any] | str]:
+    last_status: int = 0
+    last_body: dict[str, Any] | str = "not attempted"
+    for attempt in range(attempts):
+        last_status, last_body = mark_status(base_url, token, organization_id, action_id, status, result)
+        if last_status == 200:
+            return last_status, last_body
+        time.sleep(min(2**attempt, 10))
+    return last_status, last_body
+
+
 def run_once(args: argparse.Namespace) -> int:
     base_url = args.base_url.rstrip("/")
     query = {
@@ -279,7 +308,7 @@ def run_once(args: argparse.Namespace) -> int:
     action_type = str(action.get("actionType") or "")
     if action_type not in ALLOWED_ACTION_TYPES:
         result = {"ok": False, "error": "unsupported_action_type", "actionType": action_type}
-        mark_status(base_url, args.token, args.organization_id, action_id, "blocked", result)
+        mark_status_with_retry(base_url, args.token, args.organization_id, action_id, "blocked", result)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 1
 
@@ -305,7 +334,7 @@ def run_once(args: argparse.Namespace) -> int:
         result = {"ok": False, "error": f"{type(error).__name__}: {error}"}
 
     final_status = "done" if result.get("ok") else "failed"
-    update_status, update_body = mark_status(base_url, args.token, args.organization_id, action_id, final_status, result)
+    update_status, update_body = mark_status_with_retry(base_url, args.token, args.organization_id, action_id, final_status, result)
     output = {
         "ok": result.get("ok") is True and update_status == 200,
         "actionId": action_id,

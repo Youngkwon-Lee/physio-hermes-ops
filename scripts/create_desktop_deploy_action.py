@@ -19,7 +19,7 @@ DEFAULT_SMOKE_PATHS = [
     "/tasks?organizationId=org-smoke",
     "/tasks/next?organizationId=org-smoke",
     "/snapshot?organizationId=org-smoke",
-    "/mission-actions?organizationId=org-smoke",
+    "/mission-actions?organizationId=org-smoke&limit=1",
 ]
 
 
