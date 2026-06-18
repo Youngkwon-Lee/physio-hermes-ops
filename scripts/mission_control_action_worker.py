@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -15,7 +16,7 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED_ACTION_TYPES = {"desktop_repo_sync_restart_smoke"}
+ALLOWED_ACTION_TYPES = {"desktop_hermes_prompt", "desktop_repo_sync_restart_smoke"}
 
 
 def first_env(*names: str) -> str | None:
@@ -102,6 +103,85 @@ def safe_repo_path(value: str | None) -> Path:
     if not (resolved / ".git").exists():
         raise ValueError(f"repoPath is not a git worktree: {resolved}")
     return resolved
+
+
+def safe_cwd(value: str | None) -> Path:
+    path = Path(value or Path.home()).expanduser()
+    resolved = path.resolve()
+    home = Path.home().resolve()
+    if resolved != home and home not in resolved.parents:
+        raise ValueError(f"cwd must be under {home}, got {resolved}")
+    if not resolved.exists() or not resolved.is_dir():
+        raise ValueError(f"cwd is not a directory: {resolved}")
+    return resolved
+
+
+def bounded_timeout(value: Any, default: int = 600) -> int:
+    try:
+        timeout_sec = int(value)
+    except Exception:
+        timeout_sec = default
+    return max(30, min(timeout_sec, 1800))
+
+
+def resolve_hermes_bin(value: Any) -> str:
+    requested = str(value or "").strip()
+    env_requested = first_env("HERMES_CLI", "HERMES_BIN")
+    candidates: list[str] = []
+    if requested:
+        candidates.append(requested)
+    elif env_requested:
+        candidates.append(env_requested)
+    candidates.extend(
+        [
+            "hermes",
+            str(Path.home() / ".local/bin/hermes"),
+            "/home/yk/.local/bin/hermes",
+            "/usr/local/bin/hermes",
+            "/opt/homebrew/bin/hermes",
+        ]
+    )
+
+    checked: list[str] = []
+    for candidate in candidates:
+        if not candidate or candidate in checked:
+            continue
+        checked.append(candidate)
+        if "/" not in candidate:
+            found = shutil.which(candidate)
+            if found:
+                return found
+            continue
+        path = Path(candidate).expanduser()
+        if path.is_file() and os.access(path, os.X_OK):
+            return str(path)
+
+    raise FileNotFoundError(
+        "Hermes CLI not found; set params.hermesBin or HERMES_CLI/HERMES_BIN. "
+        f"Checked: {', '.join(checked)}"
+    )
+
+
+def execute_desktop_hermes_prompt(action: dict[str, Any]) -> dict[str, Any]:
+    params = action.get("params") if isinstance(action.get("params"), dict) else {}
+    prompt = str(params.get("prompt") or "").strip()
+    if not prompt:
+        raise ValueError("params.prompt is required")
+    if len(prompt) > 8000:
+        raise ValueError("params.prompt must be 8000 characters or fewer")
+
+    cwd = safe_cwd(params.get("cwd"))
+    timeout_sec = bounded_timeout(params.get("timeoutSec"))
+    hermes_bin = resolve_hermes_bin(params.get("hermesBin"))
+    command = [hermes_bin, "-z", prompt]
+    result = run_cmd(command, cwd=cwd, timeout_sec=timeout_sec)
+    return {
+        "ok": result.get("exitCode") == 0,
+        "cwd": str(cwd),
+        "timeoutSec": timeout_sec,
+        "promptPreview": compact(prompt, 500),
+        "command": result,
+    }
 
 
 def execute_repo_sync_restart_smoke(action: dict[str, Any], token: str | None) -> dict[str, Any]:
@@ -215,7 +295,12 @@ def run_once(args: argparse.Namespace) -> int:
 
     claimed = claim_body.get("item") or claim_body.get("data") or action
     try:
-        result = execute_repo_sync_restart_smoke(claimed, args.token)
+        if action_type == "desktop_repo_sync_restart_smoke":
+            result = execute_repo_sync_restart_smoke(claimed, args.token)
+        elif action_type == "desktop_hermes_prompt":
+            result = execute_desktop_hermes_prompt(claimed)
+        else:
+            result = {"ok": False, "error": "unsupported_action_type", "actionType": action_type}
     except Exception as error:
         result = {"ok": False, "error": f"{type(error).__name__}: {error}"}
 
