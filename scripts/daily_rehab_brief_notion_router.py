@@ -48,6 +48,19 @@ def split_multi(value: Any, default: list[str] | None = None) -> list[str]:
     return items or (default or [])
 
 
+def parse_optional_float(value: Any, default: float = 0.0) -> float:
+    text = q(value)
+    if not text:
+        return default
+    normalized = text.replace(",", "").strip().lower()
+    if normalized in {"n/a", "na", "none", "null", "-", "--", "unknown"}:
+        return default
+    try:
+        return float(normalized)
+    except ValueError:
+        return default
+
+
 def load_env() -> None:
     for env_path in ENV_CANDIDATES:
         path = Path(env_path)
@@ -169,7 +182,7 @@ def build_paper_properties(item: dict[str, Any]) -> dict[str, Any]:
         "발행일": {"date": {"start": q(item.get("published") or item.get("date"))}},
         "요약": {"rich_text": [{"text": {"content": q(item.get("summary"))[:1900]}}]},
         "핵심기여(1문장)": {"rich_text": [{"text": {"content": q(item.get("contribution"))[:1900]}}]},
-        "IF": {"number": float(item.get("if", 0) or 0)},
+        "IF": {"number": parse_optional_float(item.get("if"), 0.0)},
         "분기": {"select": {"name": q(item.get("quarter")) or "2026Q2"}},
         "카테고리": {"select": {"name": q(item.get("category")) or "논문/연구"}},
         "근거수준": {"select": {"name": q(item.get("evidence")) or "리뷰"}},
