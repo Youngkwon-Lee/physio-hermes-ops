@@ -163,6 +163,9 @@ curl -sS -X POST http://100.83.147.56:8792/mission-actions \
 ```bash
 curl -sS "http://100.83.147.56:8792/mission-actions?organizationId=org-smoke&limit=5" \
   -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
+
+curl -sS "http://100.83.147.56:8792/mission-actions/<action-id>?organizationId=org-smoke" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN"
 ```
 
 Desktop Hermes prompt action 예시:

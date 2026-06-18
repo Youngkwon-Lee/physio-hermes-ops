@@ -734,6 +734,17 @@ def list_mission_action_items(organization_id, limit=20, status=None, target_age
     return items[: max(1, limit)]
 
 
+def get_mission_action_item(organization_id, action_id):
+    state = load_handoff_inbox_state()
+    rows = state.get("actionsByOrg", {}).get(organization_id, [])
+    if not isinstance(rows, list):
+        return None
+    for item in rows:
+        if isinstance(item, dict) and item.get("id") == action_id:
+            return item
+    return None
+
+
 def next_mission_action_item(organization_id, target_agent=None, target_host=None):
     candidates = list_mission_action_items(
         organization_id,
@@ -999,6 +1010,19 @@ class Handler(BaseHTTPRequestHandler):
             target_agent = (params.get("targetAgent") or [""])[0].strip() or None
             target_host = (params.get("targetHost") or [""])[0].strip() or None
             item = next_mission_action_item(organization_id, target_agent=target_agent, target_host=target_host)
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/mission-actions/") and len(parsed.path.split("/")) == 3:
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            action_id = parsed.path.split("/")[2]
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            item = get_mission_action_item(organization_id, action_id)
+            if item is None:
+                return self._json(404, {"ok": False, "error": "mission_action_not_found"})
             return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
 
         if parsed.path == "/mission-actions":
