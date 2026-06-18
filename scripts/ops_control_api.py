@@ -454,24 +454,52 @@ def base_handoff_inbox_state():
     }
 
 
+def ensure_handoff_inbox_shape(state):
+    if not isinstance(state, dict):
+        state = base_handoff_inbox_state()
+    for key in ("handoffsByOrg", "plansByOrg", "tasksByOrg", "actionsByOrg"):
+        if not isinstance(state.get(key), dict):
+            state[key] = {}
+    return state
+
+
+def merge_mission_rows(current_rows, legacy_rows):
+    merged = {}
+    for row in list(legacy_rows or []) + list(current_rows or []):
+        if not isinstance(row, dict):
+            continue
+        row_id = str(row.get("id") or "").strip()
+        if not row_id:
+            continue
+        previous = merged.get(row_id)
+        if previous is None or str(row.get("updatedAt") or row.get("createdAt") or "") >= str(previous.get("updatedAt") or previous.get("createdAt") or ""):
+            merged[row_id] = row
+    return list(merged.values())
+
+
+def merge_handoff_inbox_state(current, legacy):
+    current = ensure_handoff_inbox_shape(current)
+    legacy = ensure_handoff_inbox_shape(legacy)
+    for key in ("handoffsByOrg", "plansByOrg", "tasksByOrg", "actionsByOrg"):
+        org_ids = set(current.get(key, {})) | set(legacy.get(key, {}))
+        for organization_id in org_ids:
+            current[key][organization_id] = merge_mission_rows(
+                current.get(key, {}).get(organization_id, []),
+                legacy.get(key, {}).get(organization_id, []),
+            )
+    return current
+
+
 def load_handoff_inbox_state():
     state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state()) if HANDOFF_INBOX_PATH.exists() else None
-    if state is None and HANDOFF_INBOX_PATH != LEGACY_HANDOFF_INBOX_PATH:
+    if HANDOFF_INBOX_PATH != LEGACY_HANDOFF_INBOX_PATH:
         legacy_state = read_json(LEGACY_HANDOFF_INBOX_PATH, None)
         if isinstance(legacy_state, dict):
-            state = legacy_state
+            state = merge_handoff_inbox_state(state, legacy_state)
             write_json(HANDOFF_INBOX_PATH, state)
     if not isinstance(state, dict):
         return base_handoff_inbox_state()
-    if not isinstance(state.get("handoffsByOrg"), dict):
-        state["handoffsByOrg"] = {}
-    if not isinstance(state.get("plansByOrg"), dict):
-        state["plansByOrg"] = {}
-    if not isinstance(state.get("tasksByOrg"), dict):
-        state["tasksByOrg"] = {}
-    if not isinstance(state.get("actionsByOrg"), dict):
-        state["actionsByOrg"] = {}
-    return state
+    return ensure_handoff_inbox_shape(state)
 
 
 def save_handoff_inbox_state(state):

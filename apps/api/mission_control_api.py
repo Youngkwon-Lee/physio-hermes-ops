@@ -504,18 +504,50 @@ def base_handoff_inbox_state() -> dict[str, Any]:
     }
 
 
-def load_handoff_inbox_state() -> dict[str, Any]:
-    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state()) if HANDOFF_INBOX_PATH.exists() else None
-    if state is None and HANDOFF_INBOX_PATH != LEGACY_HANDOFF_INBOX_PATH:
-        legacy_state = read_json(LEGACY_HANDOFF_INBOX_PATH, None)
-        if isinstance(legacy_state, dict):
-            state = legacy_state
-            write_json(HANDOFF_INBOX_PATH, state)
+def ensure_handoff_inbox_shape(state: dict[str, Any] | None) -> dict[str, Any]:
     if not isinstance(state, dict):
-        return base_handoff_inbox_state()
+        state = base_handoff_inbox_state()
     if "handoffsByOrg" not in state or not isinstance(state["handoffsByOrg"], dict):
         state["handoffsByOrg"] = {}
     return state
+
+
+def merge_handoff_rows(current_rows: list[Any], legacy_rows: list[Any]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for row in list(legacy_rows or []) + list(current_rows or []):
+        if not isinstance(row, dict):
+            continue
+        row_id = str(row.get("id") or "").strip()
+        if not row_id:
+            continue
+        previous = merged.get(row_id)
+        if previous is None or str(row.get("updatedAt") or row.get("createdAt") or "") >= str(previous.get("updatedAt") or previous.get("createdAt") or ""):
+            merged[row_id] = row
+    return list(merged.values())
+
+
+def merge_handoff_inbox_state(current: dict[str, Any] | None, legacy: dict[str, Any]) -> dict[str, Any]:
+    current = ensure_handoff_inbox_shape(current)
+    legacy = ensure_handoff_inbox_shape(legacy)
+    org_ids = set(current["handoffsByOrg"]) | set(legacy["handoffsByOrg"])
+    for organization_id in org_ids:
+        current["handoffsByOrg"][organization_id] = merge_handoff_rows(
+            current["handoffsByOrg"].get(organization_id, []),
+            legacy["handoffsByOrg"].get(organization_id, []),
+        )
+    return current
+
+
+def load_handoff_inbox_state() -> dict[str, Any]:
+    state = read_json(HANDOFF_INBOX_PATH, base_handoff_inbox_state()) if HANDOFF_INBOX_PATH.exists() else None
+    if HANDOFF_INBOX_PATH != LEGACY_HANDOFF_INBOX_PATH:
+        legacy_state = read_json(LEGACY_HANDOFF_INBOX_PATH, None)
+        if isinstance(legacy_state, dict):
+            state = merge_handoff_inbox_state(state, legacy_state)
+            write_json(HANDOFF_INBOX_PATH, state)
+    if not isinstance(state, dict):
+        return base_handoff_inbox_state()
+    return ensure_handoff_inbox_shape(state)
 
 
 def save_handoff_inbox_state(state: dict[str, Any]) -> None:
