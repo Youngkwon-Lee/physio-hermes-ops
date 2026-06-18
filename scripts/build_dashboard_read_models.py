@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:
+    yaml = None
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +56,11 @@ def now_iso():
 def parse_args():
     parser = argparse.ArgumentParser(description="Build dashboard read-model JSON files.")
     parser.add_argument("--event-limit", type=int, default=200, help="How many recent events to read")
+    parser.add_argument(
+        "--probe-discord",
+        action="store_true",
+        help="Call Discord API to count actual bot users in thread membership.",
+    )
     return parser.parse_args()
 
 
@@ -75,9 +88,166 @@ def read_jsonl(path: Path):
 
 def read_yaml(path: Path, default):
     try:
+        if yaml is None:
+            return read_jobs_yaml_fallback(path, default)
         return yaml.safe_load(path.read_text(encoding="utf-8")) or default
     except Exception:
         return default
+
+
+def parse_scalar(value):
+    value = value.strip()
+    if not value:
+        return ""
+    if value.startswith("[") and value.endswith("]"):
+        inner = value[1:-1].strip()
+        if not inner:
+            return []
+        return [parse_scalar(part) for part in inner.split(",")]
+    if value in {"true", "false"}:
+        return value == "true"
+    if value in {"null", "None"}:
+        return None
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        return value[1:-1]
+    return value
+
+
+def read_jobs_yaml_fallback(path: Path, default):
+    jobs = []
+    current = None
+    active_list_key = None
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped == "jobs:":
+            continue
+        if line.startswith("  - name:"):
+            if current:
+                jobs.append(current)
+            current = {"name": parse_scalar(line.split(":", 1)[1])}
+            active_list_key = None
+            continue
+        if current is None:
+            continue
+        if line.startswith("    - ") and active_list_key:
+            current.setdefault(active_list_key, []).append(parse_scalar(stripped[2:]))
+            continue
+        if not line.startswith("    ") or line.startswith("      "):
+            continue
+        key, sep, value = stripped.partition(":")
+        if not sep:
+            continue
+        value = value.strip()
+        if not value:
+            current[key] = []
+            active_list_key = key
+            continue
+        current[key] = parse_scalar(value)
+        active_list_key = None
+    if current:
+        jobs.append(current)
+    return {"jobs": jobs} if jobs else default
+
+
+def extract_snowflake(value):
+    match = re.search(r"\d{17,20}", str(value or ""))
+    return match.group(0) if match else None
+
+
+class DiscordThreadBotProbe:
+    def __init__(self, enabled=False):
+        self.enabled = enabled
+        self.token = (
+            os.environ.get("HERMES_DISCORD_BOT_TOKEN")
+            or os.environ.get("DISCORD_BOT_TOKEN")
+            or ""
+        ).strip()
+        self.cache = {}
+
+    def inspect_channel(self, channel):
+        channel_id = extract_snowflake(channel.get("id"))
+        if not self.enabled:
+            return {
+                "source": "not_checked",
+                "status": "disabled",
+                "count": None,
+                "names": [],
+                "checked_at": None,
+            }
+        if not self.token:
+            return {
+                "source": "discord_api",
+                "status": "missing_token",
+                "count": None,
+                "names": [],
+                "checked_at": now_iso(),
+            }
+        if not channel_id:
+            return {
+                "source": "discord_api",
+                "status": "missing_channel_id",
+                "count": None,
+                "names": [],
+                "checked_at": now_iso(),
+            }
+        if channel_id in self.cache:
+            return self.cache[channel_id]
+
+        query = urllib.parse.urlencode({"with_member": "true", "limit": "100"})
+        url = f"https://discord.com/api/v10/channels/{channel_id}/thread-members?{query}"
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Authorization": f"Bot {self.token}",
+                "User-Agent": "physio-hermes-ops/0.1",
+            },
+            method="GET",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                members = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            payload = {
+                "source": "discord_api",
+                "status": f"http_{exc.code}",
+                "count": None,
+                "names": [],
+                "checked_at": now_iso(),
+            }
+            self.cache[channel_id] = payload
+            return payload
+        except Exception:
+            payload = {
+                "source": "discord_api",
+                "status": "request_failed",
+                "count": None,
+                "names": [],
+                "checked_at": now_iso(),
+            }
+            self.cache[channel_id] = payload
+            return payload
+
+        bot_names = []
+        for thread_member in members if isinstance(members, list) else []:
+            member = thread_member.get("member") or {}
+            user = member.get("user") or {}
+            if not user.get("bot"):
+                continue
+            bot_names.append(user.get("global_name") or user.get("username") or user.get("id"))
+
+        payload = {
+            "source": "discord_api",
+            "status": "ok",
+            "count": len(bot_names),
+            "names": bot_names,
+            "checked_at": now_iso(),
+        }
+        self.cache[channel_id] = payload
+        return payload
 
 
 def parse_ts(value):
@@ -350,9 +520,10 @@ def delivery_matches_channel(job, channel):
     return any(candidate and (candidate in label_key or label_key in candidate) for candidate in candidate_keys)
 
 
-def build_thread_ops_profiles(events):
+def build_thread_ops_profiles(events, discord_probe=None):
     registry = read_json(CHANNEL_REGISTRY_PATH, {})
     cron_registry = read_yaml(CRON_REGISTRY_PATH, {})
+    discord_probe = discord_probe or DiscordThreadBotProbe(enabled=False)
     channels = [
         item for item in registry.get("items", [])
         if item.get("active") and item.get("kind") in {"thread", "home", "local"}
@@ -408,6 +579,7 @@ def build_thread_ops_profiles(events):
             status = "active"
         else:
             status = "idle"
+        discord_bots = discord_probe.inspect_channel(channel)
 
         items.append(
             {
@@ -420,6 +592,7 @@ def build_thread_ops_profiles(events):
                 "status": status,
                 "status_label": {"active": "정상", "check": "확인", "idle": "대기"}.get(status, "대기"),
                 "summary": " · ".join(channel.get("purpose") or []) or "운영",
+                "discord_bots": discord_bots,
                 "cron_jobs": [
                     {
                         "name": job.get("name"),
@@ -541,6 +714,7 @@ def main():
     events = sort_events(read_jsonl(LINEAGE_DIR / "events.jsonl"))[-args.event_limit :]
     latest_wave_id = events[-1].get("wave_id") if events else None
     latest_by_profile = build_profile_snapshot(events)
+    discord_probe = DiscordThreadBotProbe(enabled=args.probe_discord)
 
     write_json(OUT_DIR / "rooms.json", build_rooms(latest_by_profile, latest_wave_id, args.event_limit))
     write_json(OUT_DIR / "seats.json", build_seats(latest_by_profile))
@@ -549,7 +723,7 @@ def main():
     write_json(OUT_DIR / "ops_snapshot.json", build_ops_snapshot(events))
     write_json(OUT_DIR / "feed.json", build_feed(events))
     write_json(OUT_DIR / "kpis.json", build_kpis(events, latest_wave_id))
-    write_json(OUT_DIR / "thread_ops_profiles.json", build_thread_ops_profiles(events))
+    write_json(OUT_DIR / "thread_ops_profiles.json", build_thread_ops_profiles(events, discord_probe))
     print(str(OUT_DIR))
 
 

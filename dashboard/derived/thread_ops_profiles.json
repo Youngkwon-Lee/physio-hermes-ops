@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-14T18:32:43+09:00",
+  "generated_at": "2026-06-18T20:34:20+09:00",
   "source": {
     "channel_registry": "dashboard/derived/channel_registry.json",
     "cron_registry": "cron/registry/jobs.yaml",
@@ -19,6 +19,13 @@
       "status": "check",
       "status_label": "확인",
       "summary": "ops · general",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "daily-calendar-mail-brief",
@@ -45,6 +52,14 @@
           "output_type": "recommendation"
         },
         {
+          "name": "weekly-zotero-literature-ingest",
+          "purpose": "Create missing second-brain Zotero literature source notes from a Zotero-capable always-on runtime.",
+          "schedule": "0 9 * * 1",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "maintenance"
+        },
+        {
           "name": "daily-conversation-curator",
           "purpose": "Curate long-term-value conversation items for memory and knowledge promotion.",
           "schedule": "0 23 * * *",
@@ -59,6 +74,14 @@
           "status": "active",
           "mode": "agent",
           "output_type": "digest"
+        },
+        {
+          "name": "second-brain-safe-sync-watchdog",
+          "purpose": "Keep the desktop second-brain checkout fresh without pulling over local ingest or Obsidian changes.",
+          "schedule": "every 30m",
+          "status": "active",
+          "mode": "script",
+          "output_type": "watchdog"
         },
         {
           "name": "hermes-ops-watchdog",
@@ -105,7 +128,22 @@
       "status": "active",
       "status_label": "정상",
       "summary": "memory · curation",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
+        {
+          "name": "weekly-zotero-literature-ingest",
+          "purpose": "Create missing second-brain Zotero literature source notes from a Zotero-capable always-on runtime.",
+          "schedule": "0 9 * * 1",
+          "status": "active",
+          "mode": "agent",
+          "output_type": "maintenance"
+        },
         {
           "name": "daily-conversation-curator",
           "purpose": "Curate long-term-value conversation items for memory and knowledge promotion.",
@@ -113,6 +151,14 @@
           "status": "active",
           "mode": "agent",
           "output_type": "curator"
+        },
+        {
+          "name": "second-brain-safe-sync-watchdog",
+          "purpose": "Keep the desktop second-brain checkout fresh without pulling over local ingest or Obsidian changes.",
+          "schedule": "every 30m",
+          "status": "active",
+          "mode": "script",
+          "output_type": "watchdog"
         },
         {
           "name": "hermes-ops-watchdog",
@@ -155,6 +201,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "digest · conversation",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "daily-discord-digest",
@@ -194,6 +247,13 @@
       "status": "idle",
       "status_label": "대기",
       "summary": "ops · codex · handoff",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [],
       "agents": [
         {
@@ -220,6 +280,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "calendar · mail · briefing",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "daily-calendar-mail-brief",
@@ -263,6 +330,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "clinical · calendar · home-rehab",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "home-rehab-morning-brief",
@@ -301,6 +375,13 @@
       "status": "check",
       "status_label": "확인",
       "summary": "personal · recommendation",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "home-rehab-lunch-recommendation",
@@ -336,6 +417,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "research · briefing · rehab",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "daily-rehab-ai-research-brief",
@@ -375,6 +463,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "business · kpi · db-ops",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "weekly-pt-kpi-brief",
@@ -414,6 +509,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "business · support-programs · daily-radar",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "biz-support-radar-daily",
@@ -453,6 +555,13 @@
       "status": "active",
       "status_label": "정상",
       "summary": "news · ai · briefing",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
         {
           "name": "daily-ai-news-briefing",
@@ -503,7 +612,22 @@
       "status": "active",
       "status_label": "정상",
       "summary": "ops · script-only",
+      "discord_bots": {
+        "source": "not_checked",
+        "status": "disabled",
+        "count": null,
+        "names": [],
+        "checked_at": null
+      },
       "cron_jobs": [
+        {
+          "name": "second-brain-zotero-literature-git-sync",
+          "purpose": "Push Zotero-generated second-brain literature notes to GitHub using a clean temporary clone.",
+          "schedule": "15 9 * * 1",
+          "status": "active",
+          "mode": "script",
+          "output_type": "maintenance"
+        },
         {
           "name": "calendar-auto-classify",
           "purpose": "Apply lightweight automated classification to calendar items.",
