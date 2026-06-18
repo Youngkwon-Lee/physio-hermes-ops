@@ -97,6 +97,39 @@ jobs:
     prompt_file: "cron/prompts/weekly-pt-kpi-brief.md"
     enabled_toolsets: [terminal, file]
 
+  - name: weekly-zotero-literature-ingest
+    purpose: Create missing second-brain Zotero literature source notes from a Zotero-capable always-on runtime.
+    schedule: "0 9 * * 1"
+    mode: agent
+    status: active
+    deliver_label: "discord/비서/장기기억 기록 도우미"
+    output_type: maintenance
+    prompt_file: "cron/prompts/weekly-zotero-literature-ingest.md"
+    enabled_toolsets: [terminal, file]
+    runtime_notes:
+      - installed on desktop Hermes as df985f8b88e3 on 2026-06-18
+      - should run on desktop Hermes or another always-on environment, not MacBook Codex local cron
+      - requires access to second-brain vault at /home/yk/brain or equivalent path alias
+      - current local implementation uses Zotero Desktop local API through /home/yk/.local/bin/codex-zotero.py
+      - Windows scheduled task CodexZoteroInteractive starts Zotero in the interactive desktop session when needed
+      - cloud deployment requires Zotero Web API adaptation
+
+  - name: second-brain-zotero-literature-git-sync
+    purpose: Push Zotero-generated second-brain literature notes to GitHub using a clean temporary clone.
+    schedule: "15 9 * * 1"
+    mode: script
+    status: active
+    deliver_label: "local-only"
+    output_type: maintenance
+    script_file: "cron/scripts/zotero_literature_git_sync.py"
+    depends_on:
+      - weekly-zotero-literature-ingest
+    runtime_notes:
+      - follows the existing Notion candidate git-sync pattern
+      - copies only /home/yk/brain/research/literature/*.md into a clean clone
+      - does not commit unrelated dirty files from /home/yk/brain
+      - emits no-change output when GitHub already has the same literature notes
+
   - name: biz-support-radar-daily
     purpose: Daily scan of startup/government support programs relevant to rehabilitation, healthcare AI, and adjacent startup opportunities.
     schedule: "0 9 * * *"
@@ -144,6 +177,20 @@ jobs:
     deliver_label: "local-only"
     output_type: watchdog
     script_file: "cron/scripts/ensure-kinelo-8888.sh"
+
+  - name: second-brain-safe-sync-watchdog
+    purpose: Keep the desktop second-brain checkout fresh without pulling over local ingest or Obsidian changes.
+    schedule: "every 30m"
+    mode: script
+    status: active
+    deliver_label: "discord/비서/장기기억 기록 도우미"
+    output_type: watchdog
+    script_file: "cron/scripts/second_brain_safe_sync.py"
+    runtime_notes:
+      - silent when the repo is clean and already up to date
+      - runs git fetch first, then pulls only when the working tree is clean and strictly behind upstream
+      - reports dirty, ahead, diverged, fetch failed, pull failed, or validation failed states without modifying files
+      - default repo path is /home/yk/brain; override with SECOND_BRAIN_DIR if needed
 
   - name: hermes-ops-watchdog
     purpose: Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.
