@@ -11,6 +11,11 @@ from pathlib import Path
 from threading import Lock
 from urllib.parse import parse_qs, urlparse
 
+try:
+    import hometax_codef_client as hometax_client
+except ImportError:  # pragma: no cover - module path fallback for tests/imports
+    from scripts import hometax_codef_client as hometax_client
+
 ROOT = Path(__file__).resolve().parents[1]
 HOST = os.getenv("OPS_CTL_HOST", "127.0.0.1")
 PORT = int(os.getenv("OPS_CTL_PORT", "8788"))
@@ -1115,12 +1120,24 @@ class Handler(BaseHTTPRequestHandler):
                 return
             return self._json(200, build_fsm_snapshot(20))
 
+        if self.path.startswith("/integrations/hometax/status"):
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            return self._json(200, hometax_client.credentials_status())
+
+        if self.path.startswith("/integrations/hometax/docs"):
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            return self._json(200, {"ok": True, "items": hometax_client.docs_catalog()})
+
         return self._json(404, {"ok": False, "error": "not_found"})
 
     def do_POST(self):
         auth_ctx = None
         parsed = urlparse(self.path)
-        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks", "/mission-actions"} or (
+        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks", "/mission-actions", "/integrations/hometax/fetch"} or (
             parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status")
         ) or (
             parsed.path.startswith("/plans/") and parsed.path.endswith("/status")
@@ -1405,6 +1422,67 @@ class Handler(BaseHTTPRequestHandler):
                 "wiki_path": str(wiki_path.relative_to(ROOT)),
                 "autogit": autogit,
             })
+
+        if parsed.path == "/integrations/hometax/fetch":
+            role = (auth_ctx or {}).get("role", "admin")
+            doc_type = str(data.get("doc_type", "")).strip()
+            identity = str(data.get("identity", "")).strip()
+            user_name = str(data.get("user_name", "")).strip()
+            login_type = str(data.get("login_type", "6")).strip() or "6"
+            year = str(data.get("year", "")).strip() or None
+            twoway_info = data.get("twoway_info") if isinstance(data.get("twoway_info"), dict) else None
+            dry_run = bool(data.get("dry_run", False))
+
+            if not doc_type or not identity or not user_name:
+                return self._json(400, {
+                    "ok": False,
+                    "error": "missing_required_fields",
+                    "required": ["doc_type", "identity", "user_name"],
+                })
+
+            try:
+                payload = hometax_client.fetch_hometax(
+                    doc_type=doc_type,
+                    identity=identity,
+                    user_name=user_name,
+                    login_type=login_type,
+                    year=year,
+                    twoway_info=twoway_info,
+                    dry_run=dry_run,
+                )
+            except ValueError as e:
+                return self._json(400, {"ok": False, "error": str(e)})
+            except Exception as e:
+                audit({
+                    "time": now(),
+                    "action": "hometax_fetch",
+                    "role": role,
+                    "ok": False,
+                    "doc_type": doc_type,
+                    "masked_identity": hometax_client.mask_identity(identity),
+                    "stage": "error",
+                    "error": str(e),
+                })
+                return self._json(500, {
+                    "ok": False,
+                    "provider": "codef",
+                    "stage": "error",
+                    "doc_type": doc_type,
+                    "masked_identity": hometax_client.mask_identity(identity),
+                    "error": str(e),
+                })
+
+            audit({
+                "time": now(),
+                "action": "hometax_fetch",
+                "role": role,
+                "ok": bool(payload.get("ok", False)),
+                "doc_type": doc_type,
+                "masked_identity": hometax_client.mask_identity(identity),
+                "stage": payload.get("stage"),
+                "dry_run": dry_run,
+            })
+            return self._json(200, payload)
 
         if parsed.path != "/action":
             return self._json(404, {"ok": False, "error": "not_found"})

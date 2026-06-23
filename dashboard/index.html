@@ -380,6 +380,32 @@
             </select>
           </div>
           <div class="mini">보안모드: API 토큰 필수(브라우저 localStorage 사용)</div>
+          <div class="card" style="margin-top:10px;padding:12px;background:#0f1726">
+            <div class="section-title" style="margin-bottom:8px">홈택스 MVP (민원증명 4종)</div>
+            <div class="mini" style="margin-bottom:10px">CODEF BYOK 필요 · 전자세금계산서/현금영수증은 후속 단계</div>
+            <div class="row g-2" style="margin-bottom:8px">
+              <div class="col-12 col-md-4"><select class="form-select" id="hometax-doc-type">
+                <option value="biz_reg_proof">사업자등록증명</option>
+                <option value="income_proof">소득금액증명</option>
+                <option value="tax_clearance">납세증명</option>
+                <option value="vat_base_proof">부가가치세 과세표준증명</option>
+              </select></div>
+              <div class="col-12 col-md-4"><input class="form-control" id="hometax-user-name" placeholder="이름 / 상호 담당자" value="홍길동" /></div>
+              <div class="col-12 col-md-4"><input class="form-control" id="hometax-identity" placeholder="주민/사업자번호" value="1234567890" /></div>
+              <div class="col-12 col-md-4"><input class="form-control" id="hometax-year" placeholder="귀속연도(선택)" /></div>
+              <div class="col-12 col-md-4"><select class="form-select" id="hometax-login-type">
+                <option value="6">간편인증(기본)</option>
+                <option value="5">공동인증서</option>
+                <option value="1">ID/PW</option>
+              </select></div>
+            </div>
+            <div class="actions d-flex flex-wrap gap-2 align-items-center">
+              <button class="btn btn-outline-light" id="hometax-check-status">연동 상태</button>
+              <button class="btn btn-outline-light" id="hometax-check-docs">지원 문서</button>
+              <button class="btn btn-outline-light" id="hometax-dry-run">dry-run</button>
+            </div>
+            <div class="cmdbox" id="hometax-feedback">홈택스: 준비됨</div>
+          </div>
           <div class="cmdbox" id="action-feedback">작업: 준비됨</div>
         </div>
       </section>
@@ -1765,6 +1791,71 @@
       await loadMissionControl();
     }
 
+    function setHometaxFeedback(msg){
+      const el = document.getElementById('hometax-feedback');
+      if(el) el.textContent = msg;
+    }
+
+    function hometaxInputPayload(){
+      return {
+        doc_type: document.getElementById('hometax-doc-type')?.value || 'biz_reg_proof',
+        user_name: (document.getElementById('hometax-user-name')?.value || '').trim(),
+        identity: (document.getElementById('hometax-identity')?.value || '').trim(),
+        year: (document.getElementById('hometax-year')?.value || '').trim(),
+        login_type: document.getElementById('hometax-login-type')?.value || '6',
+      };
+    }
+
+    async function fetchHometaxStatus(){
+      const headers = {};
+      if(OPS_API.readToken) headers['Authorization'] = `Bearer ${OPS_API.readToken}`;
+      const res = await fetch(`${OPS_API.baseUrl}/integrations/hometax/status`, {cache:'no-store', headers});
+      const payload = await res.json().catch(()=>({}));
+      if(!res.ok || payload.ok === false) throw new Error(payload.error || `status ${res.status}`);
+      setHometaxFeedback(
+        `status: configured=${payload.configured ? 'yes' : 'no'} sandbox=${payload.sandbox ? '1' : '0'}\n` +
+        `env=${payload.env_file || '-'}\n` +
+        `docs=${(payload.available_doc_types || []).join(', ')}`
+      );
+    }
+
+    async function fetchHometaxDocs(){
+      const headers = {};
+      if(OPS_API.readToken) headers['Authorization'] = `Bearer ${OPS_API.readToken}`;
+      const res = await fetch(`${OPS_API.baseUrl}/integrations/hometax/docs`, {cache:'no-store', headers});
+      const payload = await res.json().catch(()=>({}));
+      if(!res.ok || payload.ok === false) throw new Error(payload.error || `status ${res.status}`);
+      const items = payload.items || [];
+      setHometaxFeedback(items.length
+        ? items.map(item => `- ${item.doc_type}: ${item.label}${item.requires_year ? ' (연도 필요)' : ''}`).join('\n')
+        : '지원 문서 없음');
+    }
+
+    async function runHometaxDryRun(){
+      const input = hometaxInputPayload();
+      if(!input.doc_type || !input.user_name || !input.identity){
+        throw new Error('doc_type / user_name / identity 입력 필요');
+      }
+      const headers = {'Content-Type':'application/json'};
+      const execToken = OPS_API.execRoleMode === 'admin' ? OPS_API.execAdminToken : OPS_API.execOperatorToken;
+      if(execToken) headers['Authorization'] = `Bearer ${execToken}`;
+      const res = await fetch(`${OPS_API.baseUrl}/integrations/hometax/fetch`, {
+        method:'POST',
+        headers,
+        body: JSON.stringify({...input, dry_run:true}),
+      });
+      const payload = await res.json().catch(()=>({}));
+      if(!res.ok || payload.ok === false) throw new Error(payload.error || `status ${res.status}`);
+      setHometaxFeedback(
+        `dry-run ok\n` +
+        `doc_type=${payload.doc_type}\n` +
+        `stage=${payload.stage}\n` +
+        `identity=${payload.masked_identity || '-'}\n` +
+        `sandbox=${payload.sandbox ? '1' : '0'}`
+      );
+    }
+
+
     function confirmAction(actionKey, label){
       const profileText = SELECTED_PROFILES.size ? [...SELECTED_PROFILES].join(',') : 'ALL';
       const roleText = OPS_API.execRoleMode === 'admin' ? '관리자(admin)' : '운영자(operator)';
@@ -1865,6 +1956,30 @@
       document.getElementById('mc-done-next')?.addEventListener('click', async () => {
         try{ await updateNextTaskStatus('done'); }
         catch(err){ setMissionFeedback(`next task done 실패: ${err.message}`); }
+      });
+
+      document.getElementById('hometax-check-status')?.addEventListener('click', async () => {
+        try{
+          await fetchHometaxStatus();
+        }catch(err){
+          setHometaxFeedback(`status 실패: ${err.message}`);
+        }
+      });
+
+      document.getElementById('hometax-check-docs')?.addEventListener('click', async () => {
+        try{
+          await fetchHometaxDocs();
+        }catch(err){
+          setHometaxFeedback(`docs 실패: ${err.message}`);
+        }
+      });
+
+      document.getElementById('hometax-dry-run')?.addEventListener('click', async () => {
+        try{
+          await runHometaxDryRun();
+        }catch(err){
+          setHometaxFeedback(`dry-run 실패: ${err.message}`);
+        }
       });
     }
 
