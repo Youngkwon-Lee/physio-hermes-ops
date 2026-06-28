@@ -22,6 +22,7 @@ from typing import Any
 
 ROOT = Path("/home/yk/physio-hermes-ops")
 HERMES_HOME = Path("/home/yk/.hermes")
+HERMES_BIN = Path("/home/yk/.local/bin/hermes")
 HEARTBEAT_PATH = ROOT / "lineage" / "heartbeat.json"
 R_LOOP_PATH = ROOT / "lineage" / "ralph_loop_state.json"
 CONFIG_PATH = HERMES_HOME / "config.yaml"
@@ -39,6 +40,10 @@ class Check:
 def run(cmd: list[str]) -> str:
     out = subprocess.run(cmd, check=True, text=True, capture_output=True)
     return out.stdout
+
+
+def hermes_cmd(*args: str) -> list[str]:
+    return [str(HERMES_BIN), *args]
 
 
 def now_local() -> datetime:
@@ -84,8 +89,8 @@ def load_memory_usage() -> tuple[int, dict[str, int]]:
 
 
 def check_cron() -> Check:
-    status_out = run(["hermes", "cron", "status"])
-    list_out = run(["hermes", "cron", "list", "--all"])
+    status_out = run(hermes_cmd("cron", "status"))
+    list_out = run(hermes_cmd("cron", "list", "--all"))
     scheduler_ok = "cron jobs will fire automatically" in status_out.lower()
     active_match = re.search(r"(\d+) active job", status_out)
     active_jobs = int(active_match.group(1)) if active_match else None
