@@ -34,6 +34,8 @@ Reasons:
 | Discord | notifications, summaries, human interrupt path | canonical run state, durable memory |
 | second-brain | promoted decisions, reusable knowledge, reviewed continuity | transport, live callback queue |
 
+Built-in Hermes memory is a small runtime profile, not a durable wiki. When an agent finds knowledge that should survive across repos, devices, or weeks, the default destination is `second-brain` first and built-in memory second.
+
 ## Protocol Roles
 
 | Protocol | Purpose | Current Use |

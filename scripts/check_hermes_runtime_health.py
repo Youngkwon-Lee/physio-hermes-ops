@@ -26,6 +26,7 @@ HEARTBEAT_PATH = ROOT / "lineage" / "heartbeat.json"
 R_LOOP_PATH = ROOT / "lineage" / "ralph_loop_state.json"
 CONFIG_PATH = HERMES_HOME / "config.yaml"
 STATE_DB = HERMES_HOME / "state.db"
+MEMORY_DIR = HERMES_HOME / "memories"
 
 
 @dataclass
@@ -68,6 +69,18 @@ def load_memory_limit() -> int | None:
     text = CONFIG_PATH.read_text(encoding="utf-8")
     m = re.search(r"^\s*memory_char_limit:\s*(\d+)\s*$", text, re.MULTILINE)
     return int(m.group(1)) if m else None
+
+
+def load_memory_usage() -> tuple[int, dict[str, int]]:
+    usage_by_file: dict[str, int] = {}
+    if not MEMORY_DIR.exists():
+        return 0, usage_by_file
+    for path in sorted(MEMORY_DIR.glob("*.md")):
+        try:
+            usage_by_file[path.name] = len(path.read_text(encoding="utf-8"))
+        except Exception:
+            usage_by_file[path.name] = 0
+    return sum(usage_by_file.values()), usage_by_file
 
 
 def check_cron() -> Check:
@@ -133,9 +146,7 @@ def check_heartbeat() -> Check:
 
 def check_memory() -> Check:
     limit = load_memory_limit()
-    # approximate current used chars from injected memory file is not available directly;
-    # derive from latest warning threshold manually by summing persistent memory text via tool is out of scope.
-    # Here we use state DB liveness + configured limit + known operational headroom from recent cleanup.
+    used, usage_by_file = load_memory_usage()
     db_ok = STATE_DB.exists() and STATE_DB.stat().st_size > 0
     message_count = None
     latest_ts = None
@@ -148,8 +159,6 @@ def check_memory() -> Check:
         row = cur.fetchone()
         latest_ts = datetime.fromtimestamp(row[0], tz=timezone.utc).astimezone().isoformat() if row else None
         conn.close()
-    # soft assessment after cleanup
-    used = 1966
     headroom = (limit - used) if limit is not None else None
     if headroom is None:
         status = "warn"
@@ -166,8 +175,9 @@ def check_memory() -> Check:
         "messages": message_count,
         "latest_message_at": latest_ts,
         "memory_char_limit": limit,
-        "estimated_memory_used": used,
-        "estimated_headroom": headroom,
+        "memory_used": used,
+        "memory_headroom": headroom,
+        "memory_files": usage_by_file,
     })
 
 
