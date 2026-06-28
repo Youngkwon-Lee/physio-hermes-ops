@@ -264,6 +264,20 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result.get("ok") else 1
     except Exception as error:
+        message = str(error)
+        if "no ingestable Mission Control payload found in Discord messages" in message:
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "stage": "noop",
+                        "message": "no ingestable payload found",
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+            return 0
         print(json.dumps({"ok": False, "error": f"{type(error).__name__}: {error}"}, ensure_ascii=False, indent=2), file=sys.stderr)
         return 1
 
