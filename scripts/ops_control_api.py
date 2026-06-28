@@ -535,6 +535,37 @@ def normalized_priority(value, default=50):
     return max(0, min(100, priority))
 
 
+def iso_sort_epoch(value):
+    text = str(value or "").strip()
+    if not text:
+        return 0
+    try:
+        return int(datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp())
+    except Exception:
+        return 0
+
+
+def mission_item_status_rank(status):
+    order = {
+        "in_progress": 0,
+        "assigned": 1,
+        "ready": 2,
+        "needs_review": 3,
+        "blocked": 4,
+        "backlog": 5,
+        "done": 6,
+    }
+    return order.get(str(status or "").strip(), 99)
+
+
+def mission_item_sort_key(item):
+    return (
+        mission_item_status_rank(item.get("status")),
+        -iso_sort_epoch(item.get("updatedAt") or item.get("createdAt")),
+        normalized_priority(item.get("priority")),
+    )
+
+
 def handoff_party(value, default_agent, default_surface):
     row = value if isinstance(value, dict) else {}
     return {
@@ -740,7 +771,7 @@ def list_mission_items(kind, organization_id, limit=20, status=None, plan_id=Non
         items = [item for item in items if item.get("status") == status]
     if plan_id:
         items = [item for item in items if item.get("planId") == plan_id]
-    items.sort(key=lambda item: (normalized_priority(item.get("priority")), str(item.get("updatedAt") or "")))
+    items.sort(key=mission_item_sort_key)
     return items[: max(1, limit)]
 
 
@@ -1194,7 +1225,7 @@ class Handler(BaseHTTPRequestHandler):
                     rows = []
                     state["plansByOrg"][organization_id] = rows
                 rows.append(item)
-                rows.sort(key=lambda row: (normalized_priority(row.get("priority")), str(row.get("updatedAt") or "")))
+                rows.sort(key=mission_item_sort_key)
                 save_handoff_inbox_state(state)
             audit({
                 "time": now(),
@@ -1236,7 +1267,7 @@ class Handler(BaseHTTPRequestHandler):
                     rows = []
                     state["tasksByOrg"][organization_id] = rows
                 rows.append(item)
-                rows.sort(key=lambda row: (normalized_priority(row.get("priority")), str(row.get("updatedAt") or "")))
+                rows.sort(key=mission_item_sort_key)
                 save_handoff_inbox_state(state)
             audit({
                 "time": now(),
