@@ -556,10 +556,10 @@ def load_windows_scheduled_tasks() -> list[dict[str, Any]]:
             "stage": "watchdog",
             "ssot": "windows-task-scheduler",
             "costClass": "low",
-            "disableSafe": False,
-            "optional": False,
+            "disableSafe": task_name == "OpenClaw Watchdog",
+            "optional": task_name == "OpenClaw Watchdog",
             "last_status": "ok" if state in {"Ready", "Running"} else None,
-            "notes": f"Windows state: {state}",
+            "notes": "Not used currently; legacy disabled by design" if task_name == "OpenClaw Watchdog" else f"Windows state: {state}",
         }
         out.append(
             build_job(
