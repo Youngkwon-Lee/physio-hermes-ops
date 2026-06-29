@@ -28,6 +28,7 @@ GITHUB_WORKFLOW_DIRS = [
     Path("/home/yk/physio_app/.github/workflows"),
     Path("/home/yk/brain/.github/workflows"),
 ]
+WINDOWS_POWERSHELL = Path("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
 OUT_PATH = DERIVED_DIR / "automation_control_center_read_model.json"
 
 PLANE_META: dict[str, dict[str, str]] = {
@@ -517,8 +518,9 @@ def load_physio_app_cron_jobs() -> list[dict[str, Any]]:
 
 
 def load_windows_scheduled_tasks() -> list[dict[str, Any]]:
+    powershell = str(WINDOWS_POWERSHELL) if WINDOWS_POWERSHELL.exists() else "powershell.exe"
     cmd = [
-        "powershell.exe",
+        powershell,
         "-NoProfile",
         "-Command",
         (
@@ -546,7 +548,7 @@ def load_windows_scheduled_tasks() -> list[dict[str, Any]]:
         if not task_name:
             continue
         task_path = str(item.get("TaskPath") or "\\")
-        state = str(item.get("State") or "Unknown")
+        state = normalize_windows_task_state(item.get("State"))
         enabled = state.lower() != "disabled"
         runtime_id = f"{task_path}{task_name}".replace("\\", "/").strip("/")
         meta = {
@@ -573,6 +575,18 @@ def load_windows_scheduled_tasks() -> list[dict[str, Any]]:
             )
         )
     return out
+
+
+def normalize_windows_task_state(value: Any) -> str:
+    state_map = {
+        "0": "Unknown",
+        "1": "Disabled",
+        "2": "Queued",
+        "3": "Ready",
+        "4": "Running",
+    }
+    state = str(value or "Unknown")
+    return state_map.get(state, state)
 
 
 def workflow_repo_label(path: Path) -> str:
