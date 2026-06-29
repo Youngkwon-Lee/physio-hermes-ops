@@ -116,6 +116,12 @@ def check_physio_app_lane() -> dict[str, Any]:
     except subprocess.CalledProcessError as exc:
         crontab_text = exc.stdout or ""
 
+    active_cron_lines = [
+        line
+        for line in crontab_text.splitlines()
+        if line.strip() and not line.lstrip().startswith("#") and not line.startswith("PATH=")
+    ]
+    active_crontab_text = "\n".join(active_cron_lines)
     required = {
         "overnight": "automation/run_overnight.sh",
         "orchestrator": "automation/run_orchestrator_round.sh",
@@ -123,19 +129,19 @@ def check_physio_app_lane() -> dict[str, Any]:
         "smoke_core": "automation/run_smoke_core.sh",
         "morning_report": "automation/send_morning_report.sh",
     }
-    entries = {key: (needle in crontab_text) for key, needle in required.items()}
-    missing = [key for key, present in entries.items() if not present]
+    entries = {key: (needle in active_crontab_text) for key, needle in required.items()}
+    active_entries = [key for key, present in entries.items() if present]
 
     logs = {
         "overnight_log": file_probe(PHYSIO_APP_ROOT / "automation" / "overnight.log"),
         "morning_report_log": file_probe(PHYSIO_APP_ROOT / "automation" / "morning_report.log"),
     }
-    status = "ok" if not missing else "warn"
+    status = "warn" if active_entries else "ok"
     return {
         "status": status,
-        "summary": "physio_app cron present" if not missing else "physio_app cron gap detected",
+        "summary": "legacy physio_app cron disabled" if not active_entries else "legacy physio_app cron still active",
         "entries": entries,
-        "missing_entries": missing,
+        "active_entries": active_entries,
         "logs": logs,
     }
 
