@@ -131,7 +131,12 @@ def check_heartbeat() -> Check:
         live_cron_has_heartbeat = "heartbeat" in jobs_text.lower()
     except Exception:
         pass
-    if freshness == "stale" or not live_cron_has_heartbeat:
+    loop_summary = str(loop.get("summary") or "").lower()
+    retired = not live_cron_has_heartbeat and "standby" in loop_summary
+    if retired:
+        status = "ok"
+        summary = "legacy heartbeat retired; live Hermes cron is canonical"
+    elif freshness == "stale" or not live_cron_has_heartbeat:
         status = "warn"
         summary = "legacy heartbeat stale or not backed by live Hermes cron"
     else:
@@ -144,6 +149,7 @@ def check_heartbeat() -> Check:
         "age_minutes": age_min,
         "source": source,
         "live_cron_has_heartbeat_job": live_cron_has_heartbeat,
+        "retired": retired,
         "ralph_loop_generated_at": loop.get("generated_at"),
         "ralph_loop_summary": loop.get("summary"),
     })
