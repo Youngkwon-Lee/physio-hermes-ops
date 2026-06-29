@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from datetime import datetime
@@ -19,14 +20,14 @@ except ModuleNotFoundError:  # pragma: no cover
 ROOT = Path("/home/yk/physio-hermes-ops")
 DERIVED_DIR = ROOT / "dashboard" / "derived"
 HERMES_HOME = Path("/home/yk/.hermes")
-BRAIN_DIR = Path("/home/yk/brain")
+BRAIN_DIR = Path(os.environ.get("SECOND_BRAIN_DIR", "/home/yk/brain-linux"))
 WINDOWS_CODEX_AUTOMATIONS_DIR = Path("/mnt/c/Users/82106/.codex/automations")
 MACBOOK_LAUNCHAGENT_SNAPSHOT_PATH = BRAIN_DIR / "operations" / "cache" / "macbook-launchagents-status.json"
 PHYSIO_APP_DIR = Path("/home/yk/physio_app")
 GITHUB_WORKFLOW_DIRS = [
     Path("/home/yk/kinelo-ops/.github/workflows"),
     Path("/home/yk/physio_app/.github/workflows"),
-    Path("/home/yk/brain/.github/workflows"),
+    BRAIN_DIR / ".github" / "workflows",
 ]
 WINDOWS_POWERSHELL = Path("/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
 OUT_PATH = DERIVED_DIR / "automation_control_center_read_model.json"

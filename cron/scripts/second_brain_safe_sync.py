@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DEFAULT_BRAIN_DIR = Path(os.environ.get("SECOND_BRAIN_DIR", "/home/yk/brain"))
+DEFAULT_BRAIN_DIR = Path(os.environ.get("SECOND_BRAIN_DIR", "/home/yk/brain-linux"))
 REMOTE = os.environ.get("SECOND_BRAIN_REMOTE", "origin")
 BRANCH = os.environ.get("SECOND_BRAIN_BRANCH", "main")
 STATUS_LIMIT = int(os.environ.get("SECOND_BRAIN_SYNC_STATUS_LIMIT", "30"))

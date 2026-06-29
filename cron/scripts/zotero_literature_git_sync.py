@@ -11,11 +11,12 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tempfile
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-SOURCE_BRAIN = Path("/home/yk/brain")
+SOURCE_BRAIN = Path(os.environ.get("SECOND_BRAIN_DIR", "/home/yk/brain-linux"))
 SOURCE_LITERATURE = SOURCE_BRAIN / "research" / "literature"
 REPO_URL = "git@github.com:Youngkwon-Lee/second-brain.git"
 BRANCH = "main"
