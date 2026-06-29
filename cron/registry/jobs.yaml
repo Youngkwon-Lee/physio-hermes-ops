@@ -6,9 +6,11 @@ notes:
   - This file is documentation-first and should not contain secrets, tokens, or private message contents.
   - Discord delivery targets are intentionally abstracted to human-readable labels rather than raw private IDs.
   - Runtime truth still lives in Hermes cron state; this registry is the version-controlled source of intent.
+  - Operator-facing labels should prefer `[Home desktop Hermes] HH:MM <what>` or `[Home desktop Hermes] every <interval> <what>`.
 
 jobs:
   - name: daily-ai-news-briefing
+    operator_label: "[Home desktop Hermes] 05:30 AI News Briefing"
     purpose: Summarize high-signal AI news relevant to rehab, clinical AI, agent operations, and knowledge workflows.
     schedule: "30 5 * * *"
     mode: agent
@@ -35,6 +37,7 @@ jobs:
       - daily-ai-news-briefing
 
   - name: daily-rehab-ai-research-brief
+    operator_label: "[Home desktop Hermes] 06:00 Rehab AI Research Brief"
     purpose: Deliver a daily research brief focused on physical therapy, rehabilitation, multimodal AI, and clinical relevance.
     schedule: "0 6 * * *"
     mode: agent
@@ -55,6 +58,7 @@ jobs:
     enabled_toolsets: [session_search, file]
 
   - name: daily-calendar-mail-brief
+    operator_label: "[Home desktop Hermes] 07:30 Calendar + Mail Brief"
     purpose: Combine calendar context and important unread mail into a single operational morning brief.
     schedule: "30 7 * * 1-5"
     mode: script
@@ -98,6 +102,7 @@ jobs:
     enabled_toolsets: [terminal, file]
 
   - name: weekly-zotero-literature-ingest
+    operator_label: "[Home desktop Hermes] Mon 09:00 Zotero Literature Ingest"
     purpose: Create missing second-brain Zotero literature source notes from a Zotero-capable always-on runtime.
     schedule: "0 9 * * 1"
     mode: agent
@@ -115,6 +120,7 @@ jobs:
       - cloud deployment requires Zotero Web API adaptation
 
   - name: second-brain-zotero-literature-git-sync
+    operator_label: "[Home desktop Hermes] Mon 09:15 Zotero Literature Git Sync"
     purpose: Push Zotero-generated second-brain literature notes to GitHub using a clean temporary clone.
     schedule: "15 9 * * 1"
     mode: script
@@ -141,6 +147,7 @@ jobs:
     enabled_toolsets: [web, file]
 
   - name: daily-conversation-curator
+    operator_label: "[Home desktop Hermes] 23:00 Conversation Curator"
     purpose: Curate long-term-value conversation items for memory and knowledge promotion.
     schedule: "0 23 * * *"
     mode: agent
@@ -151,6 +158,7 @@ jobs:
     enabled_toolsets: [session_search, memory]
 
   - name: daily-discord-digest
+    operator_label: "[Home desktop Hermes] 23:35 Discord Digest"
     purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions.
     schedule: "35 23 * * *"
     mode: agent
@@ -179,6 +187,7 @@ jobs:
     script_file: "cron/scripts/ensure-kinelo-8888.sh"
 
   - name: second-brain-safe-sync-watchdog
+    operator_label: "[Home desktop Hermes] every 30m Second-brain Safe Sync Watchdog"
     purpose: Keep the desktop second-brain checkout fresh without pulling over local ingest or Obsidian changes.
     schedule: "every 30m"
     mode: script
@@ -193,6 +202,7 @@ jobs:
       - default repo path is /home/yk/brain; override with SECOND_BRAIN_DIR if needed
 
   - name: hermes-ops-watchdog
+    operator_label: "[Home desktop Hermes] every 10m Hermes Ops Watchdog"
     purpose: Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.
     schedule: "every 10m"
     mode: script
