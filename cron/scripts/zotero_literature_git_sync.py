@@ -3,7 +3,7 @@
 
 This follows the existing Notion candidate sync pattern: use a clean temporary
 clone, copy only the bounded target files, then commit/push if there is a diff.
-It avoids committing unrelated dirty files from /home/yk/brain.
+It avoids committing unrelated dirty files from the second-brain checkout.
 """
 
 from __future__ import annotations

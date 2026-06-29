@@ -17,9 +17,11 @@ python3 scripts/capture_continuity_handoff.py --input handoff.json
 Use a real second-brain directory:
 
 ```bash
-SECOND_BRAIN_DIR=/home/yk/brain \
+SECOND_BRAIN_DIR=/home/yk/brain-linux \
 python3 scripts/capture_continuity_handoff.py --input handoff.json
 ```
+
+On the home desktop, `/home/yk/brain-linux` is the automation canonical checkout. `/home/yk/brain` is a legacy symlink to the Windows Obsidian mirror and should not be used as the default automation write path.
 
 Local fallback writes to:
 
@@ -104,7 +106,7 @@ Default mode writes a JSONL event that desktop Hermes can poll or watch.
 ```bash
 python3 scripts/capture_continuity_handoff.py \
   --input handoff.json \
-  --event-log /home/yk/brain/operations/events/continuity_handoff_events.jsonl
+  --event-log /home/yk/brain-linux/operations/events/continuity_handoff_events.jsonl
 ```
 
 Near real-time mode sends the same event to a running Hermes/Mission Control API.

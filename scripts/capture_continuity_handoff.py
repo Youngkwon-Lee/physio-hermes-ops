@@ -53,9 +53,9 @@ def resolve_brain_dir(value: str | None) -> Path:
     env_value = os.getenv("SECOND_BRAIN_DIR")
     if env_value:
         return Path(env_value).expanduser()
-    home_brain = Path.home() / "brain"
-    if home_brain.exists():
-        return home_brain
+    linux_brain = Path.home() / "brain-linux"
+    if linux_brain.exists():
+        return linux_brain
     return ROOT / "ops_knowledge"
 
 

@@ -4,12 +4,12 @@
 
 목표:
 - Zotero에 새로 들어온 literature item을 확인한다.
-- 아직 없는 `/home/yk/brain/research/literature/<citekey>.md` source note만 생성한다.
+- 아직 없는 `${SECOND_BRAIN_DIR:-/home/yk/brain-linux}/research/literature/<citekey>.md` source note만 생성한다.
 - 생성 후 구조 검증으로 pass를 닫는다.
 
 반드시 아래 절차를 따른다:
 1. terminal 도구로 실행 환경을 확인한다.
-   - `/home/yk/brain` 또는 second-brain vault 경로가 존재하는지 확인한다.
+   - `SECOND_BRAIN_DIR` 또는 `/home/yk/brain-linux` second-brain vault 경로가 존재하는지 확인한다.
    - Zotero local API 또는 configured Zotero helper가 동작하는지 확인한다.
    - Zotero helper가 실패하면, desktop Windows interactive task가 있으면 한 번 깨운 뒤 재확인한다.
 
@@ -22,7 +22,8 @@ python3 /home/yk/.local/bin/codex-zotero.py status
 2. 아래 명령을 실행한다.
 
 ```bash
-python3 /home/yk/brain/operations/tools/literature_ingest_loop.py --write
+SECOND_BRAIN_DIR="${SECOND_BRAIN_DIR:-/home/yk/brain-linux}"
+python3 "$SECOND_BRAIN_DIR/operations/tools/literature_ingest_loop.py" --write
 ```
 
 3. stdout을 읽고 `created`, `skipped_existing`, `errors`, `PASS: brain_lint checks passed`, `PASS: literature ingest loop completed`를 확인한다.

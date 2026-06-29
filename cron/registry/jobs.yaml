@@ -114,7 +114,7 @@ jobs:
     runtime_notes:
       - installed on desktop Hermes as df985f8b88e3 on 2026-06-18
       - should run on desktop Hermes or another always-on environment, not MacBook Codex local cron
-      - requires access to second-brain vault at /home/yk/brain or equivalent path alias
+      - requires access to the home desktop automation canonical checkout at /home/yk/brain-linux via SECOND_BRAIN_DIR
       - current local implementation uses Zotero Desktop local API through /home/yk/.local/bin/codex-zotero.py
       - Windows scheduled task CodexZoteroInteractive starts Zotero in the interactive desktop session when needed
       - cloud deployment requires Zotero Web API adaptation
@@ -132,8 +132,8 @@ jobs:
       - weekly-zotero-literature-ingest
     runtime_notes:
       - follows the existing Notion candidate git-sync pattern
-      - copies only /home/yk/brain/research/literature/*.md into a clean clone
-      - does not commit unrelated dirty files from /home/yk/brain
+      - reads only /home/yk/brain-linux/research/literature/*.md via SECOND_BRAIN_DIR
+      - does not commit unrelated dirty files from the second-brain checkout
       - emits no-change output when GitHub already has the same literature notes
 
   - name: biz-support-radar-daily
@@ -199,7 +199,7 @@ jobs:
       - silent when the repo is clean and already up to date
       - runs git fetch first, then pulls only when the working tree is clean and strictly behind upstream
       - reports dirty, ahead, diverged, fetch failed, pull failed, or validation failed states without modifying files
-      - default repo path is /home/yk/brain; override with SECOND_BRAIN_DIR if needed
+      - default repo path is /home/yk/brain-linux; override with SECOND_BRAIN_DIR if needed
 
   - name: hermes-ops-watchdog
     operator_label: "[Home desktop Hermes] every 10m Hermes Ops Watchdog"
