@@ -668,7 +668,7 @@ def load_launchagent_jobs() -> list[dict[str, Any]]:
                 "stage": meta["stage"],
                 "owner": PLANE_META["macbook_launchagents"]["owner"],
                 "schedule": item.get("schedule") or "unknown",
-                "enabled": bool(item.get("exists")),
+                "enabled": bool(item.get("exists")) and not bool(item.get("disabled")),
                 "health": health,
                 "input": meta.get("input", []),
                 "output": meta.get("output", []),
@@ -751,7 +751,7 @@ def build_planes(jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "runtimeFamily": meta["runtimeFamily"],
             "owner": meta["owner"],
             "jobCount": len(items),
-            "runningCount": sum(1 for job in items if job["enabled"]),
+            "runningCount": sum(1 for job in items if job["health"] != "disabled"),
             "healthyCount": sum(1 for job in items if job["health"] == "healthy"),
             "delayedCount": sum(1 for job in items if job["health"] == "delayed"),
             "failedCount": sum(1 for job in items if job["health"] == "failed"),
@@ -855,7 +855,7 @@ def build_summary(jobs: list[dict[str, Any]]) -> dict[str, Any]:
             "scheduledAt": dt.isoformat(),
         }
     return {
-        "running": sum(1 for job in jobs if job["enabled"]),
+        "running": sum(1 for job in jobs if job["health"] != "disabled"),
         "healthy": sum(1 for job in jobs if job["health"] == "healthy"),
         "delayed": sum(1 for job in jobs if job["health"] == "delayed"),
         "failed": sum(1 for job in jobs if job["health"] == "failed"),
