@@ -3,7 +3,7 @@
 이 문서는 `physio-hermes-ops`의 **얇은 실행 상태 카드**입니다.
 
 원칙:
-- 장기 구조/운영 원칙은 repo의 `docs/`와 `/home/yk/brain/operations` canonical 문서에 둔다.
+- 장기 구조/운영 원칙은 repo의 `docs/`와 second-brain canonical 문서에 둔다. 홈데스크탑 자동화 기준 경로는 `/home/yk/brain-linux`이며, Windows Obsidian 폴더는 mirror다.
 - 이 파일은 다음 agent가 **지금 어떤 운영 작업을 이어야 하는지** 빠르게 파악하는 execution layer다.
 - 장문의 운영 로그나 일별 worklog는 여기에 누적하지 않는다.
 
@@ -18,9 +18,10 @@
   - `docs/architecture/PHYSIO_APP_RUNTIME_SPLIT.md`
   - `docs/runbook/CRON_OPERATIONS.md`
 - Related brain docs:
-  - `/home/yk/brain/operations/latest-handoff.md`
-  - `/home/yk/brain/operations/multi-device-agent-sync-v1.md`
-  - `/home/yk/brain/operations/agent-startup-rule-v1.md`
+  - `/home/yk/brain-linux/operations/latest-handoff.md`
+  - `/home/yk/brain-linux/operations/multi-device-agent-sync-v1.md`
+  - `/home/yk/brain-linux/operations/agent-startup-rule-v1.md`
+  - `docs/runbook/SECOND_BRAIN_PATH_CONTRACT_V1.md`
 
 ## Confirmed
 - `physio-hermes-ops`는 Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 repo다.
@@ -36,7 +37,7 @@
 ## Next action
 - 실제 작업 시작 시 현재 과제를 한 문장으로 `Current goal`에 채운다.
 - 작업 주제에 맞는 primary docs 1~3개만 먼저 읽고, 그다음 변경/운영 액션으로 들어간다.
-- 작업 종료 시 이 파일과 `/home/yk/brain/operations/latest-handoff.md`를 함께 갱신해 cross-repo continuity를 유지한다.
+- 작업 종료 시 이 파일과 `/home/yk/brain-linux/operations/latest-handoff.md`를 함께 갱신해 cross-repo continuity를 유지한다.
 
 ## Promotion decision
 - execution note
