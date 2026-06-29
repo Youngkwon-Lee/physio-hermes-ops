@@ -20,6 +20,8 @@ __pycache__/
 
 # runtime artifacts
 .runtime/
+dashboard/derived/*.json
+lineage/runtime_health_snapshot.md
 lineage/actions_audit.jsonl
 lineage/mission_control_events.jsonl
 .vercel
