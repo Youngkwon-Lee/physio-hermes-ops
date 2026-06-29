@@ -299,6 +299,7 @@ JOB_META: dict[str, dict[str, Any]] = {
     "com.youngkwon.secondbrain.codex-thread-delta": {"pipelineId": "memory_capture", "stage": "capture", "ssot": "second-brain", "costClass": "low", "disableSafe": False, "optional": False},
     "com.youngkwon.zotero-snapshot-sync": {"pipelineId": "research_literature_ingest", "stage": "capture", "ssot": "second-brain", "costClass": "low", "disableSafe": False, "optional": False},
     "ai.hermes.gateway-macbookbridge": {"pipelineId": "memory_capture", "stage": "watchdog", "ssot": "local-runtime", "costClass": "low", "disableSafe": False, "optional": False},
+    "com.youngkwon.secondbrain.nightly-capture-batch": {"pipelineId": "memory_capture", "stage": "capture", "ssot": "second-brain", "costClass": "medium", "disableSafe": False, "optional": False},
     "actions.runner.Youngkwon-Lee-physio_app.physio-ci-mac-codex": {"pipelineId": "runtime_watchdog", "stage": "watchdog", "ssot": "github-actions", "costClass": "medium", "disableSafe": True, "optional": True},
     "actions.runner.Youngkwon-Lee-physio_app.physio-ci-mac-build-codex": {"pipelineId": "runtime_watchdog", "stage": "watchdog", "ssot": "github-actions", "costClass": "high", "disableSafe": True, "optional": True},
     "com.youngkwon.secondbrain.launchagent-health-snapshot": {"pipelineId": "runtime_watchdog", "stage": "watchdog", "ssot": "local-runtime", "costClass": "low", "disableSafe": False, "optional": False},
