@@ -21,6 +21,8 @@ ROOT = Path("/home/yk/physio-hermes-ops")
 DERIVED_DIR = ROOT / "dashboard" / "derived"
 HERMES_HOME = Path("/home/yk/.hermes")
 BRAIN_DIR = Path(os.environ.get("SECOND_BRAIN_DIR", "/home/yk/brain-linux"))
+WINDOWS_OBSIDIAN_BRAIN_DIR = Path(os.environ.get("WINDOWS_OBSIDIAN_BRAIN_DIR", "/mnt/c/Users/82106/Documents/brain"))
+MACBOOK_SECOND_BRAIN_DIR = Path(os.environ.get("MACBOOK_SECOND_BRAIN_DIR", "/Users/youngkwon/projects/second-brain"))
 WINDOWS_CODEX_AUTOMATIONS_DIR = Path("/mnt/c/Users/82106/.codex/automations")
 MACBOOK_LAUNCHAGENT_SNAPSHOT_PATH = BRAIN_DIR / "operations" / "cache" / "macbook-launchagents-status.json"
 PHYSIO_APP_DIR = Path("/home/yk/physio_app")
@@ -350,6 +352,10 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def run_text(cmd: list[str]) -> str:
     return subprocess.run(cmd, check=True, text=True, capture_output=True).stdout
+
+
+def run_optional(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
 
 
 def slug(value: str) -> str:
@@ -839,6 +845,88 @@ def build_sources() -> list[dict[str, Any]]:
     ]
 
 
+def git_surface_status(path: Path) -> dict[str, Any]:
+    exists = path.exists()
+    is_repo = exists and (path / ".git").exists()
+    status = {
+        "exists": exists,
+        "isGitRepo": is_repo,
+        "head": None,
+        "branch": None,
+        "upstream": None,
+        "ahead": None,
+        "behind": None,
+        "dirtyCount": None,
+        "health": "missing" if not exists else "not_git",
+    }
+    if not is_repo:
+        return status
+
+    head = run_optional(["git", "rev-parse", "--short", "HEAD"], cwd=path)
+    branch = run_optional(["git", "branch", "--show-current"], cwd=path)
+    upstream = run_optional(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], cwd=path)
+    dirty = run_optional(["git", "status", "--porcelain"], cwd=path)
+    counts = run_optional(["git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}"], cwd=path)
+
+    dirty_lines = [line for line in dirty.stdout.splitlines() if line.strip()] if dirty.returncode == 0 else []
+    status["head"] = head.stdout.strip() if head.returncode == 0 else None
+    status["branch"] = branch.stdout.strip() if branch.returncode == 0 else None
+    status["upstream"] = upstream.stdout.strip() if upstream.returncode == 0 else None
+    status["dirtyCount"] = len(dirty_lines) if dirty.returncode == 0 else None
+    if counts.returncode == 0:
+        left, right = counts.stdout.strip().split()[:2]
+        status["ahead"] = int(left)
+        status["behind"] = int(right)
+
+    if status["dirtyCount"]:
+        status["health"] = "dirty"
+    elif status["ahead"] and status["behind"]:
+        status["health"] = "diverged"
+    elif status["ahead"]:
+        status["health"] = "ahead"
+    elif status["behind"]:
+        status["health"] = "behind"
+    else:
+        status["health"] = "clean"
+    return status
+
+
+def build_storage_surfaces() -> list[dict[str, Any]]:
+    surfaces = [
+        {
+            "surfaceId": "home_desktop_automation_canonical",
+            "name": "Home Desktop Automation Canonical",
+            "role": "write-commit-push canonical checkout for home desktop automations",
+            "owner": "home-desktop",
+            "path": str(BRAIN_DIR),
+            "envKey": "SECOND_BRAIN_DIR",
+            "writePolicy": "automation-write",
+        },
+        {
+            "surfaceId": "windows_obsidian_mirror",
+            "name": "Windows Obsidian Mirror",
+            "role": "Obsidian UI mirror; fast-forward pull only when clean",
+            "owner": "home-desktop",
+            "path": str(WINDOWS_OBSIDIAN_BRAIN_DIR),
+            "envKey": "WINDOWS_OBSIDIAN_BRAIN_DIR",
+            "writePolicy": "mirror-pull-only",
+        },
+        {
+            "surfaceId": "macbook_checkout",
+            "name": "MacBook Checkout",
+            "role": "MacBook Codex and LaunchAgent local capture checkout",
+            "owner": "macbook",
+            "path": str(MACBOOK_SECOND_BRAIN_DIR),
+            "envKey": "MACBOOK_SECOND_BRAIN_DIR",
+            "writePolicy": "macbook-local-capture",
+        },
+    ]
+    for surface in surfaces:
+        status = git_surface_status(Path(surface["path"]))
+        surface.update(status)
+    return surfaces
+
+
 def build_summary(jobs: list[dict[str, Any]]) -> dict[str, Any]:
     next_candidates = []
     for job in jobs:
@@ -890,6 +978,7 @@ def main() -> None:
         "pipelines": pipelines,
         "jobs": sorted(jobs, key=lambda item: (item["planeId"], item["runtimeId"])),
         "failures": failures,
+        "storageSurfaces": build_storage_surfaces(),
         "sources": build_sources(),
     }
     write_json(OUT_PATH, payload)
