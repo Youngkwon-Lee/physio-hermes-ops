@@ -261,6 +261,17 @@ python3 scripts/ingest_discord_thread_to_mission_control.py \
   --thread-id 1515296585410416931
 ```
 
+Kinelo Ops 운영 인박스 미러링:
+```bash
+export KINELO_OPS_INTAKE_URL="https://kinelo-ops.vercel.app/api/ops-intake"
+export KINELO_OPS_INTAKE_SECRET="<server-only-intake-secret>"
+```
+
+- env가 없으면 기존처럼 Mission Control에만 저장한다.
+- env가 있으면 각 `tasks[]` 항목을 Kinelo Ops `tasks`에도 `source_provider=discord`로 생성한다.
+- 중복 키는 `discord-thread:<thread-id>:<message-id>:<task-index>`이며, Kinelo Ops가 같은 요청을 dedupe한다.
+- `DISCORD_GUILD_ID`가 있으면 source URL은 `https://discord.com/channels/<guild>/<thread>/<message>` 형태로 저장한다.
+
 토큰 없이 fixture smoke:
 ```bash
 python3 scripts/ingest_discord_thread_to_mission_control.py \

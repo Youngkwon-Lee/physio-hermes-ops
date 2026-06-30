@@ -8,6 +8,7 @@ import re
 import sys
 import urllib.parse
 import urllib.request
+from urllib.error import HTTPError, URLError
 from pathlib import Path
 from typing import Any
 
@@ -109,7 +110,107 @@ def mark_processed(state: dict[str, Any], source_message: dict[str, Any], result
             for task in result.get("tasks", [])
             if isinstance(task, dict) and task.get("id")
         ],
+        "kineloOpsMirrorCount": len(
+            [
+                row
+                for row in result.get("kineloOpsMirrors", [])
+                if isinstance(row, dict) and row.get("ok")
+            ]
+        ),
     }
+
+
+def discord_source_url(source_thread: dict[str, Any], source_message: dict[str, Any], guild_id: str | None) -> str | None:
+    explicit_url = str(source_thread.get("url") or "").strip()
+    if explicit_url:
+        return explicit_url
+
+    thread_id = str(source_thread.get("threadId") or "").strip()
+    message_id = str(source_message.get("messageId") or "").strip()
+    if not thread_id:
+        return None
+
+    server_id = (guild_id or "@me").strip() or "@me"
+    if message_id:
+        return f"https://discord.com/channels/{server_id}/{thread_id}/{message_id}"
+    return f"https://discord.com/channels/{server_id}/{thread_id}"
+
+
+def kinelo_priority(value: Any) -> str:
+    try:
+        priority = int(value)
+    except (TypeError, ValueError):
+        return "medium"
+    if priority <= 10:
+        return "urgent"
+    if priority <= 30:
+        return "high"
+    if priority >= 80:
+        return "low"
+    return "medium"
+
+
+def mirror_task_to_kinelo_ops(
+    task_payload: dict[str, Any],
+    *,
+    args: argparse.Namespace,
+    source_thread: dict[str, Any],
+    source_message: dict[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    if not args.kinelo_ops_intake_url or not args.kinelo_ops_intake_secret:
+        return {"ok": True, "skipped": True, "reason": "kinelo ops intake is not configured"}
+
+    source_url = discord_source_url(source_thread, source_message, args.discord_guild_id)
+    external_parts = [
+        "discord-thread",
+        str(source_thread.get("threadId") or args.thread_id or "").strip(),
+        str(source_message.get("messageId") or "").strip(),
+        str(index),
+    ]
+    source_external_id = ":".join([part for part in external_parts if part])
+    context = str(task_payload.get("context") or "").strip()
+    expected_output = str(task_payload.get("expectedOutput") or "").strip()
+    description = "\n\n".join([part for part in [context, f"Expected output: {expected_output}" if expected_output else ""] if part])
+    assignee = task_payload.get("assignee") if isinstance(task_payload.get("assignee"), dict) else {}
+
+    payload = {
+        "title": task_payload.get("title") or f"Discord task {index}",
+        "description": description or None,
+        "priority": kinelo_priority(task_payload.get("priority")),
+        "owner": assignee.get("agent") or args.default_assignee,
+        "source_provider": "discord",
+        "source_url": source_url,
+        "source_external_id": source_external_id or None,
+    }
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(
+        args.kinelo_ops_intake_url,
+        data=data,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {args.kinelo_ops_intake_secret}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            body = response.read().decode("utf-8", errors="replace")
+            parsed = json.loads(body) if body else {}
+            return {
+                "ok": 200 <= response.status < 300,
+                "status": response.status,
+                "taskId": parsed.get("taskId") if isinstance(parsed, dict) else None,
+                "deduped": bool(parsed.get("deduped")) if isinstance(parsed, dict) else False,
+                "sourceExternalId": source_external_id,
+            }
+    except HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")
+        return {"ok": False, "status": error.code, "error": body[:500], "sourceExternalId": source_external_id}
+    except (URLError, TimeoutError) as error:
+        return {"ok": False, "status": 0, "error": str(error), "sourceExternalId": source_external_id}
 
 
 def extract_marker_block(text: str) -> str | None:
@@ -201,6 +302,7 @@ def run_ingest(raw: str, args: argparse.Namespace, source_message: dict[str, Any
     plan = plan_body.get("item") or plan_body.get("data") or {}
     plan_id = str(plan.get("id") or "")
     created_tasks = []
+    kinelo_ops_mirrors = []
     for index, task in enumerate(tasks_raw, start=1):
         task_payload = ingest.normalize_task(
             task if isinstance(task, dict) else {"title": str(task)},
@@ -212,13 +314,23 @@ def run_ingest(raw: str, args: argparse.Namespace, source_message: dict[str, Any
         task_status, task_body = ingest.request_json(f"{base_url}/tasks", args.token, method="POST", payload=task_payload)
         created_tasks.append({"status": task_status, "response": task_body})
         if task_status != 200 or not isinstance(task_body, dict) or not task_body.get("ok"):
-            return {"ok": False, "stage": "create_task", "plan": plan, "tasks": created_tasks}
+            return {"ok": False, "stage": "create_task", "plan": plan, "tasks": created_tasks, "kineloOpsMirrors": kinelo_ops_mirrors}
+        kinelo_ops_mirrors.append(
+            mirror_task_to_kinelo_ops(
+                task_payload,
+                args=args,
+                source_thread=source_thread,
+                source_message=source_message,
+                index=index,
+            )
+        )
 
     return {
         "ok": True,
         "sourceMessage": source_message,
         "plan": plan,
         "tasks": [(row["response"].get("item") or row["response"].get("data")) for row in created_tasks],
+        "kineloOpsMirrors": kinelo_ops_mirrors,
     }
 
 
@@ -240,6 +352,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--default-assignee", default="desktop-hermes")
     parser.add_argument("--state-file", default=str(DEFAULT_STATE_FILE), help="Processed message state path. Use empty string with --no-state.")
     parser.add_argument("--no-state", action="store_true", help="Disable duplicate prevention state.")
+    parser.add_argument("--kinelo-ops-intake-url", default=first_env("KINELO_OPS_INTAKE_URL") or "")
+    parser.add_argument("--kinelo-ops-intake-secret", default=first_env("KINELO_OPS_INTAKE_SECRET") or "")
+    parser.add_argument("--discord-guild-id", default=first_env("HERMES_DISCORD_GUILD_ID", "DISCORD_GUILD_ID") or "")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
