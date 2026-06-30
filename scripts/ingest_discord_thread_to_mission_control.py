@@ -19,6 +19,31 @@ DEFAULT_THREAD_ID = "1515296585410416931"
 DEFAULT_THREAD_NAME = "맥북코덱스소통채널"
 DEFAULT_CHANNEL_NAME = "second_memory"
 DEFAULT_STATE_FILE = Path.home() / ".local" / "state" / "physio-hermes-ops" / "mission_control" / "discord_thread_ingest_state.json"
+KINELO_MIRROR_KEYWORDS = {
+    "action",
+    "agent",
+    "automation",
+    "business",
+    "customer",
+    "decision",
+    "follow-up",
+    "handoff",
+    "important",
+    "kinelo",
+    "ops",
+    "revenue",
+    "urgent",
+    "고객",
+    "결정",
+    "긴급",
+    "매출",
+    "사업",
+    "실행",
+    "운영",
+    "자동화",
+    "중요",
+    "후속",
+}
 
 
 def first_env(*names: str) -> str | None:
@@ -150,6 +175,77 @@ def kinelo_priority(value: Any) -> str:
     return "medium"
 
 
+def boolish(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and value in {0, 1}:
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+    return None
+
+
+def task_tags(task_payload: dict[str, Any]) -> list[str]:
+    tags = task_payload.get("tags")
+    if not isinstance(tags, list):
+        return []
+    return [str(tag).strip().lower() for tag in tags if str(tag).strip()]
+
+
+def has_important_priority(task_payload: dict[str, Any]) -> bool:
+    try:
+        return int(task_payload.get("priority")) <= 30
+    except (TypeError, ValueError):
+        return False
+
+
+def is_kinelo_ops_mirror_candidate(task_payload: dict[str, Any], policy: str) -> tuple[bool, str]:
+    normalized_policy = (policy or "important").strip().lower()
+    if normalized_policy in {"off", "none", "disabled", "0", "false"}:
+        return False, "policy_off"
+    if normalized_policy == "all":
+        return True, "policy_all"
+
+    explicit = (
+        boolish(task_payload.get("kineloOps"))
+        if "kineloOps" in task_payload
+        else boolish(task_payload.get("kinelo_ops"))
+        if "kinelo_ops" in task_payload
+        else boolish(task_payload.get("opsTask"))
+        if "opsTask" in task_payload
+        else boolish(task_payload.get("mirrorToKineloOps"))
+        if "mirrorToKineloOps" in task_payload
+        else boolish(task_payload.get("mirror_to_kinelo_ops"))
+        if "mirror_to_kinelo_ops" in task_payload
+        else None
+    )
+    if explicit is not None:
+        return explicit, "explicit_flag" if explicit else "explicit_skip"
+
+    tags = task_tags(task_payload)
+    if any(tag in KINELO_MIRROR_KEYWORDS for tag in tags):
+        return True, "important_tag"
+
+    if has_important_priority(task_payload):
+        return True, "important_priority"
+
+    text = " ".join(
+        [
+            str(task_payload.get("title") or ""),
+            str(task_payload.get("context") or ""),
+            str(task_payload.get("expectedOutput") or ""),
+        ]
+    ).lower()
+    if any(keyword in text for keyword in KINELO_MIRROR_KEYWORDS):
+        return True, "important_keyword"
+
+    return False, "not_important"
+
+
 def mirror_task_to_kinelo_ops(
     task_payload: dict[str, Any],
     *,
@@ -160,6 +256,10 @@ def mirror_task_to_kinelo_ops(
 ) -> dict[str, Any]:
     if not args.kinelo_ops_intake_url or not args.kinelo_ops_intake_secret:
         return {"ok": True, "skipped": True, "reason": "kinelo ops intake is not configured"}
+
+    should_mirror, reason = is_kinelo_ops_mirror_candidate(task_payload, args.kinelo_ops_mirror_policy)
+    if not should_mirror:
+        return {"ok": True, "skipped": True, "reason": reason}
 
     source_url = discord_source_url(source_thread, source_message, args.discord_guild_id)
     external_parts = [
@@ -204,6 +304,7 @@ def mirror_task_to_kinelo_ops(
                 "status": response.status,
                 "taskId": parsed.get("taskId") if isinstance(parsed, dict) else None,
                 "deduped": bool(parsed.get("deduped")) if isinstance(parsed, dict) else False,
+                "reason": reason,
                 "sourceExternalId": source_external_id,
             }
     except HTTPError as error:
@@ -354,6 +455,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-state", action="store_true", help="Disable duplicate prevention state.")
     parser.add_argument("--kinelo-ops-intake-url", default=first_env("KINELO_OPS_INTAKE_URL") or "")
     parser.add_argument("--kinelo-ops-intake-secret", default=first_env("KINELO_OPS_INTAKE_SECRET") or "")
+    parser.add_argument("--kinelo-ops-mirror-policy", default=first_env("KINELO_OPS_MIRROR_POLICY") or "important", choices=["important", "all", "off"])
     parser.add_argument("--discord-guild-id", default=first_env("HERMES_DISCORD_GUILD_ID", "DISCORD_GUILD_ID") or "")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()

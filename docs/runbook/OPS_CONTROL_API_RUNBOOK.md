@@ -265,10 +265,16 @@ Kinelo Ops 운영 인박스 미러링:
 ```bash
 export KINELO_OPS_INTAKE_URL="https://kinelo-ops.vercel.app/api/ops-intake"
 export KINELO_OPS_INTAKE_SECRET="<server-only-intake-secret>"
+export KINELO_OPS_MIRROR_POLICY="important"
 ```
 
 - env가 없으면 기존처럼 Mission Control에만 저장한다.
-- env가 있으면 각 `tasks[]` 항목을 Kinelo Ops `tasks`에도 `source_provider=discord`로 생성한다.
+- 기본 정책은 `important`이며, 모든 Discord task를 무조건 Kinelo Ops로 보내지 않는다.
+- `KINELO_OPS_MIRROR_POLICY=all`이면 모든 `tasks[]`를 미러링하고, `off`이면 미러링을 끈다.
+- `important` 정책에서는 아래 중 하나일 때만 Kinelo Ops `tasks`에 `source_provider=discord`로 생성한다.
+- 명시 플래그: `kineloOps`, `kinelo_ops`, `opsTask`, `mirrorToKineloOps`, `mirror_to_kinelo_ops`가 true.
+- 태그/본문 키워드: `important`, `urgent`, `action`, `handoff`, `ops`, `automation`, `business`, `customer`, `revenue`, `decision`, `follow-up`, `중요`, `긴급`, `실행`, `후속`, `운영`, `자동화`, `사업`, `고객`, `매출`, `결정`.
+- 우선순위: Mission Control task `priority <= 30`.
 - 중복 키는 `discord-thread:<thread-id>:<message-id>:<task-index>`이며, Kinelo Ops가 같은 요청을 dedupe한다.
 - `DISCORD_GUILD_ID`가 있으면 source URL은 `https://discord.com/channels/<guild>/<thread>/<message>` 형태로 저장한다.
 
