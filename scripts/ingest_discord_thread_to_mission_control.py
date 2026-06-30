@@ -167,7 +167,7 @@ def kinelo_priority(value: Any) -> str:
     except (TypeError, ValueError):
         return "medium"
     if priority <= 10:
-        return "urgent"
+        return "high"
     if priority <= 30:
         return "high"
     if priority >= 80:
