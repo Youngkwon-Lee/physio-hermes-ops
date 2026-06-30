@@ -34,8 +34,8 @@ def run_script(script_name: str) -> tuple[int, str]:
     return result.returncode, f"[{status}] {script_name}\n{output}".rstrip()
 
 
-def should_run_raw(now: datetime) -> bool:
-    return os.environ.get("RUN_RAW_HANDOFF_SYNC") == "1" or now.minute < 15
+def should_run_raw() -> bool:
+    return os.environ.get("SKIP_RAW_HANDOFF_SYNC") != "1"
 
 
 def should_run_notion_candidates(now: datetime) -> bool:
@@ -54,9 +54,10 @@ def main() -> int:
             print("[second-brain git sync batch]\nstatus: skipped\nreason: previous run still active")
             return 0
 
-        tasks = ["second_brain_safe_sync.py"]
-        if should_run_raw(now):
+        tasks = []
+        if should_run_raw():
             tasks.append("raw_handoff_digest_git_sync.py")
+        tasks.append("second_brain_safe_sync.py")
         if should_run_notion_candidates(now):
             tasks.append("notion_brain_candidate_git_sync.py")
         tasks.append("windows_obsidian_mirror_pull.py")
