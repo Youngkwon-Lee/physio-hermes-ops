@@ -256,6 +256,7 @@ def main() -> None:
     inserted: list[dict[str, Any]] = []
     skipped_duplicates: list[dict[str, Any]] = []
     skipped_invalid: list[dict[str, Any]] = []
+    skipped_failed: list[dict[str, Any]] = []
 
     for item in items:
         kind = classify_kind(item)
@@ -278,7 +279,14 @@ def main() -> None:
             out = create_page(get_db_id(kind), token, props)
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="ignore")
-            raise SystemExit(f"Notion write failed for {kind}:{title}: HTTP {exc.code} {body}") from exc
+            skipped_failed.append({
+                "kind": kind,
+                "title": title,
+                "url": url,
+                "status": exc.code,
+                "error": body[:1000],
+            })
+            continue
         inserted.append({"kind": kind, "title": title, "url": url, "id": out.get("id")})
         existing_urls[kind].add(url)
         existing_titles[kind].add(title_norm)
@@ -291,6 +299,7 @@ def main() -> None:
         "inserted": inserted,
         "skipped_duplicates": skipped_duplicates,
         "skipped_invalid": skipped_invalid,
+        "skipped_failed": skipped_failed,
     }, ensure_ascii=False, indent=2))
 
 
