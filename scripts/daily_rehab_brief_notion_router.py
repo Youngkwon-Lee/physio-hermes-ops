@@ -48,6 +48,22 @@ def split_multi(value: Any, default: list[str] | None = None) -> list[str]:
     return items or (default or [])
 
 
+def notion_option_name(value: Any, default: str) -> str:
+    text = q(value) or default
+    if "," in text:
+        text = " / ".join(part.strip() for part in text.split(",") if part.strip())
+    return text[:100] or default
+
+
+def notion_multi_options(value: Any, default: list[str]) -> list[dict[str, str]]:
+    names: list[str] = []
+    for item in split_multi(value, default=default):
+        name = notion_option_name(item, "")
+        if name and name not in names:
+            names.append(name)
+    return [{"name": name[:100]} for name in names[:10]]
+
+
 def parse_optional_float(value: Any, default: float = 0.0) -> float:
     text = q(value)
     if not text:
@@ -172,25 +188,48 @@ def fetch_existing_index(data_source_id: str, token: str, title_key: str) -> tup
     return urls, titles, total
 
 
+def infer_paper_source(item: dict[str, Any]) -> str:
+    explicit = q(item.get("source"))
+    if explicit:
+        return explicit
+    url = q(item.get("url")).lower()
+    journal = q(item.get("journal")).lower()
+    title = q(item.get("title")).lower()
+    if "arxiv.org" in url or "arxiv" in journal or title.startswith("arxiv:"):
+        return "arXiv"
+    return "PubMed"
+
+
+def infer_paper_journal(item: dict[str, Any]) -> str:
+    journal = q(item.get("journal"))
+    if journal:
+        return journal
+    source = infer_paper_source(item)
+    if source.lower() == "arxiv":
+        return "arXiv preprint"
+    return source or "Unknown"
+
+
 def build_paper_properties(item: dict[str, Any]) -> dict[str, Any]:
+    source = infer_paper_source(item)
+    journal = infer_paper_journal(item)
     return {
         "제목": {"title": [{"text": {"content": q(item.get("title"))[:1900]}}]},
-        "저널": {"rich_text": [{"text": {"content": q(item.get("journal"))[:1900]}}]},
+        "저널": {"rich_text": [{"text": {"content": journal[:1900]}}]},
         "저자": {"rich_text": [{"text": {"content": (q(item.get("authors") or item.get("author")) or "N/A")[:1900]}}]},
-        "출처": {"select": {"name": q(item.get("source")) or "PubMed"}},
+        "출처": {"select": {"name": notion_option_name(source, "PubMed")}},
         "링크": {"url": q(item.get("url"))},
         "발행일": {"date": {"start": q(item.get("published") or item.get("date"))}},
         "요약": {"rich_text": [{"text": {"content": q(item.get("summary"))[:1900]}}]},
         "핵심기여(1문장)": {"rich_text": [{"text": {"content": q(item.get("contribution"))[:1900]}}]},
         "IF": {"number": parse_optional_float(item.get("if"), 0.0)},
-        "분기": {"select": {"name": q(item.get("quarter")) or "2026Q2"}},
-        "카테고리": {"select": {"name": q(item.get("category")) or "논문/연구"}},
-        "근거수준": {"select": {"name": q(item.get("evidence")) or "리뷰"}},
+        "분기": {"select": {"name": notion_option_name(item.get("quarter"), "2026Q2")}},
+        "카테고리": {"select": {"name": notion_option_name(item.get("category"), "논문/연구")}},
+        "근거수준": {"select": {"name": notion_option_name(item.get("evidence"), "리뷰")}},
     }
 
 
 def build_dataset_properties(item: dict[str, Any]) -> dict[str, Any]:
-    tags = split_multi(item.get("tags"), default=["rehab-ai"])
     return {
         "데이터셋/벤치마크명": {"title": [{"text": {"content": q(item.get("title"))[:1900]}}]},
         "출처/기관": {"rich_text": [{"text": {"content": (q(item.get("org")) or q(item.get("source_org")) or q(item.get("journal")) or "N/A")[:1900]}}]},
@@ -198,16 +237,15 @@ def build_dataset_properties(item: dict[str, Any]) -> dict[str, Any]:
         "링크": {"url": q(item.get("url"))},
         "요약": {"rich_text": [{"text": {"content": q(item.get("summary"))[:1900]}}]},
         "핵심기여(1문장)": {"rich_text": [{"text": {"content": q(item.get("contribution"))[:1900]}}]},
-        "분기": {"select": {"name": q(item.get("quarter")) or "2026Q2"}},
-        "카테고리": {"select": {"name": q(item.get("category")) or "재활/로보틱스"}},
-        "유형": {"select": {"name": q(item.get("dataset_type") or item.get("subtype")) or "dataset"}},
-        "활용난이도": {"select": {"name": q(item.get("difficulty")) or "medium"}},
-        "태그": {"multi_select": [{"name": tag[:100]} for tag in tags[:10]]},
+        "분기": {"select": {"name": notion_option_name(item.get("quarter"), "2026Q2")}},
+        "카테고리": {"select": {"name": notion_option_name(item.get("category"), "재활/로보틱스")}},
+        "유형": {"select": {"name": notion_option_name(item.get("dataset_type") or item.get("subtype"), "dataset")}},
+        "활용난이도": {"select": {"name": notion_option_name(item.get("difficulty"), "medium")}},
+        "태그": {"multi_select": notion_multi_options(item.get("tags"), ["rehab-ai"])},
     }
 
 
 def build_startup_properties(item: dict[str, Any]) -> dict[str, Any]:
-    areas = split_multi(item.get("application_area") or item.get("areas") or item.get("tags"), default=["rehab-ai"])
     return {
         "항목명": {"title": [{"text": {"content": q(item.get("title"))[:1900]}}]},
         "회사/기관": {"rich_text": [{"text": {"content": (q(item.get("org")) or q(item.get("company")) or q(item.get("journal")) or "N/A")[:1900]}}]},
@@ -215,25 +253,21 @@ def build_startup_properties(item: dict[str, Any]) -> dict[str, Any]:
         "링크": {"url": q(item.get("url"))},
         "요약": {"rich_text": [{"text": {"content": q(item.get("summary"))[:1900]}}]},
         "핵심기여(1문장)": {"rich_text": [{"text": {"content": q(item.get("contribution"))[:1900]}}]},
-        "분기": {"select": {"name": q(item.get("quarter")) or "2026Q2"}},
-        "카테고리": {"select": {"name": q(item.get("category")) or "재활 AI"}},
-        "유형": {"select": {"name": q(item.get("startup_type") or item.get("subtype") or item.get("type")) or "startup"}},
-        "영향도": {"select": {"name": q(item.get("impact")) or "medium"}},
-        "적용영역": {"multi_select": [{"name": area[:100]} for area in areas[:10]]},
+        "분기": {"select": {"name": notion_option_name(item.get("quarter"), "2026Q2")}},
+        "카테고리": {"select": {"name": notion_option_name(item.get("category"), "재활 AI")}},
+        "유형": {"select": {"name": notion_option_name(item.get("startup_type") or item.get("subtype") or item.get("type"), "startup")}},
+        "영향도": {"select": {"name": notion_option_name(item.get("impact"), "medium")}},
+        "적용영역": {"multi_select": notion_multi_options(item.get("application_area") or item.get("areas") or item.get("tags"), ["rehab-ai"])},
     }
 
 
 def validate_item(item: dict[str, Any], kind: str) -> list[str]:
-    required = ["title", "url", "summary", "contribution"]
-    if kind == "paper":
-        required += ["journal", "published"]
-    else:
-        required += ["published"]
+    required = ["title", "url", "summary", "contribution", "published"]
     return [field for field in required if not q(item.get(field))]
 
 
-def create_page(db_id: str, token: str, properties: dict[str, Any]) -> dict[str, Any]:
-    payload = {"parent": {"database_id": db_id}, "properties": properties}
+def create_page(parent_id: str, token: str, properties: dict[str, Any], *, parent_type: str = "data_source_id") -> dict[str, Any]:
+    payload = {"parent": {"type": parent_type, parent_type: parent_id}, "properties": properties}
     return notion_request("/pages", token, method="POST", payload=payload)
 
 
@@ -276,7 +310,7 @@ def main() -> None:
             "startup": build_startup_properties,
         }[kind](item)
         try:
-            out = create_page(get_db_id(kind), token, props)
+            out = create_page(get_data_source_id(kind), token, props)
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="ignore")
             skipped_failed.append({
