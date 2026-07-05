@@ -232,7 +232,7 @@ def validate_item(item: dict[str, Any]) -> list[str]:
 
 
 def create_page(data_source_id: str, token: str, properties: dict[str, Any]) -> dict[str, Any]:
-    payload = {'parent': {'data_source_id': data_source_id}, 'properties': properties}
+    payload = {'parent': {'type': 'data_source_id', 'data_source_id': data_source_id}, 'properties': properties}
     return notion_request('/pages', token, method='POST', payload=payload)
 
 
