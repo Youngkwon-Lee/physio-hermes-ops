@@ -12,6 +12,7 @@ API_DIR = Path(__file__).resolve().parents[1] / "apps" / "api"
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
+import mission_control_api
 from mission_control_api import (
     apply_autonomy_policy_to_run,
     approve_next_pending_gate,
@@ -180,6 +181,9 @@ def test_autonomy_policy_read_model_keeps_production_never() -> None:
 
     assert feature["issue"]["decision"] == "auto"
     assert feature["pull-request"]["decision"] == "auto"
+    assert feature["preview"]["decision"] == "manual"
+    assert feature["preview"]["configuredDecision"] == "auto"
+    assert feature["preview"]["requiredActuator"] == "agent-os-preview-chain"
     assert feature["production"]["decision"] == "never"
     assert db_data["production"]["decision"] == "never"
     assert db_data["migration"]["decision"] == "manual"
@@ -200,6 +204,8 @@ def test_autonomy_policy_annotates_runs_without_auto_approving_initial_manual_ga
     assert by_gate["plan"]["autonomy"]["decision"] == "manual"
     assert by_gate["issue"]["autonomy"]["decision"] == "auto"
     assert by_gate["pull-request"]["autonomy"]["decision"] == "auto"
+    assert by_gate["preview"]["autonomy"]["decision"] == "manual"
+    assert by_gate["preview"]["autonomy"]["configuredDecision"] == "auto"
     assert by_gate["production"]["autonomy"]["decision"] == "never"
     assert any(item["label"] == "Autonomy policy" for item in run["artifacts"])
 
@@ -225,6 +231,58 @@ def test_autonomy_policy_auto_advances_allowed_gates_after_human_plan_approval()
     assert by_gate["production"]["autonomy"]["decision"] == "never"
     assert updated["status"] == "waiting-for-approval"
     assert any("auto-approved" in item["title"] for item in updated["traceItems"])
+
+
+def test_autonomy_policy_auto_advances_preview_when_actuator_is_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_publish_preview_deployment(run: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str]:
+        return (
+            [
+                {
+                    "label": "Preview Deployment",
+                    "kind": "preview-deploy",
+                    "value": "State: READY",
+                    "metadata": {"dryRun": False, "previewUrl": "https://stage5-preview.example", "state": "READY"},
+                }
+            ],
+            [
+                {
+                    "id": "trace-preview-ready",
+                    "timestamp": "2026-07-08T00:00:00Z",
+                    "agentId": "devops",
+                    "title": "Preview deployment ready",
+                    "summary": "Preview is live.",
+                    "tone": "success",
+                }
+            ],
+            "ready",
+        )
+
+    monkeypatch.setattr(mission_control_api, "actuator_statuses_by_id", lambda: {"agent-os-preview-chain": "ready"})
+    monkeypatch.setattr(mission_control_api, "publish_preview_deployment", fake_publish_preview_deployment)
+    run = create_mission_run(
+        {
+            "organizationId": "org-1",
+            "title": "Autonomy preview advance",
+            "laneId": "feature",
+            "ownerAgents": ["planner", "frontend", "qa", "devops"],
+        }
+    )
+
+    updated = apply_autonomy_policy_to_run(approve_next_pending_gate(run))
+    by_gate = {item["gate"]: item for item in updated["approvalItems"]}
+
+    assert by_gate["plan"]["status"] == "approved"
+    assert by_gate["issue"]["status"] == "approved"
+    assert by_gate["pull-request"]["status"] == "approved"
+    assert by_gate["preview"]["status"] == "approved"
+    assert by_gate["preview"]["autonomy"]["decision"] == "auto"
+    assert by_gate["production"]["status"] == "pending"
+    assert by_gate["production"]["autonomy"]["decision"] == "never"
+    assert updated["status"] == "waiting-for-approval"
+    assert any(
+        item.get("kind") == "preview-deploy" and not item.get("metadata", {}).get("dryRun")
+        for item in updated["artifacts"]
+    )
 
 
 def test_autonomy_policy_file_override_is_bounded(tmp_path: Path) -> None:

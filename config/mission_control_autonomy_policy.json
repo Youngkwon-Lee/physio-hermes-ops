@@ -26,6 +26,14 @@
       "reason": "Approved feature issue plans may prepare draft PR payloads automatically."
     },
     {
+      "id": "feature-preview-auto",
+      "laneId": "feature",
+      "gate": "preview",
+      "decision": "auto",
+      "requiresActuator": "agent-os-preview-chain",
+      "reason": "Approved feature draft PRs may resolve a Vercel preview when the PR and preview actuators are ready."
+    },
+    {
       "id": "growth-issue-auto",
       "laneId": "growth",
       "gate": "issue",
@@ -38,6 +46,14 @@
       "gate": "pull-request",
       "decision": "auto",
       "reason": "Approved growth issue plans may prepare draft PR payloads automatically."
+    },
+    {
+      "id": "growth-preview-auto",
+      "laneId": "growth",
+      "gate": "preview",
+      "decision": "auto",
+      "requiresActuator": "agent-os-preview-chain",
+      "reason": "Approved growth draft PRs may resolve a Vercel preview when the PR and preview actuators are ready."
     },
     {
       "id": "maintenance-pr-auto",

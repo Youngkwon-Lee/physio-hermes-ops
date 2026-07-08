@@ -230,9 +230,11 @@ Decision values:
 - `manual`: 운영자 승인을 기다린다.
 - `never`: 자동승인 금지. `production`은 policy file이 `auto`로 바뀌어도 항상 `never`다.
 
-Default Stage 5 policy는 feature/growth의 `issue`, `pull-request`와
-maintenance/mlops의 `pull-request`, ops-finance의 `issue`만 자동진행한다.
-`plan`, `preview`, `migration`, `production`은 사람 경계로 남긴다.
+Default Stage 5 policy는 feature/growth의 `issue`, `pull-request`를
+자동진행한다. feature/growth `preview`도 정책상 자동진행 후보지만
+`agent-os-preview-chain` actuator가 ready일 때만 실제 `auto`로 평가된다.
+이 virtual actuator는 `github-pr`과 `vercel-preview`가 모두 ready일 때만
+ready다. `plan`, `migration`, `production`은 사람 경계로 남긴다.
 
 Autonomy smoke:
 ```bash
@@ -246,8 +248,13 @@ curl -fsS -X POST 'http://127.0.0.1:8791/runs/<run-id>/approve' \
 curl -fsS 'http://127.0.0.1:8791/snapshot?organizationId=org-smoke'
 ```
 
-Expected after approving the feature `plan` gate: `issue` and `pull-request`
-are approved by policy, `preview` is pending, and `production` remains non-auto.
+Expected after approving the feature `plan` gate with the preview chain still in
+dry-run: `issue` and `pull-request` are approved by policy, `preview` is pending,
+and `production` remains non-auto.
+
+Expected after `github-pr` and `vercel-preview` are both ready and live PR
+metadata is present: `issue`, `pull-request`, and `preview` are approved by
+policy, and `production` remains the next human gate with `never` autonomy.
 
 ## 6-4) Discord/Hermes 회의 요약 -> Mission Control
 목적: Discord/Hermes 회의에서 나온 결론을 prose-only 메시지로 흘려보내지 않고, Mission Control `/plans`와 `/tasks`에 구조화해 다음 작업으로 보이게 한다.

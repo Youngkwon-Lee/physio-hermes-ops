@@ -2191,24 +2191,38 @@ def current_autonomy_policy() -> dict[str, Any]:
     return load_autonomy_policy(AUTONOMY_POLICY_PATH)
 
 
+def actuator_statuses_by_id() -> dict[str, str]:
+    statuses = {str(item.get("id") or ""): str(item.get("status") or "") for item in get_mission_control_readiness()}
+    preview_chain_parts = [statuses.get("github-pr", ""), statuses.get("vercel-preview", "")]
+    if all(status == "ready" for status in preview_chain_parts):
+        statuses["agent-os-preview-chain"] = "ready"
+    elif any(status == "blocked" for status in preview_chain_parts):
+        statuses["agent-os-preview-chain"] = "blocked"
+    else:
+        statuses["agent-os-preview-chain"] = "dry-run"
+    return statuses
+
+
 def current_autonomy_policy_read_model() -> dict[str, Any]:
     return autonomy_policy_read_model(
         current_autonomy_policy(),
         list(LANES.keys()),
         {lane_id: list(lane["approvalGates"]) for lane_id, lane in LANES.items()},
+        actuator_statuses_by_id(),
     )
 
 
 def apply_autonomy_policy_to_run(run: dict[str, Any]) -> dict[str, Any]:
     policy = current_autonomy_policy()
-    updated = annotate_run_with_autonomy_policy(run, policy)
+    actuator_statuses = actuator_statuses_by_id()
+    updated = annotate_run_with_autonomy_policy(run, policy, actuator_statuses)
     max_iterations = len(updated.get("approvalItems", [])) + 1
     for _ in range(max_iterations):
         if updated.get("status") == "blocked":
-            return annotate_run_with_autonomy_policy(updated, policy)
+            return annotate_run_with_autonomy_policy(updated, policy, actuator_statuses_by_id())
         pending = next((item for item in updated.get("approvalItems", []) if item.get("status") == "pending"), None)
         if not pending:
-            return annotate_run_with_autonomy_policy(updated, policy)
+            return annotate_run_with_autonomy_policy(updated, policy, actuator_statuses_by_id())
         autonomy = pending.get("autonomy") if isinstance(pending.get("autonomy"), dict) else {}
         if autonomy.get("decision") != "auto":
             return updated
@@ -2223,7 +2237,8 @@ def apply_autonomy_policy_to_run(run: dict[str, Any]) -> dict[str, Any]:
                 "success",
             )
         )
-        updated = annotate_run_with_autonomy_policy(updated, policy)
+        actuator_statuses = actuator_statuses_by_id()
+        updated = annotate_run_with_autonomy_policy(updated, policy, actuator_statuses)
     return updated
 
 
