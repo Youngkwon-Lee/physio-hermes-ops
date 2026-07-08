@@ -1,0 +1,27 @@
+[project]
+name = "physio-hermes-ops"
+version = "0.1.0"
+description = "Public-safe Hermes operations scripts and runbooks for PhysioKorea/Kinelo automation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "google-api-python-client>=2.0",
+    "PyYAML>=6.0",
+    "requests>=2.31",
+]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0",
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["apps/api", "scripts"]
+addopts = [
+    "-ra",
+    "--strict-config",
+    "--strict-markers",
+]
