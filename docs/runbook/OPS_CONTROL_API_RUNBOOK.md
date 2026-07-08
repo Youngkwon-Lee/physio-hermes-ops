@@ -218,6 +218,37 @@ profiles are `physio-orchestrator`, `physio-planner`, `physio-frontend`,
 `physio-backend`, and `physio-qa`; `db` delegates to `physio-backend`, and
 `devops` delegates to `physio-orchestrator` until dedicated profiles are live.
 
+Mission Control autonomy policy:
+- 기본 정책 파일: `config/mission_control_autonomy_policy.json`
+- override: `HERMES_MISSION_CONTROL_AUTONOMY_POLICY_PATH`
+- readback: `GET /autonomy-policy`
+- snapshot 포함: `GET /snapshot?organizationId=<org>`의 `autonomyPolicy`
+- approval item annotation: `approvalItems[].autonomy.decision`
+
+Decision values:
+- `auto`: preceding human gate가 승인된 뒤 API가 gate를 자동 진행할 수 있다.
+- `manual`: 운영자 승인을 기다린다.
+- `never`: 자동승인 금지. `production`은 policy file이 `auto`로 바뀌어도 항상 `never`다.
+
+Default Stage 5 policy는 feature/growth의 `issue`, `pull-request`와
+maintenance/mlops의 `pull-request`, ops-finance의 `issue`만 자동진행한다.
+`plan`, `preview`, `migration`, `production`은 사람 경계로 남긴다.
+
+Autonomy smoke:
+```bash
+curl -fsS 'http://127.0.0.1:8791/autonomy-policy'
+curl -fsS -X POST 'http://127.0.0.1:8791/runs' \
+  -H 'Content-Type: application/json' \
+  -d '{"organizationId":"org-smoke","title":"Autonomy smoke","laneId":"feature"}'
+curl -fsS -X POST 'http://127.0.0.1:8791/runs/<run-id>/approve' \
+  -H 'Content-Type: application/json' \
+  -d '{"organizationId":"org-smoke"}'
+curl -fsS 'http://127.0.0.1:8791/snapshot?organizationId=org-smoke'
+```
+
+Expected after approving the feature `plan` gate: `issue` and `pull-request`
+are approved by policy, `preview` is pending, and `production` remains non-auto.
+
 ## 6-4) Discord/Hermes 회의 요약 -> Mission Control
 목적: Discord/Hermes 회의에서 나온 결론을 prose-only 메시지로 흘려보내지 않고, Mission Control `/plans`와 `/tasks`에 구조화해 다음 작업으로 보이게 한다.
 

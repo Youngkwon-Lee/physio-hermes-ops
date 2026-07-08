@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,11 +12,20 @@ API_DIR = Path(__file__).resolve().parents[1] / "apps" / "api"
 if str(API_DIR) not in sys.path:
     sys.path.insert(0, str(API_DIR))
 
-from mission_control_api import build_base_run, create_mission_run
+from mission_control_api import (
+    apply_autonomy_policy_to_run,
+    approve_next_pending_gate,
+    build_base_run,
+    create_mission_run,
+)
 from mission_control_runtime import (
+    annotate_run_with_autonomy_policy,
+    autonomy_policy_read_model,
     claim_mission_action,
     create_mission_action,
+    evaluate_autonomy_policy,
     find_mission_action,
+    load_autonomy_policy,
     next_mission_action,
     read_action_state,
     resolve_owner_agent_profiles,
@@ -152,3 +162,93 @@ def test_resolved_owner_profiles_have_rows_for_runtime_agents() -> None:
         "physio-backend",
         "physio-qa",
     }
+
+
+def test_autonomy_policy_read_model_keeps_production_never() -> None:
+    policy = load_autonomy_policy()
+    read_model = autonomy_policy_read_model(
+        policy,
+        ["feature", "db-data"],
+        {
+            "feature": ["plan", "issue", "pull-request", "preview", "production"],
+            "db-data": ["migration", "pull-request", "production"],
+        },
+    )
+
+    feature = {item["gate"]: item for item in read_model["decisionsByLane"]["feature"]}
+    db_data = {item["gate"]: item for item in read_model["decisionsByLane"]["db-data"]}
+
+    assert feature["issue"]["decision"] == "auto"
+    assert feature["pull-request"]["decision"] == "auto"
+    assert feature["production"]["decision"] == "never"
+    assert db_data["production"]["decision"] == "never"
+    assert db_data["migration"]["decision"] == "manual"
+
+
+def test_autonomy_policy_annotates_runs_without_auto_approving_initial_manual_gate() -> None:
+    run = create_mission_run(
+        {
+            "organizationId": "org-1",
+            "title": "Autonomy policy smoke",
+            "laneId": "feature",
+            "ownerAgents": ["planner", "frontend", "qa"],
+        }
+    )
+
+    by_gate = {item["gate"]: item for item in run["approvalItems"]}
+    assert by_gate["plan"]["status"] == "pending"
+    assert by_gate["plan"]["autonomy"]["decision"] == "manual"
+    assert by_gate["issue"]["autonomy"]["decision"] == "auto"
+    assert by_gate["pull-request"]["autonomy"]["decision"] == "auto"
+    assert by_gate["production"]["autonomy"]["decision"] == "never"
+    assert any(item["label"] == "Autonomy policy" for item in run["artifacts"])
+
+
+def test_autonomy_policy_auto_advances_allowed_gates_after_human_plan_approval() -> None:
+    run = create_mission_run(
+        {
+            "organizationId": "org-1",
+            "title": "Autonomy policy advance",
+            "laneId": "feature",
+            "ownerAgents": ["planner", "frontend", "qa"],
+        }
+    )
+
+    updated = apply_autonomy_policy_to_run(approve_next_pending_gate(run))
+    by_gate = {item["gate"]: item for item in updated["approvalItems"]}
+
+    assert by_gate["plan"]["status"] == "approved"
+    assert by_gate["issue"]["status"] == "approved"
+    assert by_gate["pull-request"]["status"] == "approved"
+    assert by_gate["preview"]["status"] == "pending"
+    assert by_gate["production"]["status"] == "waived"
+    assert by_gate["production"]["autonomy"]["decision"] == "never"
+    assert updated["status"] == "waiting-for-approval"
+    assert any("auto-approved" in item["title"] for item in updated["traceItems"])
+
+
+def test_autonomy_policy_file_override_is_bounded(tmp_path: Path) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(
+        json.dumps(
+            {
+                "policyId": "test-policy",
+                "version": 2,
+                "defaultDecision": "auto",
+                "rules": [
+                    {"id": "bad-production", "laneId": "feature", "gate": "production", "decision": "auto"}
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    policy = load_autonomy_policy(policy_path)
+    annotated = annotate_run_with_autonomy_policy(
+        build_base_run(title="Override smoke", description="x", lane_id="feature"),
+        policy,
+    )
+
+    assert evaluate_autonomy_policy(policy, "feature", "issue")["decision"] == "auto"
+    assert evaluate_autonomy_policy(policy, "feature", "production")["decision"] == "never"
+    assert {item["gate"]: item for item in annotated["approvalItems"]}["production"]["autonomy"]["decision"] == "never"

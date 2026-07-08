@@ -12,6 +12,72 @@ ACTION_TYPES = {
     "desktop_repo_sync_restart_smoke",
 }
 ACTION_STATUSES = {"queued", "running", "done", "failed", "blocked", "cancelled"}
+AUTONOMY_DECISIONS = {"auto", "manual", "never"}
+
+DEFAULT_AUTONOMY_POLICY: dict[str, Any] = {
+    "policyId": "aiops-autonomy-policy-v1",
+    "version": 1,
+    "description": "Lane and gate policy for Product Mission Control autonomous approvals.",
+    "defaultDecision": "manual",
+    "rules": [
+        {
+            "id": "production-never",
+            "laneId": "*",
+            "gate": "production",
+            "decision": "never",
+            "reason": "Production is a permanent human approval boundary.",
+        },
+        {
+            "id": "feature-issue-auto",
+            "laneId": "feature",
+            "gate": "issue",
+            "decision": "auto",
+            "reason": "Approved feature plans may open issue drafts automatically.",
+        },
+        {
+            "id": "feature-pr-auto",
+            "laneId": "feature",
+            "gate": "pull-request",
+            "decision": "auto",
+            "reason": "Approved feature issue plans may prepare draft PR payloads automatically.",
+        },
+        {
+            "id": "growth-issue-auto",
+            "laneId": "growth",
+            "gate": "issue",
+            "decision": "auto",
+            "reason": "Approved growth plans may open issue drafts automatically.",
+        },
+        {
+            "id": "growth-pr-auto",
+            "laneId": "growth",
+            "gate": "pull-request",
+            "decision": "auto",
+            "reason": "Approved growth issue plans may prepare draft PR payloads automatically.",
+        },
+        {
+            "id": "maintenance-pr-auto",
+            "laneId": "maintenance",
+            "gate": "pull-request",
+            "decision": "auto",
+            "reason": "Maintenance fixes may prepare draft PR payloads after queue intake.",
+        },
+        {
+            "id": "mlops-pr-auto",
+            "laneId": "mlops",
+            "gate": "pull-request",
+            "decision": "auto",
+            "reason": "MLOps improvements may prepare draft PR payloads after plan approval.",
+        },
+        {
+            "id": "ops-finance-issue-auto",
+            "laneId": "ops-finance",
+            "gate": "issue",
+            "decision": "auto",
+            "reason": "Approved ops plans may open follow-up issue drafts automatically.",
+        },
+    ],
+}
 
 CORE_PROFILE_IDS = {
     "physio-orchestrator",
@@ -74,6 +140,146 @@ AGENT_PROFILE_ROWS: tuple[dict[str, str], ...] = (
 )
 
 PROFILE_BY_AGENT = {row["agentId"]: row for row in AGENT_PROFILE_ROWS}
+
+
+def normalized_policy_decision(value: Any, default: str = "manual") -> str:
+    decision = str(value or "").strip()
+    if decision in AUTONOMY_DECISIONS:
+        return decision
+    return default
+
+
+def normalize_autonomy_policy(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        value = deepcopy(DEFAULT_AUTONOMY_POLICY)
+    policy_id = str(value.get("policyId") or DEFAULT_AUTONOMY_POLICY["policyId"]).strip()
+    default_decision = normalized_policy_decision(value.get("defaultDecision"), "manual")
+    rules: list[dict[str, str]] = []
+    for raw_rule in value.get("rules", []):
+        if not isinstance(raw_rule, dict):
+            continue
+        lane_id = str(raw_rule.get("laneId") or "*").strip() or "*"
+        gate = str(raw_rule.get("gate") or "").strip()
+        decision = normalized_policy_decision(raw_rule.get("decision"), default_decision)
+        if not gate:
+            continue
+        rules.append(
+            {
+                "id": str(raw_rule.get("id") or f"{lane_id}:{gate}:{decision}").strip(),
+                "laneId": lane_id,
+                "gate": gate,
+                "decision": decision,
+                "reason": str(raw_rule.get("reason") or "").strip(),
+            }
+        )
+    if not any(rule["gate"] == "production" and rule["decision"] == "never" for rule in rules):
+        rules.insert(0, deepcopy(DEFAULT_AUTONOMY_POLICY["rules"][0]))
+    return {
+        "policyId": policy_id,
+        "version": int(value.get("version") or DEFAULT_AUTONOMY_POLICY["version"]),
+        "description": str(value.get("description") or DEFAULT_AUTONOMY_POLICY["description"]).strip(),
+        "defaultDecision": default_decision,
+        "rules": rules,
+    }
+
+
+def load_autonomy_policy(path: Path | None = None) -> dict[str, Any]:
+    if path and path.exists():
+        try:
+            import json
+
+            return normalize_autonomy_policy(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            return normalize_autonomy_policy(DEFAULT_AUTONOMY_POLICY)
+    return normalize_autonomy_policy(DEFAULT_AUTONOMY_POLICY)
+
+
+def rule_specificity(rule: dict[str, str], lane_id: str, gate: str) -> int:
+    score = 0
+    if rule.get("laneId") == lane_id:
+        score += 2
+    elif rule.get("laneId") == "*":
+        score += 1
+    if rule.get("gate") == gate:
+        score += 2
+    return score
+
+
+def evaluate_autonomy_policy(policy: dict[str, Any], lane_id: str, gate: str) -> dict[str, Any]:
+    normalized = normalize_autonomy_policy(policy)
+    if gate == "production":
+        return {
+            "policyId": normalized["policyId"],
+            "ruleId": "production-never",
+            "decision": "never",
+            "requiresHuman": True,
+            "reason": "Production is a permanent human approval boundary.",
+        }
+
+    candidates = [
+        rule
+        for rule in normalized["rules"]
+        if rule.get("gate") == gate and rule.get("laneId") in {lane_id, "*"}
+    ]
+    candidates.sort(key=lambda rule: rule_specificity(rule, lane_id, gate), reverse=True)
+    rule = candidates[0] if candidates else None
+    decision = rule["decision"] if rule else normalized["defaultDecision"]
+    return {
+        "policyId": normalized["policyId"],
+        "ruleId": rule["id"] if rule else "default",
+        "decision": decision,
+        "requiresHuman": decision != "auto",
+        "reason": rule["reason"] if rule else "No explicit lane/gate rule matched.",
+    }
+
+
+def annotate_run_with_autonomy_policy(run: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
+    updated = deepcopy(run)
+    lane_id = str(updated.get("laneId") or "").strip()
+    decisions: list[str] = []
+    for item in updated.get("approvalItems", []):
+        if not isinstance(item, dict):
+            continue
+        gate = str(item.get("gate") or "").strip()
+        evaluation = evaluate_autonomy_policy(policy, lane_id, gate)
+        item["autonomy"] = evaluation
+        decisions.append(f"{gate}:{evaluation['decision']}")
+
+    artifact = {
+        "label": "Autonomy policy",
+        "kind": "policy",
+        "value": ", ".join(decisions),
+        "metadata": {
+            "policyId": normalize_autonomy_policy(policy)["policyId"],
+            "production": "never",
+        },
+    }
+    artifacts = updated.setdefault("artifacts", [])
+    for index, current in enumerate(artifacts):
+        if isinstance(current, dict) and current.get("label") == artifact["label"] and current.get("kind") == artifact["kind"]:
+            artifacts[index] = artifact
+            break
+    else:
+        artifacts.append(artifact)
+    return updated
+
+
+def autonomy_policy_read_model(policy: dict[str, Any], lane_ids: list[str], gates_by_lane: dict[str, list[str]]) -> dict[str, Any]:
+    normalized = normalize_autonomy_policy(policy)
+    decisions_by_lane: dict[str, list[dict[str, Any]]] = {}
+    for lane_id in lane_ids:
+        decisions_by_lane[lane_id] = [
+            {"gate": gate, **evaluate_autonomy_policy(normalized, lane_id, gate)}
+            for gate in gates_by_lane.get(lane_id, [])
+        ]
+    return {
+        "policyId": normalized["policyId"],
+        "version": normalized["version"],
+        "description": normalized["description"],
+        "defaultDecision": normalized["defaultDecision"],
+        "rules": normalized["rules"],
+        "decisionsByLane": decisions_by_lane,
+    }
 
 
 def normalize_owner_agent_ids(values: Any, fallback: list[str]) -> list[str]:
