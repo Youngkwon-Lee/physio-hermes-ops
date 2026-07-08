@@ -16,10 +16,13 @@ from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import Request, urlopen
 
 from mission_control_runtime import (
+    annotate_run_with_autonomy_policy,
+    autonomy_policy_read_model,
     claim_mission_action,
     create_mission_action,
     find_mission_action,
     list_mission_actions,
+    load_autonomy_policy,
     next_mission_action,
     normalize_owner_agent_ids,
     read_action_state,
@@ -78,6 +81,12 @@ MISSION_ACTION_STATE_PATH = Path(
     os.getenv(
         "HERMES_MISSION_CONTROL_ACTION_STATE_PATH",
         str(MISSION_CONTROL_STATE_DIR / "mission_actions.json"),
+    )
+)
+AUTONOMY_POLICY_PATH = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_AUTONOMY_POLICY_PATH",
+        str(ROOT / "config" / "mission_control_autonomy_policy.json"),
     )
 )
 LEGACY_HANDOFF_INBOX_PATH = ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"
@@ -2178,6 +2187,46 @@ def recheck_preview_gate(run: dict[str, Any]) -> dict[str, Any]:
     return run
 
 
+def current_autonomy_policy() -> dict[str, Any]:
+    return load_autonomy_policy(AUTONOMY_POLICY_PATH)
+
+
+def current_autonomy_policy_read_model() -> dict[str, Any]:
+    return autonomy_policy_read_model(
+        current_autonomy_policy(),
+        list(LANES.keys()),
+        {lane_id: list(lane["approvalGates"]) for lane_id, lane in LANES.items()},
+    )
+
+
+def apply_autonomy_policy_to_run(run: dict[str, Any]) -> dict[str, Any]:
+    policy = current_autonomy_policy()
+    updated = annotate_run_with_autonomy_policy(run, policy)
+    max_iterations = len(updated.get("approvalItems", [])) + 1
+    for _ in range(max_iterations):
+        if updated.get("status") == "blocked":
+            return annotate_run_with_autonomy_policy(updated, policy)
+        pending = next((item for item in updated.get("approvalItems", []) if item.get("status") == "pending"), None)
+        if not pending:
+            return annotate_run_with_autonomy_policy(updated, policy)
+        autonomy = pending.get("autonomy") if isinstance(pending.get("autonomy"), dict) else {}
+        if autonomy.get("decision") != "auto":
+            return updated
+        gate = str(pending.get("gate") or "")
+        rule_id = str(autonomy.get("ruleId") or "default")
+        updated = approve_next_pending_gate(updated)
+        updated["traceItems"].append(
+            make_trace(
+                str(pending.get("requiredBy") or "orchestrator"),
+                f"{pending.get('label', gate)} auto-approved",
+                f"Autonomy policy {policy.get('policyId')} rule {rule_id} approved gate {gate}.",
+                "success",
+            )
+        )
+        updated = annotate_run_with_autonomy_policy(updated, policy)
+    return updated
+
+
 def normalize_codex_smoke_result(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("result must be an object")
@@ -2301,7 +2350,7 @@ def create_mission_run(payload: dict[str, Any]) -> dict[str, Any]:
     source = normalize_run_source(payload.get("source"))
     if priority not in {"low", "medium", "high", "urgent"}:
         raise ValueError("priority is invalid")
-    return build_base_run(
+    run = build_base_run(
         title=title,
         description=description,
         lane_id=lane_id,
@@ -2309,6 +2358,7 @@ def create_mission_run(payload: dict[str, Any]) -> dict[str, Any]:
         owner_agents=normalize_owner_agent_ids(payload.get("ownerAgents"), list(LANES[lane_id]["primaryAgents"])),
         source=source,
     )
+    return apply_autonomy_policy_to_run(run)
 
 
 def summarize_readiness_counts(readiness: list[dict[str, Any]]) -> dict[str, int]:
@@ -2628,7 +2678,7 @@ def create_daily_ops_run(organization_id: str) -> dict[str, Any]:
             "- 승인",
         ]
     )
-    return build_base_run(
+    run = build_base_run(
         title="오늘 운영 점검",
         description="마일스톤, 사용, 유지보수, 퍼널, 모델, 배포 점검. 보고서, 개선, 승인.",
         lane_id="ops-finance",
@@ -2669,6 +2719,7 @@ def create_daily_ops_run(organization_id: str) -> dict[str, Any]:
             ),
         ],
     )
+    return apply_autonomy_policy_to_run(run)
 
 
 def create_heartbeat_cron_enablement_run() -> dict[str, Any]:
@@ -2697,7 +2748,7 @@ def create_heartbeat_cron_enablement_run() -> dict[str, Any]:
             "- Roll back by removing the cron entry or setting AGENT_OS_HEARTBEAT_ENABLED=0.",
         ]
     )
-    return build_base_run(
+    run = build_base_run(
         title="Enable Agent OS heartbeat cron",
         description="Create a reviewed PR request that arms the 24/7 Mission Control heartbeat without bypassing human approval.",
         lane_id="devops",
@@ -2747,6 +2798,7 @@ def create_heartbeat_cron_enablement_run() -> dict[str, Any]:
             make_trace("devops", "Safety boundary locked", "The request does not mutate vercel.json, env vars, deployment state, or trace-writing automation.", "success"),
         ],
     )
+    return apply_autonomy_policy_to_run(run)
 
 
 def heartbeat_check(write_traces: bool = False) -> dict[str, Any]:
@@ -2896,6 +2948,8 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                 return self._json(200, ok(get_mission_control_readiness()))
             if parsed.path == "/heartbeat/control":
                 return self._json(200, ok(get_heartbeat_control_state()))
+            if parsed.path == "/autonomy-policy":
+                return self._json(200, ok(current_autonomy_policy_read_model()))
             if parsed.path == "/snapshot":
                 if not organization_id:
                     return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
@@ -2907,6 +2961,7 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     "handoffs": list_handoff_items(organization_id),
                     "readiness": get_mission_control_readiness(),
                     "heartbeatControl": get_heartbeat_control_state(),
+                    "autonomyPolicy": current_autonomy_policy_read_model(),
                 }
                 return self._json(200, ok(snapshot))
             if parsed.path == "/mission-actions":
@@ -3043,7 +3098,7 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     index, current = find_run(state, organization_id, run_id)
                     if current is None:
                         return self._json(404, err("Mission run not found", "NOT_FOUND"))
-                    updated = approve_next_pending_gate(current)
+                    updated = apply_autonomy_policy_to_run(approve_next_pending_gate(current))
                     state["runsByOrg"][organization_id][index] = updated
                     save_state(state)
                 log_event("run.approved", {"organizationId": organization_id, "runId": run_id})

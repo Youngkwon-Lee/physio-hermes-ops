@@ -1,0 +1,64 @@
+{
+  "policyId": "aiops-autonomy-policy-v1",
+  "version": 1,
+  "description": "Lane and gate policy for Product Mission Control autonomous approvals.",
+  "defaultDecision": "manual",
+  "rules": [
+    {
+      "id": "production-never",
+      "laneId": "*",
+      "gate": "production",
+      "decision": "never",
+      "reason": "Production is a permanent human approval boundary."
+    },
+    {
+      "id": "feature-issue-auto",
+      "laneId": "feature",
+      "gate": "issue",
+      "decision": "auto",
+      "reason": "Approved feature plans may open issue drafts automatically."
+    },
+    {
+      "id": "feature-pr-auto",
+      "laneId": "feature",
+      "gate": "pull-request",
+      "decision": "auto",
+      "reason": "Approved feature issue plans may prepare draft PR payloads automatically."
+    },
+    {
+      "id": "growth-issue-auto",
+      "laneId": "growth",
+      "gate": "issue",
+      "decision": "auto",
+      "reason": "Approved growth plans may open issue drafts automatically."
+    },
+    {
+      "id": "growth-pr-auto",
+      "laneId": "growth",
+      "gate": "pull-request",
+      "decision": "auto",
+      "reason": "Approved growth issue plans may prepare draft PR payloads automatically."
+    },
+    {
+      "id": "maintenance-pr-auto",
+      "laneId": "maintenance",
+      "gate": "pull-request",
+      "decision": "auto",
+      "reason": "Maintenance fixes may prepare draft PR payloads after queue intake."
+    },
+    {
+      "id": "mlops-pr-auto",
+      "laneId": "mlops",
+      "gate": "pull-request",
+      "decision": "auto",
+      "reason": "MLOps improvements may prepare draft PR payloads after plan approval."
+    },
+    {
+      "id": "ops-finance-issue-auto",
+      "laneId": "ops-finance",
+      "gate": "issue",
+      "decision": "auto",
+      "reason": "Approved ops plans may open follow-up issue drafts automatically."
+    }
+  ]
+}
