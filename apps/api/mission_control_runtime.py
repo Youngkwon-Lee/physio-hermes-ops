@@ -42,6 +42,14 @@ DEFAULT_AUTONOMY_POLICY: dict[str, Any] = {
             "reason": "Approved feature issue plans may prepare draft PR payloads automatically.",
         },
         {
+            "id": "feature-preview-auto",
+            "laneId": "feature",
+            "gate": "preview",
+            "decision": "auto",
+            "requiresActuator": "agent-os-preview-chain",
+            "reason": "Approved feature draft PRs may resolve a Vercel preview when the PR and preview actuators are ready.",
+        },
+        {
             "id": "growth-issue-auto",
             "laneId": "growth",
             "gate": "issue",
@@ -54,6 +62,14 @@ DEFAULT_AUTONOMY_POLICY: dict[str, Any] = {
             "gate": "pull-request",
             "decision": "auto",
             "reason": "Approved growth issue plans may prepare draft PR payloads automatically.",
+        },
+        {
+            "id": "growth-preview-auto",
+            "laneId": "growth",
+            "gate": "preview",
+            "decision": "auto",
+            "requiresActuator": "agent-os-preview-chain",
+            "reason": "Approved growth draft PRs may resolve a Vercel preview when the PR and preview actuators are ready.",
         },
         {
             "id": "maintenance-pr-auto",
@@ -170,6 +186,7 @@ def normalize_autonomy_policy(value: Any) -> dict[str, Any]:
                 "gate": gate,
                 "decision": decision,
                 "reason": str(raw_rule.get("reason") or "").strip(),
+                "requiresActuator": str(raw_rule.get("requiresActuator") or "").strip(),
             }
         )
     if not any(rule["gate"] == "production" and rule["decision"] == "never" for rule in rules):
@@ -205,7 +222,12 @@ def rule_specificity(rule: dict[str, str], lane_id: str, gate: str) -> int:
     return score
 
 
-def evaluate_autonomy_policy(policy: dict[str, Any], lane_id: str, gate: str) -> dict[str, Any]:
+def evaluate_autonomy_policy(
+    policy: dict[str, Any],
+    lane_id: str,
+    gate: str,
+    actuator_statuses: dict[str, str] | None = None,
+) -> dict[str, Any]:
     normalized = normalize_autonomy_policy(policy)
     if gate == "production":
         return {
@@ -223,17 +245,31 @@ def evaluate_autonomy_policy(policy: dict[str, Any], lane_id: str, gate: str) ->
     ]
     candidates.sort(key=lambda rule: rule_specificity(rule, lane_id, gate), reverse=True)
     rule = candidates[0] if candidates else None
-    decision = rule["decision"] if rule else normalized["defaultDecision"]
+    configured_decision = rule["decision"] if rule else normalized["defaultDecision"]
+    required_actuator = rule.get("requiresActuator") if rule else ""
+    actuator_status = (actuator_statuses or {}).get(required_actuator, "") if required_actuator else ""
+    decision = configured_decision
+    reason = rule["reason"] if rule else "No explicit lane/gate rule matched."
+    if configured_decision == "auto" and required_actuator and actuator_status != "ready":
+        decision = "manual"
+        reason = f"{reason} Waiting for actuator {required_actuator} to become ready."
     return {
         "policyId": normalized["policyId"],
         "ruleId": rule["id"] if rule else "default",
         "decision": decision,
+        "configuredDecision": configured_decision,
         "requiresHuman": decision != "auto",
-        "reason": rule["reason"] if rule else "No explicit lane/gate rule matched.",
+        "reason": reason,
+        "requiredActuator": required_actuator or None,
+        "actuatorStatus": actuator_status or None,
     }
 
 
-def annotate_run_with_autonomy_policy(run: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
+def annotate_run_with_autonomy_policy(
+    run: dict[str, Any],
+    policy: dict[str, Any],
+    actuator_statuses: dict[str, str] | None = None,
+) -> dict[str, Any]:
     updated = deepcopy(run)
     lane_id = str(updated.get("laneId") or "").strip()
     decisions: list[str] = []
@@ -241,7 +277,7 @@ def annotate_run_with_autonomy_policy(run: dict[str, Any], policy: dict[str, Any
         if not isinstance(item, dict):
             continue
         gate = str(item.get("gate") or "").strip()
-        evaluation = evaluate_autonomy_policy(policy, lane_id, gate)
+        evaluation = evaluate_autonomy_policy(policy, lane_id, gate, actuator_statuses)
         item["autonomy"] = evaluation
         decisions.append(f"{gate}:{evaluation['decision']}")
 
@@ -264,12 +300,17 @@ def annotate_run_with_autonomy_policy(run: dict[str, Any], policy: dict[str, Any
     return updated
 
 
-def autonomy_policy_read_model(policy: dict[str, Any], lane_ids: list[str], gates_by_lane: dict[str, list[str]]) -> dict[str, Any]:
+def autonomy_policy_read_model(
+    policy: dict[str, Any],
+    lane_ids: list[str],
+    gates_by_lane: dict[str, list[str]],
+    actuator_statuses: dict[str, str] | None = None,
+) -> dict[str, Any]:
     normalized = normalize_autonomy_policy(policy)
     decisions_by_lane: dict[str, list[dict[str, Any]]] = {}
     for lane_id in lane_ids:
         decisions_by_lane[lane_id] = [
-            {"gate": gate, **evaluate_autonomy_policy(normalized, lane_id, gate)}
+            {"gate": gate, **evaluate_autonomy_policy(normalized, lane_id, gate, actuator_statuses)}
             for gate in gates_by_lane.get(lane_id, [])
         ]
     return {
