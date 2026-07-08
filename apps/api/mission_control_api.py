@@ -15,6 +15,19 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import Request, urlopen
 
+from mission_control_runtime import (
+    claim_mission_action,
+    create_mission_action,
+    find_mission_action,
+    list_mission_actions,
+    next_mission_action,
+    normalize_owner_agent_ids,
+    read_action_state,
+    resolve_owner_agent_profiles,
+    update_mission_action_status,
+    write_action_state,
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 HOST = os.getenv("HERMES_MISSION_CONTROL_HOST", "127.0.0.1")
 PORT = int(os.getenv("HERMES_MISSION_CONTROL_PORT", "8791"))
@@ -59,6 +72,12 @@ MISSION_CONTROL_STATE_DIR = Path(
     os.getenv(
         "HERMES_MISSION_CONTROL_STATE_DIR",
         str(Path.home() / ".local" / "state" / "physio-hermes-ops" / "mission_control"),
+    )
+)
+MISSION_ACTION_STATE_PATH = Path(
+    os.getenv(
+        "HERMES_MISSION_CONTROL_ACTION_STATE_PATH",
+        str(MISSION_CONTROL_STATE_DIR / "mission_actions.json"),
     )
 )
 LEGACY_HANDOFF_INBOX_PATH = ROOT / ".runtime" / "mission_control" / "handoff_inbox.json"
@@ -878,7 +897,8 @@ def build_base_run(
     created_at = now_iso()
     gates = approval_gates if approval_gates is not None else list(lane["approvalGates"])
     run_workflows = workflow_ids if workflow_ids is not None else list(lane["defaultWorkflowIds"])
-    run_agents = owner_agents if owner_agents is not None else list(lane["primaryAgents"])
+    run_agents = normalize_owner_agent_ids(owner_agents, list(lane["primaryAgents"]))
+    run_agent_profiles = resolve_owner_agent_profiles(run_agents)
     approval_items = []
     for index, gate in enumerate(gates):
         approval_items.append(
@@ -895,6 +915,7 @@ def build_base_run(
         {"label": "Lane", "value": lane["name"]},
         {"label": "Target green level", "value": lane["defaultGreenLevel"]},
         {"label": "Primary agents", "value": ", ".join(run_agents)},
+        {"label": "Hermes profiles", "value": ", ".join(profile["profileId"] for profile in run_agent_profiles)},
     ]
     if source and source.get("streamId"):
         base_artifacts.append({"label": "Source stream", "value": str(source["streamId"])})
@@ -929,6 +950,7 @@ def build_base_run(
         "priority": priority,
         "workflowIds": run_workflows,
         "ownerAgents": run_agents,
+        "ownerAgentProfiles": run_agent_profiles,
         "approvalItems": approval_items,
         "traceItems": base_trace,
         "artifacts": base_artifacts,
@@ -2284,6 +2306,7 @@ def create_mission_run(payload: dict[str, Any]) -> dict[str, Any]:
         description=description,
         lane_id=lane_id,
         priority=priority,
+        owner_agents=normalize_owner_agent_ids(payload.get("ownerAgents"), list(LANES[lane_id]["primaryAgents"])),
         source=source,
     )
 
@@ -2886,6 +2909,29 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     "heartbeatControl": get_heartbeat_control_state(),
                 }
                 return self._json(200, ok(snapshot))
+            if parsed.path == "/mission-actions":
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                limit_value = (params.get("limit") or ["30"])[0]
+                limit = max(1, min(100, int(limit_value)))
+                state = read_action_state(MISSION_ACTION_STATE_PATH, now_iso())
+                return self._json(200, ok(list_mission_actions(state, organization_id, limit)))
+            if parsed.path == "/mission-actions/next":
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                target_agent = (params.get("targetAgent") or [""])[0].strip()
+                target_host = (params.get("targetHost") or [""])[0].strip() or None
+                state = read_action_state(MISSION_ACTION_STATE_PATH, now_iso())
+                return self._json(200, ok(next_mission_action(state, organization_id, target_agent, target_host)))
+            if parsed.path.startswith("/mission-actions/"):
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                action_id = parsed.path.split("/")[2]
+                state = read_action_state(MISSION_ACTION_STATE_PATH, now_iso())
+                _, item = find_mission_action(state, organization_id, action_id)
+                if item is None:
+                    return self._json(404, err("Mission action not found", "NOT_FOUND"))
+                return self._json(200, ok(item))
             return self._json(404, err("Not found", "NOT_FOUND"))
         except ValueError as error:
             return self._json(400, err(str(error), "VALIDATION_ERROR"))
@@ -3099,6 +3145,66 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     save_state(state)
                 log_event("heartbeat.cron-requested", {"organizationId": organization_id, "runId": run["id"]})
                 return self._json(200, ok(run))
+
+            if parsed.path == "/mission-actions":
+                organization_id, item = create_mission_action(data, now_iso())
+                with STATE_LOCK:
+                    state = read_action_state(MISSION_ACTION_STATE_PATH, now_iso())
+                    rows = state.setdefault("actionsByOrg", {}).setdefault(organization_id, [])
+                    if not isinstance(rows, list):
+                        rows = []
+                        state["actionsByOrg"][organization_id] = rows
+                    rows.append(item)
+                    write_action_state(MISSION_ACTION_STATE_PATH, state, now_iso())
+                log_event(
+                    "mission-action.created",
+                    {
+                        "organizationId": organization_id,
+                        "actionId": item["id"],
+                        "actionType": item["actionType"],
+                    },
+                )
+                return self._json(200, ok(item))
+
+            if parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/claim"):
+                action_id = parsed.path.split("/")[2]
+                organization_id = str(data.get("organizationId", "")).strip()
+                worker_id = str(data.get("workerId") or "mission-control-action-worker").strip()
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                with STATE_LOCK:
+                    state = read_action_state(MISSION_ACTION_STATE_PATH, now_iso())
+                    try:
+                        item = claim_mission_action(state, organization_id, action_id, worker_id, now_iso())
+                    except KeyError:
+                        return self._json(404, err("Mission action not found", "NOT_FOUND"))
+                    write_action_state(MISSION_ACTION_STATE_PATH, state, now_iso())
+                log_event("mission-action.claimed", {"organizationId": organization_id, "actionId": action_id, "workerId": worker_id})
+                return self._json(200, ok(item))
+
+            if parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/status"):
+                action_id = parsed.path.split("/")[2]
+                organization_id = str(data.get("organizationId", "")).strip()
+                status = str(data.get("status") or "").strip()
+                if not organization_id:
+                    return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
+                with STATE_LOCK:
+                    state = read_action_state(MISSION_ACTION_STATE_PATH, now_iso())
+                    try:
+                        item = update_mission_action_status(
+                            state,
+                            organization_id,
+                            action_id,
+                            status,
+                            str(data.get("result") or "").strip() or None,
+                            data.get("resultData"),
+                            now_iso(),
+                        )
+                    except KeyError:
+                        return self._json(404, err("Mission action not found", "NOT_FOUND"))
+                    write_action_state(MISSION_ACTION_STATE_PATH, state, now_iso())
+                log_event("mission-action.status-updated", {"organizationId": organization_id, "actionId": action_id, "status": status})
+                return self._json(200, ok(item))
 
             return self._json(404, err("Not found", "NOT_FOUND"))
         except ValueError as error:

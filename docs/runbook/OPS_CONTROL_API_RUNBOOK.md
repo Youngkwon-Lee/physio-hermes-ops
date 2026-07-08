@@ -109,6 +109,7 @@ curl -s -X POST http://127.0.0.1:8788/action \
 현재 허용 action type:
 - `desktop_repo_sync_restart_smoke`: canonical repo에서 `git pull --ff-only`, `ops-control-api.service` restart, smoke endpoint 검증
 - `desktop_hermes_prompt`: desktop worker가 로컬 `hermes -z`로 bounded prompt를 실행하고 결과를 action status에 기록
+- `desktop_hermes_profile_prompt`: desktop worker가 whitelist된 `physio-*` Hermes profile로 `hermes -p <profile> chat -q`를 실행하고 결과를 action status에 기록
 
 systemd(user) worker 활성화:
 ```bash
@@ -191,6 +192,31 @@ curl -sS -X POST http://100.83.147.56:8792/mission-actions \
     }
   }'
 ```
+
+Profile-targeted Hermes prompt action 예시:
+```bash
+curl -sS -X POST http://100.83.147.56:8792/mission-actions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MISSION_CONTROL_SHARED_TOKEN" \
+  -d '{
+    "organizationId": "org-smoke",
+    "actionType": "desktop_hermes_profile_prompt",
+    "title": "Ask physio-frontend to review Mission Control UI risk",
+    "target": {"agent": "desktop-hermes", "surface": "hermes-gateway", "host": "desktop-wsl", "profileId": "frontend"},
+    "priority": 20,
+    "params": {
+      "cwd": "/home/yk/physio-hermes-ops",
+      "timeoutSec": 600,
+      "prompt": "Mission Control UI에서 ownerAgentProfiles readback이 보이는지 점검하고 다음 조치 1개를 제안해."
+    }
+  }'
+```
+
+Mission runs keep the existing `ownerAgents` role ids and also expose
+`ownerAgentProfiles` with the concrete Hermes profile routing. Current direct
+profiles are `physio-orchestrator`, `physio-planner`, `physio-frontend`,
+`physio-backend`, and `physio-qa`; `db` delegates to `physio-backend`, and
+`devops` delegates to `physio-orchestrator` until dedicated profiles are live.
 
 ## 6-4) Discord/Hermes 회의 요약 -> Mission Control
 목적: Discord/Hermes 회의에서 나온 결론을 prose-only 메시지로 흘려보내지 않고, Mission Control `/plans`와 `/tasks`에 구조화해 다음 작업으로 보이게 한다.

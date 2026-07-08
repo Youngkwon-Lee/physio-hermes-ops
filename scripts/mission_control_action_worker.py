@@ -16,7 +16,23 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED_ACTION_TYPES = {"desktop_hermes_prompt", "desktop_repo_sync_restart_smoke"}
+ALLOWED_ACTION_TYPES = {"desktop_hermes_prompt", "desktop_hermes_profile_prompt", "desktop_repo_sync_restart_smoke"}
+ALLOWED_PROFILE_IDS = {
+    "physio-orchestrator",
+    "physio-planner",
+    "physio-frontend",
+    "physio-backend",
+    "physio-qa",
+}
+PROFILE_BY_AGENT = {
+    "orchestrator": "physio-orchestrator",
+    "planner": "physio-planner",
+    "frontend": "physio-frontend",
+    "backend": "physio-backend",
+    "db": "physio-backend",
+    "qa": "physio-qa",
+    "devops": "physio-orchestrator",
+}
 
 
 def first_env(*names: str) -> str | None:
@@ -172,6 +188,15 @@ def resolve_hermes_bin(value: Any) -> str:
     )
 
 
+def resolve_profile_id(value: Any) -> str:
+    profile_id = str(value or "").strip()
+    if profile_id in ALLOWED_PROFILE_IDS:
+        return profile_id
+    if profile_id in PROFILE_BY_AGENT:
+        return PROFILE_BY_AGENT[profile_id]
+    raise ValueError(f"unsupported profileId: {profile_id or 'missing'}")
+
+
 def execute_desktop_hermes_prompt(action: dict[str, Any]) -> dict[str, Any]:
     params = action.get("params") if isinstance(action.get("params"), dict) else {}
     prompt = str(params.get("prompt") or "").strip()
@@ -189,6 +214,31 @@ def execute_desktop_hermes_prompt(action: dict[str, Any]) -> dict[str, Any]:
         "ok": result.get("exitCode") == 0,
         "cwd": str(cwd),
         "timeoutSec": timeout_sec,
+        "promptPreview": compact(prompt, 500),
+        "command": result,
+    }
+
+
+def execute_desktop_hermes_profile_prompt(action: dict[str, Any]) -> dict[str, Any]:
+    params = action.get("params") if isinstance(action.get("params"), dict) else {}
+    target = action.get("target") if isinstance(action.get("target"), dict) else {}
+    prompt = str(params.get("prompt") or "").strip()
+    if not prompt:
+        raise ValueError("params.prompt is required")
+    if len(prompt) > 8000:
+        raise ValueError("params.prompt must be 8000 characters or fewer")
+
+    profile_id = resolve_profile_id(params.get("profileId") or target.get("profileId") or target.get("agent"))
+    cwd = safe_cwd(params.get("cwd"))
+    timeout_sec = bounded_timeout(params.get("timeoutSec"))
+    hermes_bin = resolve_hermes_bin(params.get("hermesBin"))
+    command = [hermes_bin, "-p", profile_id, "chat", "-q", prompt]
+    result = run_cmd(command, cwd=cwd, timeout_sec=timeout_sec)
+    return {
+        "ok": result.get("exitCode") == 0,
+        "cwd": str(cwd),
+        "timeoutSec": timeout_sec,
+        "profileId": profile_id,
         "promptPreview": compact(prompt, 500),
         "command": result,
     }
@@ -328,6 +378,8 @@ def run_once(args: argparse.Namespace) -> int:
     try:
         if action_type == "desktop_repo_sync_restart_smoke":
             result = execute_repo_sync_restart_smoke(claimed, args.token)
+        elif action_type == "desktop_hermes_profile_prompt":
+            result = execute_desktop_hermes_profile_prompt(claimed)
         elif action_type == "desktop_hermes_prompt":
             result = execute_desktop_hermes_prompt(claimed)
         else:
