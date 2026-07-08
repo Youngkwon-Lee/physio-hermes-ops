@@ -2,6 +2,16 @@
 
 Hermes 멀티프로필 운영(physio-*)을 위한 공개 운영 레포입니다.
 
+## Local Checks
+
+This repo uses `uv` for Python dependency management and `pre-commit` for the local gitleaks secret gate.
+
+```bash
+uv sync --dev
+uv run pre-commit install
+make check
+```
+
 ## 포함 범위 (MVP)
 - 프로필 스펙/페르소나 문서
 - nightly 운영 runbook/timeout 정책
