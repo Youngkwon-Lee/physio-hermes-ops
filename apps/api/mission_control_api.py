@@ -2880,6 +2880,44 @@ def request_json(handler: BaseHTTPRequestHandler) -> dict[str, Any]:
     return json.loads(raw.decode("utf-8"))
 
 
+EVALOPS_P0_REPORT_PATH = "docs/reports/evalops-p0-gate-summary.md"
+
+
+def _evalops_p0_missing_read_model() -> dict[str, Any]:
+    """Well-formed 'missing' model, mirroring physio_app's emptyReadModel so the
+    contract shape holds even before the artifact is generated."""
+    return {
+        "generatedAt": None,
+        "schemaVersion": None,
+        "status": "missing",
+        "summary": "EvalOps P0 JSON report has not been generated yet.",
+        "reportPath": EVALOPS_P0_REPORT_PATH,
+        "workflows": [],
+        "totals": {
+            "workflowCount": 0,
+            "passingWorkflowCount": 0,
+            "fixtureCount": 0,
+            "passCount": 0,
+            "failCount": 0,
+            "knownFailureCount": 0,
+            "blockedCount": 0,
+        },
+        "releaseCriteria": [],
+        "smokeEvidence": [],
+        "nextRequiredWork": [],
+    }
+
+
+def get_evalops_p0_read_model() -> dict[str, Any]:
+    """Phase 5 (Hermes Runtime Split): serve the EvalOps P0 Mission Control read
+    model that physio_app already computed and wrote to its artifact. Hermes does
+    NOT re-run the transform here — re-implementing it in Python would recreate the
+    dual existence Phase 5 removes — it passes the finished artifact through, or a
+    well-formed 'missing' model when the artifact has not been generated yet."""
+    artifact = target_app_path() / "output" / "evalops-p0-mission-control.json"
+    return read_json(artifact, _evalops_p0_missing_read_model())
+
+
 class MissionControlHandler(BaseHTTPRequestHandler):
     server_version = "HermesMissionControl/0.1"
 
@@ -2965,6 +3003,10 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                 return self._json(200, ok(get_heartbeat_control_state()))
             if parsed.path == "/autonomy-policy":
                 return self._json(200, ok(current_autonomy_policy_read_model()))
+            if parsed.path == "/evalops/p0":
+                # Phase 5 pass-through: physio_app already computed this read model.
+                # The gate report is repo-global, so no organizationId is required.
+                return self._json(200, ok(get_evalops_p0_read_model()))
             if parsed.path == "/snapshot":
                 if not organization_id:
                     return self._json(400, err("organizationId is required", "VALIDATION_ERROR"))
