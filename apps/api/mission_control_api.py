@@ -2918,6 +2918,16 @@ def get_evalops_p0_read_model() -> dict[str, Any]:
     return read_json(artifact, _evalops_p0_missing_read_model())
 
 
+def get_mission_control_snapshot_read_models() -> dict[str, Any]:
+    """Phase 5 pass-through: physio_app computed its 11 ops read models and wrote
+    them to a single artifact keyed by snapshot field name. Serve them verbatim
+    (no re-transform). Absent/malformed → {} so the physio_app loader falls back to
+    its own local computation via `?? fallback`."""
+    artifact = target_app_path() / "output" / "mission-control-snapshot-read-models.json"
+    models = read_json(artifact, {})
+    return models if isinstance(models, dict) else {}
+
+
 class MissionControlHandler(BaseHTTPRequestHandler):
     server_version = "HermesMissionControl/0.1"
 
@@ -3019,6 +3029,10 @@ class MissionControlHandler(BaseHTTPRequestHandler):
                     "readiness": get_mission_control_readiness(),
                     "heartbeatControl": get_heartbeat_control_state(),
                     "autonomyPolicy": current_autonomy_policy_read_model(),
+                    # Phase 5: spread the physio_app-computed ops read models (agentOps,
+                    # devOps, …, evalOpsP0, mlOps) verbatim. Absent → nothing added, and
+                    # the physio_app loader falls back to local per-field computation.
+                    **get_mission_control_snapshot_read_models(),
                 }
                 return self._json(200, ok(snapshot))
             if parsed.path == "/mission-actions":
