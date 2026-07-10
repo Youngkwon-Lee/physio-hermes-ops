@@ -1,22 +1,11 @@
 #!/usr/bin/env python3
-"""Compare public-safe cron registry against live Hermes cron state.
-
-Checks:
-- missing/extra jobs by name
-- schedule mismatch
-- mode mismatch (agent vs script)
-- toolset mismatch for agent jobs
-- tracked prompt/script file existence inside the repo
-
-Usage:
-  python scripts/check_cron_registry.py
-  python scripts/check_cron_registry.py --strict
-"""
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,11 +14,11 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_PATH = ROOT / "cron" / "registry" / "jobs.yaml"
+PROFILE_ENV = "HERMES_CRON_PROFILE"
 
 
 def load_registry() -> dict[str, dict[str, Any]]:
-    data = yaml.safe_load(REGISTRY_PATH.read_text(encoding="utf-8"))
+    data = yaml.safe_load((ROOT / "cron" / "registry" / "jobs.yaml").read_text(encoding="utf-8"))
     jobs = data.get("jobs", []) if isinstance(data, dict) else []
     return {job["name"]: job for job in jobs if isinstance(job, dict) and job.get("name")}
 
@@ -72,27 +61,110 @@ def parse_live_jobs(text: str) -> dict[str, dict[str, Any]]:
     return jobs
 
 
-def get_live_jobs() -> dict[str, dict[str, Any]]:
-    proc = subprocess.run(["hermes", "cron", "list", "--all"], capture_output=True, text=True)
+def registry_live_names(job: dict[str, Any]) -> list[str]:
+    names = [str(job.get("name") or "").strip()]
+    runtime_name = str(job.get("runtime_name") or "").strip()
+    if runtime_name:
+        names.append(runtime_name)
+    runtime_aliases = job.get("runtime_aliases") or []
+    if isinstance(runtime_aliases, list):
+        names.extend(str(alias).strip() for alias in runtime_aliases)
+    return [name for name in dict.fromkeys(names) if name]
+
+
+def registry_candidate_names(registry: dict[str, dict[str, Any]]) -> set[str]:
+    return {name for job in registry.values() for name in registry_live_names(job)}
+
+
+def runtime_only_job_names(registry: dict[str, dict[str, Any]]) -> list[str]:
+    return sorted(name for name, job in registry.items() if job.get("source_state") == "runtime_only")
+
+
+def find_live_job(
+    registry_job: dict[str, Any],
+    live: dict[str, dict[str, Any]],
+) -> tuple[str | None, dict[str, Any] | None]:
+    for name in registry_live_names(registry_job):
+        if name in live:
+            return name, live[name]
+    return None, None
+
+
+def hermes_executable() -> str:
+    configured = os.getenv("HERMES_BIN", "").strip()
+    if configured:
+        return configured
+    found = shutil.which("hermes")
+    if found:
+        return found
+    user_bin = Path.home() / ".local" / "bin" / "hermes"
+    if user_bin.exists():
+        return str(user_bin)
+    return "hermes"
+
+
+def hermes_cron_command(profile: str | None) -> list[str]:
+    command = [hermes_executable()]
+    if profile:
+        command.extend(["-p", profile])
+    command.extend(["cron", "list", "--all"])
+    return command
+
+
+def get_live_jobs(profile: str | None) -> dict[str, dict[str, Any]]:
+    command = hermes_cron_command(profile)
+    try:
+        proc = subprocess.run(command, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError(f"Hermes executable not found: {command[0]}") from exc
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or proc.stdout).strip() or "hermes cron list failed")
     return parse_live_jobs(proc.stdout)
 
 
+def live_environment_issue(
+    registry: dict[str, dict[str, Any]],
+    live: dict[str, dict[str, Any]],
+    profile: str | None,
+) -> dict[str, str] | None:
+    if not registry:
+        return None
+    if not live:
+        return {
+            "kind": "no_live_jobs",
+            "profile": profile or "default",
+            "message": (
+                "Hermes returned no cron jobs. Verify --profile or "
+                f"{PROFILE_ENV} points at the desktop Hermes runtime."
+            ),
+        }
+    if registry_candidate_names(registry).isdisjoint(live):
+        return {
+            "kind": "no_registry_job_overlap",
+            "profile": profile or "default",
+            "message": (
+                "Live Hermes cron jobs do not overlap the registry. "
+                "This is probably the wrong Hermes profile for this repo."
+            ),
+        }
+    return None
+
+
 def compare(registry: dict[str, dict[str, Any]], live: dict[str, dict[str, Any]]) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
 
-    registry_names = set(registry)
     live_names = set(live)
+    matched_live_names: set[str] = set()
 
-    for name in sorted(registry_names - live_names):
-        issues.append({"severity": "error", "job": name, "issue": "missing_live_job"})
-    for name in sorted(live_names - registry_names):
-        issues.append({"severity": "warn", "job": name, "issue": "untracked_live_job"})
-
-    for name in sorted(registry_names & live_names):
+    for name in sorted(registry):
         reg = registry[name]
-        runtime = live[name]
+        runtime_only = reg.get("source_state") == "runtime_only"
+        live_name, runtime = find_live_job(reg, live)
+        if runtime is None:
+            issues.append({"severity": "error", "job": name, "issue": "missing_live_job"})
+            continue
+        if live_name:
+            matched_live_names.add(live_name)
 
         if reg.get("schedule") != runtime.get("schedule"):
             issues.append({
@@ -116,9 +188,10 @@ def compare(registry: dict[str, dict[str, Any]], live: dict[str, dict[str, Any]]
 
         if reg_mode == "script":
             script_file = reg.get("script_file")
-            if not script_file:
+            script_name = script_file or reg.get("runtime_script")
+            if not script_file and not runtime_only:
                 issues.append({"severity": "error", "job": name, "issue": "missing_script_file_field"})
-            else:
+            elif script_file:
                 full_path = ROOT / script_file
                 if not full_path.exists():
                     issues.append({
@@ -127,20 +200,20 @@ def compare(registry: dict[str, dict[str, Any]], live: dict[str, dict[str, Any]]
                         "issue": "missing_repo_script_file",
                         "path": script_file,
                     })
-                live_script = runtime.get("script")
-                if live_script and Path(script_file).name != Path(live_script).name:
-                    issues.append({
-                        "severity": "warn",
-                        "job": name,
-                        "issue": "script_basename_mismatch",
-                        "registry": Path(script_file).name,
-                        "live": str(live_script),
-                    })
+            live_script = runtime.get("script")
+            if live_script and script_name and Path(script_name).name != Path(live_script).name:
+                issues.append({
+                    "severity": "warn",
+                    "job": name,
+                    "issue": "script_basename_mismatch",
+                    "registry": Path(script_name).name,
+                    "live": str(live_script),
+                })
         else:
             prompt_file = reg.get("prompt_file")
-            if not prompt_file:
+            if not prompt_file and not runtime_only:
                 issues.append({"severity": "error", "job": name, "issue": "missing_prompt_file_field"})
-            else:
+            elif prompt_file:
                 full_path = ROOT / prompt_file
                 if not full_path.exists():
                     issues.append({
@@ -150,25 +223,61 @@ def compare(registry: dict[str, dict[str, Any]], live: dict[str, dict[str, Any]]
                         "path": prompt_file,
                     })
 
+    for name in sorted(live_names - matched_live_names):
+        issues.append({"severity": "warn", "job": name, "issue": "untracked_live_job"})
+
     return issues
+
+
+def summary_payload(
+    profile: str | None,
+    registry: dict[str, dict[str, Any]],
+    live_count: int,
+    runtime_only_names: list[str],
+    environment_issue: dict[str, str] | None,
+    issues: list[dict[str, str]],
+) -> dict[str, Any]:
+    return {
+        "profile": profile or "default",
+        "registry_jobs": len(registry),
+        "live_jobs": live_count,
+        "errors": sum(1 for item in issues if item["severity"] == "error"),
+        "warnings": sum(1 for item in issues if item["severity"] == "warn"),
+        "runtime_only_jobs": len(runtime_only_names),
+        "runtime_only_job_names": runtime_only_names,
+        "environment_issue": environment_issue,
+        "issues": issues,
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--strict", action="store_true", help="exit non-zero on warnings too")
+    parser.add_argument(
+        "--profile",
+        default=os.getenv(PROFILE_ENV),
+        help=f"Hermes profile to inspect; defaults to ${PROFILE_ENV}, then default profile",
+    )
     args = parser.parse_args()
 
+    profile = args.profile.strip() if args.profile else None
     registry = load_registry()
-    live = get_live_jobs()
-    issues = compare(registry, live)
+    runtime_only_names = runtime_only_job_names(registry)
+    try:
+        live = get_live_jobs(profile)
+    except RuntimeError as exc:
+        issue = {"kind": "live_command_failed", "profile": profile or "default", "message": str(exc)}
+        summary = summary_payload(profile, registry, 0, runtime_only_names, issue, [])
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return 2
+    environment_issue = live_environment_issue(registry, live, profile)
+    if environment_issue:
+        summary = summary_payload(profile, registry, len(live), runtime_only_names, environment_issue, [])
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return 2
 
-    summary = {
-        "registry_jobs": len(registry),
-        "live_jobs": len(live),
-        "errors": sum(1 for item in issues if item["severity"] == "error"),
-        "warnings": sum(1 for item in issues if item["severity"] == "warn"),
-        "issues": issues,
-    }
+    issues = compare(registry, live)
+    summary = summary_payload(profile, registry, len(live), runtime_only_names, None, issues)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
     if summary["errors"]:

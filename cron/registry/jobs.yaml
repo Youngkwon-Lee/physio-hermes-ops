@@ -10,6 +10,7 @@ notes:
 
 jobs:
   - name: daily-ai-news-briefing
+    runtime_name: "매일 05:30 AI 뉴스 브리프"
     operator_label: "[Home desktop Hermes] 05:30 AI News Briefing"
     purpose: Summarize high-signal AI news relevant to rehab, clinical AI, agent operations, and knowledge workflows.
     schedule: "30 5 * * *"
@@ -25,6 +26,7 @@ jobs:
       - action-oriented
 
   - name: daily-ai-news-discussion-kickoff
+    runtime_name: "매일 07:30 AI 뉴스 토론 시작"
     purpose: Convert the morning AI news brief into actionable discussion questions and experiment prompts.
     schedule: "30 7 * * *"
     mode: agent
@@ -37,6 +39,7 @@ jobs:
       - daily-ai-news-briefing
 
   - name: daily-rehab-ai-research-brief
+    runtime_name: "매일 06:00 재활 AI 논문·뉴스"
     operator_label: "[Home desktop Hermes] 06:00 Rehab AI Research Brief"
     purpose: Deliver a daily research brief focused on physical therapy, rehabilitation, multimodal AI, and clinical relevance.
     schedule: "0 6 * * *"
@@ -48,6 +51,7 @@ jobs:
     enabled_toolsets: [web, terminal, file]
 
   - name: overnight-pt-morning-summary
+    runtime_name: "평일 07:05 밤새 PT 요약"
     purpose: Summarize overnight PT/rehab/research discussions into a short morning handoff.
     schedule: "5 7 * * 1-5"
     mode: agent
@@ -58,6 +62,7 @@ jobs:
     enabled_toolsets: [session_search, file]
 
   - name: daily-calendar-mail-brief
+    runtime_name: "평일 07:30 일정·메일 요약"
     operator_label: "[Home desktop Hermes] 07:30 Calendar + Mail Brief"
     purpose: Combine calendar context and important unread mail into a single operational morning brief.
     schedule: "30 7 * * 1-5"
@@ -71,18 +76,19 @@ jobs:
       - should not commit raw personal email contents
 
   - name: home-rehab-morning-brief
+    runtime_name: "평일 07:45 방문재활 아침 브리프"
     purpose: Present today's home-rehab schedule in a compact action-ready morning format.
-    schedule: "0 9 * * *"
-    mode: agent
+    schedule: "45 7 * * 1-5"
+    mode: script
     status: active
     deliver_label: "discord/비서/방문재활 일정 관리"
     output_type: schedule_brief
-    prompt_file: "cron/prompts/home-rehab-morning-brief.md"
-    enabled_toolsets: [terminal, file]
+    script_file: "cron/scripts/home_rehab_morning_brief.py"
 
   - name: home-rehab-lunch-recommendation
+    runtime_name: "평일 08:00 점심 추천"
     purpose: Recommend lunch options based on the day's home-rehab route and prior preferences.
-    schedule: "0 8 * * *"
+    schedule: "0 8 * * 1-5"
     mode: agent
     status: needs_review
     deliver_label: "discord/비서/맛집 추천 기록"
@@ -92,6 +98,7 @@ jobs:
     known_issue: recent runtime error observed; verify before relying on output
 
   - name: weekly-pt-kpi-brief
+    runtime_name: "월요일 09:00 PT KPI 요약"
     purpose: Weekly KPI summary for PT MVP operations.
     schedule: "0 9 * * 1"
     mode: agent
@@ -102,6 +109,7 @@ jobs:
     enabled_toolsets: [terminal, file]
 
   - name: weekly-zotero-literature-ingest
+    runtime_name: "월요일 09:00 Zotero 논문 수집"
     operator_label: "[Home desktop Hermes] Mon 09:00 Zotero Literature Ingest"
     purpose: Create missing second-brain Zotero literature source notes from a Zotero-capable always-on runtime.
     schedule: "0 9 * * 1"
@@ -120,6 +128,7 @@ jobs:
       - cloud deployment requires Zotero Web API adaptation
 
   - name: second-brain-zotero-literature-git-sync
+    runtime_name: "월요일 09:15 Zotero 결과 Git 동기화"
     operator_label: "[Home desktop Hermes] Mon 09:15 Zotero Literature Git Sync"
     purpose: Push Zotero-generated second-brain literature notes to GitHub using a clean temporary clone.
     schedule: "15 9 * * 1"
@@ -137,8 +146,9 @@ jobs:
       - emits no-change output when GitHub already has the same literature notes
 
   - name: biz-support-radar-daily
+    runtime_name: "매일 05:00 외부 기회 패킷"
     purpose: Daily scan of startup/government support programs relevant to rehabilitation, healthcare AI, and adjacent startup opportunities.
-    schedule: "0 9 * * *"
+    schedule: "0 5 * * *"
     mode: agent
     status: active
     deliver_label: "discord/사업/지원사업 레이더 운영 (일일/크론) v2"
@@ -147,6 +157,7 @@ jobs:
     enabled_toolsets: [web, file]
 
   - name: daily-conversation-curator
+    runtime_name: "매일 23:00 기억 후보 찾기"
     operator_label: "[Home desktop Hermes] 23:00 Conversation Curator"
     purpose: Curate long-term-value conversation items for memory and knowledge promotion.
     schedule: "0 23 * * *"
@@ -158,9 +169,10 @@ jobs:
     enabled_toolsets: [session_search, memory]
 
   - name: daily-discord-digest
+    runtime_name: "매일 23:50 디스코드 하루 요약"
     operator_label: "[Home desktop Hermes] 23:35 Discord Digest"
     purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions.
-    schedule: "35 23 * * *"
+    schedule: "50 23 * * *"
     mode: agent
     status: active
     deliver_label: "discord/비서/하루 대화 요약 리포터"
@@ -169,6 +181,7 @@ jobs:
     enabled_toolsets: [session_search, file]
 
   - name: calendar-auto-classify
+    runtime_name: "매일 23:10 캘린더 자동 분류"
     purpose: Apply lightweight automated classification to calendar items.
     schedule: "10 23 * * *"
     mode: script
@@ -178,6 +191,7 @@ jobs:
     script_file: "cron/scripts/calendar_auto_classify.py"
 
   - name: ensure-kinelo-8888-server
+    runtime_name: "5분마다 Kinelo 서버 확인"
     purpose: Watchdog job to keep the local Kinelo service on port 8888 alive.
     schedule: "every 5m"
     mode: script
@@ -187,9 +201,10 @@ jobs:
     script_file: "cron/scripts/ensure-kinelo-8888.sh"
 
   - name: second-brain-safe-sync-watchdog
+    runtime_name: "30분마다 second-brain 안전 pull"
     operator_label: "[Home desktop Hermes] every 30m Second-brain Safe Sync Watchdog"
     purpose: Keep the desktop second-brain checkout fresh without pulling over local ingest or Obsidian changes.
-    schedule: "every 30m"
+    schedule: "*/30 * * * *"
     mode: script
     status: active
     deliver_label: "discord/비서/장기기억 기록 도우미"
@@ -202,6 +217,7 @@ jobs:
       - default repo path is /home/yk/brain-linux; override with SECOND_BRAIN_DIR if needed
 
   - name: hermes-ops-watchdog
+    runtime_name: "10분마다 Hermes 상태 확인"
     operator_label: "[Home desktop Hermes] every 10m Hermes Ops Watchdog"
     purpose: Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.
     schedule: "every 10m"
@@ -214,3 +230,487 @@ jobs:
       - silent-by-default; emits output only when an issue is detected
       - checks gateway state via systemd user unit status
       - checks active cron jobs for error markers and overdue next_run_at
+
+  - name: weekly-pt-gurus-research-tracker
+    runtime_name: "weekly-pt-gurus-research-tracker"
+    runtime_job_id: "08f77858a0bf"
+    purpose: Track weekly PT and rehab expert research signals from the live Hermes runtime.
+    schedule: "10 6 * * 1"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: research_tracker
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-pt-gurus-research-tracker.md"
+    enabled_toolsets: [web, terminal, file]
+    provider: "openai-codex"
+    model: "gpt-5.4"
+
+  - name: nightly-workout-sns-nudge
+    runtime_name: "nightly-workout-sns-nudge"
+    runtime_job_id: "8e5c61f76c1b"
+    purpose: Nightly runtime-configured nudge for workout-related SNS activity.
+    schedule: "45 23 * * *"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: nudge
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/nightly-workout-sns-nudge.md"
+    enabled_toolsets: [session_search, file]
+
+  - name: nightly-dev-sns-nudge
+    runtime_name: "nightly-dev-sns-nudge"
+    runtime_job_id: "6b70035dc802"
+    purpose: Nightly runtime-configured nudge for development-related SNS activity.
+    schedule: "50 23 * * *"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: nudge
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/nightly-dev-sns-nudge.md"
+    enabled_toolsets: [terminal, session_search, file]
+    runtime_workdir: "/home/yk"
+    provider: "openai-codex"
+    model: "gpt-5.4"
+
+  - name: hourly-continuity-handoff-summary
+    runtime_name: "매시 58분 작업 인수인계 요약"
+    runtime_job_id: "6cd11d8bbd31"
+    purpose: Produce an hourly continuity handoff summary from the live Hermes runtime.
+    schedule: "58 * * * *"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: handoff
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/hourly-continuity-handoff-summary.md"
+    enabled_toolsets: [file, session_search]
+    provider: "gemini"
+    model: "gemini-2.5-flash"
+
+  - name: weekly-memory-candidate-review
+    runtime_name: "일요일 21:00 장기기억 후보 검토"
+    runtime_job_id: "8157a60bbeea"
+    purpose: Review long-term memory candidates weekly from the live Hermes runtime.
+    schedule: "0 21 * * 0"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: memory_review
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-memory-candidate-review.md"
+    enabled_toolsets: [session_search, file]
+    provider: "gemini"
+    model: "gemini-2.5-flash"
+
+  - name: weekly-memory-apply-draft
+    runtime_name: "일요일 21:30 반영 초안 만들기"
+    runtime_job_id: "332bafb5d82c"
+    purpose: Draft weekly long-term memory application changes from the live Hermes runtime.
+    schedule: "30 21 * * 0"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: memory_draft
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-memory-apply-draft.md"
+    enabled_toolsets: [session_search, file]
+    provider: "gemini"
+    model: "gemini-2.5-flash"
+
+  - name: weekly-memory-apply-confirmation
+    runtime_name: "일요일 21:40 반영 확인 알림"
+    runtime_job_id: "d6a20f068a7f"
+    purpose: Send a weekly confirmation reminder for long-term memory application.
+    schedule: "40 21 * * 0"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: reminder
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-memory-apply-confirmation.md"
+    enabled_toolsets: [file]
+    provider: "gemini"
+    model: "gemini-2.5-flash"
+
+  - name: google-token-watchdog-12h
+    runtime_name: "12시간마다 Google 토큰 확인"
+    runtime_job_id: "1e4b5a57a2ca"
+    purpose: Check Google token health every 12 hours from the live Hermes runtime.
+    schedule: "every 720m"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: watchdog
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/google_token_watchdog.py"
+
+  - name: notion-brain-candidate-exporter-daily
+    runtime_name: "매일 06:20 Notion 후보 내보내기"
+    runtime_job_id: "202384ffa9d3"
+    purpose: Export Notion brain candidates daily from the live Hermes runtime.
+    schedule: "20 6 * * *"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: export
+    source_state: public_safe_template
+    script_file: "cron/scripts/notion_brain_candidate_exporter.py"
+
+  - name: continuity-handoff-runtime-tick
+    runtime_name: "5분마다 인수인계 노트 반영"
+    runtime_job_id: "a5ce838f268b"
+    purpose: Apply continuity handoff note updates every 5 minutes from the live Hermes runtime.
+    schedule: "every 5m"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: maintenance
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/continuity_handoff_runtime_tick.py"
+
+  - name: rehab-research-notion-backfill-watchdog
+    runtime_name: "rehab-research-notion-backfill-watchdog"
+    runtime_job_id: "b4564dfeee23"
+    purpose: Watch rehab research Notion backfill state from the live Hermes runtime.
+    schedule: "40 6 * * *"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: watchdog
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/rehab-research-notion-backfill-watchdog.md"
+    enabled_toolsets: [web, terminal, file]
+    runtime_workdir: "/home/yk/physio-hermes-ops"
+    provider: "gemini"
+    model: "gemini-2.5-flash"
+
+  - name: notion-brain-candidate-git-sync-daily
+    runtime_name: "매일 06:35 후보 Git 동기화"
+    runtime_job_id: "65a6f6edc9d0"
+    purpose: Sync exported Notion brain candidates to Git daily from the live Hermes runtime.
+    schedule: "35 6 * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: git_sync
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/notion_brain_candidate_git_sync.py"
+
+  - name: weekly-rehab-research-promotion-review
+    runtime_name: "weekly-rehab-research-promotion-review"
+    runtime_job_id: "fcc3418d3c03"
+    purpose: Review rehab research promotion candidates weekly from the live Hermes runtime.
+    schedule: "35 6 * * 1"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: research_review
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-rehab-research-promotion-review.md"
+    enabled_toolsets: [file]
+    runtime_workdir: "/home/yk/brain"
+
+  - name: weekly-rehab-research-auto-apply-note
+    runtime_name: "weekly-rehab-research-auto-apply-note"
+    runtime_job_id: "834f6e020f0e"
+    purpose: Apply weekly rehab research promotion notes from the live Hermes runtime.
+    schedule: "45 6 * * 1"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: research_note
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-rehab-research-auto-apply-note.md"
+    enabled_toolsets: [file]
+    runtime_workdir: "/home/yk/brain"
+
+  - name: daily-discord-action-cleanup
+    runtime_name: "매일 23:25 디스코드 액션 정리"
+    runtime_job_id: "01dd14f9c228"
+    purpose: Clean up Discord action items daily from the live Hermes runtime.
+    schedule: "25 23 * * *"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: action_cleanup
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/daily-discord-action-cleanup.md"
+    enabled_toolsets: [session_search, file]
+
+  - name: rehab-research-pipeline-watchdog
+    runtime_name: "매일 06:50 연구 파이프라인 확인"
+    runtime_job_id: "9ff452874c27"
+    purpose: Check the rehab research pipeline daily from the live Hermes runtime.
+    schedule: "50 6 * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: watchdog
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/rehab_research_pipeline_watchdog.py"
+
+  - name: daily-discord-digest-postsync
+    runtime_name: "매일 23:55 디스코드 요약 후처리"
+    runtime_job_id: "f5ace0662536"
+    purpose: Run daily Discord digest post-sync processing from the live Hermes runtime.
+    schedule: "55 23 * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: digest_postsync
+    source_state: public_safe_template
+    script_file: "cron/scripts/daily_discord_digest_postsync.py"
+
+  - name: morning-calendar-brief
+    runtime_name: "아침 일정 브리핑"
+    runtime_job_id: "da1b22213b5a"
+    purpose: Produce a daily morning calendar brief from the live Hermes runtime.
+    schedule: "0 7 * * *"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: calendar_brief
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/morning-calendar-brief.py"
+
+  - name: morning-batch-followup-watchdog
+    runtime_name: "매일 08:10 아침 브리프 후속 확인"
+    runtime_job_id: "1ace6b3ad0c0"
+    purpose: Check follow-up state after the morning brief from the live Hermes runtime.
+    schedule: "10 8 * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: watchdog
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/morning_batch_followup_watchdog.py"
+
+  - name: raw-handoff-digest-git-sync-hourly
+    runtime_name: "매시 02분 raw 인수인계 Git 동기화"
+    runtime_job_id: "f03ad41c5ec6"
+    purpose: Sync raw handoff digest material to Git hourly from the live Hermes runtime.
+    schedule: "2 * * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: git_sync
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/raw_handoff_digest_git_sync.py"
+
+  - name: desktop-secondbrain-codex-capture-4h
+    runtime_name: "desktop-secondbrain-codex-capture-4h"
+    runtime_job_id: "fd7c6df80ece"
+    purpose: Capture Codex second-brain candidates from the desktop runtime every 4 hours.
+    schedule: "every 240m"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: capture
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/desktop-secondbrain-codex-capture-4h.sh"
+
+  - name: desktop-secondbrain-keep-capture-2200
+    runtime_name: "desktop-secondbrain-keep-capture-2200"
+    runtime_job_id: "73b5a4255fa0"
+    purpose: Capture Keep-based second-brain candidates nightly from the desktop runtime.
+    schedule: "0 22 * * *"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: capture
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/desktop-secondbrain-keep-capture-2200.sh"
+
+  - name: event-platform-radar-daily
+    runtime_name: "매일 06:15 이벤트 플랫폼 레이더"
+    runtime_job_id: "c7dca5b86275"
+    purpose: Run a daily event platform radar from the live Hermes runtime.
+    schedule: "15 6 * * *"
+    mode: agent
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: business_radar
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/event-platform-radar-daily.md"
+    enabled_toolsets: [web]
+
+  - name: kinelo-interview-dropzone-watchdog
+    runtime_name: "매시 Kinelo 인터뷰 폴더 확인"
+    runtime_job_id: "7a55d26ff570"
+    purpose: Watch the Kinelo interview dropzone hourly from the live Hermes runtime.
+    schedule: "every 60m"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: watchdog
+    script_file: "cron/scripts/kinelo_interview_dropzone_watchdog.py"
+
+  - name: second-brain-promotion-review-daily
+    runtime_name: "매일 23:30 second-brain 승격 후보 검토"
+    runtime_job_id: "e688910e7718"
+    purpose: Review second-brain promotion candidates nightly from the live Hermes runtime.
+    schedule: "30 23 * * *"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: memory_review
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/second-brain-promotion-review-daily.md"
+    enabled_toolsets: [session_search, file, terminal]
+    runtime_workdir: "/home/yk/brain-linux"
+    provider: "openai-codex"
+    model: "gpt-5.4"
+
+  - name: morning-ops-brief-weekday
+    runtime_name: "평일 06:45 아침 운영 브리프"
+    runtime_job_id: "e4f4c4661364"
+    purpose: Produce a weekday morning operations brief from the live Hermes runtime.
+    schedule: "45 6 * * 1-5"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: ops_brief
+    prompt_file: "cron/prompts/morning-ops-brief-weekday.md"
+    enabled_toolsets: [terminal, file]
+    runtime_workdir: "/home/yk"
+    provider: "openai-api"
+    model: "gpt-5-mini"
+
+  - name: second-brain-git-sync-batch
+    runtime_name: "30분마다 second-brain Git 동기화 묶음"
+    runtime_job_id: "291191b0acd7"
+    purpose: Run second-brain Git synchronization as a 30-minute batch from the live Hermes runtime.
+    schedule: "*/30 * * * *"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: git_sync
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/second_brain_git_sync_batch.py"
+
+  - name: home-desktop-watchdog-batch
+    runtime_name: "10분마다 집데스크탑 상태 점검 묶음"
+    runtime_job_id: "5f0e4066c286"
+    purpose: Run batched home desktop health checks from the live Hermes runtime.
+    schedule: "*/10 * * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: watchdog
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/home_desktop_watchdog_batch.py"
+
+  - name: weekly-memory-packet
+    runtime_name: "일요일 21:00 주간 장기기억 패킷"
+    runtime_job_id: "db682251c7a2"
+    purpose: Produce a weekly long-term memory packet from the live Hermes runtime.
+    schedule: "0 21 * * 0"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: memory_packet
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/weekly-memory-packet.md"
+    runtime_workdir: "/mnt/c/Users/82106/Documents/brain"
+
+  - name: daily-discord-nightly-packet
+    runtime_name: "매일 23:25 디스코드 nightly 패킷"
+    runtime_job_id: "a05100ef81ac"
+    purpose: Produce the nightly Discord packet from the live Hermes runtime.
+    schedule: "25 23 * * *"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: digest
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/daily_discord_nightly_packet.py"
+
+  - name: monday-weekly-ops-packet
+    runtime_name: "월요일 09:00 주간 운영 패킷"
+    runtime_job_id: "43e36ea7bb36"
+    purpose: Produce the weekly operations packet from the live Hermes runtime.
+    schedule: "0 9 * * 1"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: ops_packet
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/monday_weekly_ops_packet.py"
+
+  - name: chatgpt-browser-candidate-capture
+    runtime_name: "[Home desktop] 22:45 ChatGPT Browser Candidate Capture"
+    runtime_job_id: "e0bcea0bd782"
+    purpose: Capture ChatGPT browser candidates nightly from the home desktop runtime.
+    schedule: "45 22 * * *"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: capture
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/chatgpt-browser-candidate-capture.md"
+    runtime_workdir: "/home/yk/brain-linux"
+    provider: "openai-api"
+    model: "gpt-5-mini"
+
+  - name: gmail-github-noise-labeler
+    runtime_name: "[Home desktop] 20:20 Gmail GitHub Noise Labeler"
+    runtime_job_id: "82e7857f79d9"
+    purpose: Label low-value GitHub notification mail from the home desktop runtime.
+    schedule: "20 20 * * *"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: inbox_triage
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/gmail-github-noise-labeler.md"
+    runtime_workdir: "/home/yk/brain-linux"
+    provider: "openai-api"
+    model: "gpt-5-mini"
+
+  - name: gmail-important-action-digest
+    runtime_name: "[Home desktop] 20:30 Gmail Important Action Digest"
+    runtime_job_id: "415f7b663f31"
+    purpose: Produce an important Gmail action digest from the home desktop runtime.
+    schedule: "30 20 * * *"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: inbox_digest
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/gmail-important-action-digest.md"
+    runtime_workdir: "/home/yk/brain-linux"
+    provider: "openai-api"
+    model: "gpt-5-mini"
+
+  - name: second-brain-nightly-capture
+    runtime_name: "[Home desktop] 23:00 Second-brain Nightly Capture"
+    runtime_job_id: "ad5e753663a9"
+    purpose: Capture second-brain material nightly from the home desktop runtime.
+    schedule: "0 23 * * *"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: capture
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/second-brain-nightly-capture.md"
+    runtime_workdir: "/home/yk/brain-linux"
+    provider: "openai-api"
+    model: "gpt-5-mini"
+
+  - name: candidate-promotion-review-weekly
+    runtime_name: "[Home desktop] Sun 21:10 Candidate Promotion Review"
+    runtime_job_id: "89ac78b36110"
+    purpose: Review candidate promotions weekly from the home desktop runtime.
+    schedule: "10 21 * * 0"
+    mode: agent
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: memory_review
+    source_state: runtime_snapshot
+    prompt_file: "cron/prompts/candidate-promotion-review-weekly.md"
+    runtime_workdir: "/home/yk/brain-linux"
+    provider: "openai-api"
+    model: "gpt-5-mini"
