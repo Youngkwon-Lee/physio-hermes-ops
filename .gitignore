@@ -1,6 +1,9 @@
 # secrets
 .env
 .env.*
+# real shell env scripts carry live values; commit only *.example variants.
+*_env.sh
+!*_env.example.sh
 *.pem
 *.key
 *.p12
