@@ -1,0 +1,26 @@
+# gitleaks accepted-findings ledger (fingerprint = commit:file:rule:line)
+# Each entry is a deliberate, reviewed decision — not a blanket mute.
+# Regenerate with: gitleaks detect --source . --config .gitleaks.toml --log-opts="--all"
+
+# --- REAL secret, ROTATED 2026-07-10, history intentionally retained ---
+# CONTINUITY_HANDOFF_NOTIFY_TOKEN / MISSION_CONTROL_SHARED_TOKEN (same live value)
+# for the self-hosted notify endpoint (Tailnet-only, http://100.83.147.56:8792).
+# Rotated on the home-desktop ops-control-api service and verified end-to-end via
+# continuity_handoff_notify_smoke.py. History kept by decision (public repo, no
+# filter-repo/force-push). Note OPS_CTL_REQUIRE_TOKEN was 0 (auth not enforced)
+# on this surface at the time, which lowered actual exposure risk.
+4b8181c3108e55cc02d78e28d3d03b9f3295930b:scripts/macos_continuity_notify_env.sh:generic-env-secret-assignment:9
+00dd53c674c0971989ce1f696dfe00ec12e8da0f:scripts/macos_continuity_notify_env.sh:generic-env-secret-assignment:9
+
+# --- FALSE POSITIVE: documentation placeholder values, not real secrets ---
+# docs/runbook examples use human-written stand-ins (e.g. "dev-local-mission-control",
+# "READ_LONG_RANDOM_TOKEN") that read as plausible tokens but are literal instructional
+# text, not generated secrets. Confirmed by content inspection, not just by path.
+08b1650dafc35f62e8ee1be957dd9a735a459d93:docs/runbook/CONTINUITY_HANDOFF_RUNBOOK_V0_1.md:generic-env-secret-assignment:243
+4b8181c3108e55cc02d78e28d3d03b9f3295930b:docs/runbook/CONTINUITY_HANDOFF_RUNBOOK_V0_1.md:generic-env-secret-assignment:229
+00dd53c674c0971989ce1f696dfe00ec12e8da0f:docs/runbook/CONTINUITY_HANDOFF_RUNBOOK_V0_1.md:generic-env-secret-assignment:229
+a09b4b6d66568e600645dd7e380b2b909abecd6c:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:28
+a09b4b6d66568e600645dd7e380b2b909abecd6c:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:29
+8944e26d64cbb2e08d645d6a0390320e8e824ab9:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:19
+8944e26d64cbb2e08d645d6a0390320e8e824ab9:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:20
+f03d79505edd50eee3c126dfc59ec2d915f8ed7c:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:14

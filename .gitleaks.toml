@@ -6,7 +6,7 @@ useDefault = true
 [[rules]]
 id = "generic-env-secret-assignment"
 description = "Generic secret-like environment or config assignment"
-regex = '''(?i)\b(?:api[_-]?key|secret|token|password|client[_-]?secret|private[_-]?key|access[_-]?token)\b\s*[:=]\s*['"]([^'"\s]{16,})['"]'''
+regex = '''(?i)(?:api[_-]?key|secret|token|password|client[_-]?secret|private[_-]?key|access[_-]?token)\b\s*[:=]\s*['"]([^'"\s]{16,})['"]'''
 secretGroup = 1
 keywords = [
   "api_key",
@@ -31,7 +31,7 @@ tags = ["secret", "generic"]
 [[rules]]
 id = "database-url-assignment"
 description = "Database URL assignment with embedded credentials"
-regex = '''(?i)\b(?:database_url|postgres_url|postgresql_url)\b\s*[:=]\s*['"]((?:postgres|postgresql)://[^'"]+)['"]'''
+regex = '''(?i)(?:database_url|postgres_url|postgresql_url)\b\s*[:=]\s*['"]((?:postgres|postgresql)://[^'"]+)['"]'''
 secretGroup = 1
 keywords = ["database_url", "postgres_url", "postgresql_url"]
 tags = ["secret", "database"]
