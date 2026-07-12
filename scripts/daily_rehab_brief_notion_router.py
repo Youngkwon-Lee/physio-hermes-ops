@@ -210,6 +210,19 @@ def infer_paper_journal(item: dict[str, Any]) -> str:
     return source or "Unknown"
 
 
+def normalize_item(item: dict[str, Any], kind: str) -> dict[str, Any]:
+    normalized = dict(item)
+    if kind != "paper":
+        return normalized
+    source = infer_paper_source(normalized)
+    journal = infer_paper_journal(normalized)
+    if q(source):
+        normalized["source"] = source
+    if q(journal):
+        normalized["journal"] = journal
+    return normalized
+
+
 def build_paper_properties(item: dict[str, Any]) -> dict[str, Any]:
     source = infer_paper_source(item)
     journal = infer_paper_journal(item)
@@ -294,6 +307,7 @@ def main() -> None:
 
     for item in items:
         kind = classify_kind(item)
+        item = normalize_item(item, kind)
         title = q(item.get("title"))
         url = q(item.get("url"))
         missing = validate_item(item, kind)
