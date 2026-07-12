@@ -9,7 +9,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-ROUTER_SCRIPT = Path('/home/yk/physio-hermes-ops/scripts/daily_rehab_brief_notion_router.py')
+ROUTER_SCRIPT = Path(__file__).with_name('daily_rehab_brief_notion_router.py')
 spec = importlib.util.spec_from_file_location('daily_rehab_brief_notion_router', ROUTER_SCRIPT)
 router = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
@@ -122,14 +122,22 @@ def validate_url_and_title(item: dict[str, Any]) -> list[str]:
     return []
 
 
-def validate_item(item: dict[str, Any]) -> list[str]:
+def normalize_item(item: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(item, dict):
-        return ['not_object']
+        return item
     kind = router.classify_kind(item)
-    missing = router.validate_item(item, kind)
+    return router.normalize_item(item, kind)
+
+
+def validate_item(item: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    if not isinstance(item, dict):
+        return item, ['not_object']
+    normalized = normalize_item(item)
+    kind = router.classify_kind(normalized)
+    missing = router.validate_item(normalized, kind)
     if missing:
-        return missing
-    return validate_url_and_title(item)
+        return normalized, missing
+    return normalized, validate_url_and_title(normalized)
 
 
 def main() -> int:
@@ -147,18 +155,18 @@ def main() -> int:
     seen_urls: set[str] = set()
 
     for index, item in enumerate(items):
-        title = q(item.get('title')) if isinstance(item, dict) else '(non-object)'
-        url = q(item.get('url')) if isinstance(item, dict) else ''
-        reasons = validate_item(item)
+        normalized, reasons = validate_item(item)
+        title = q(normalized.get('title')) if isinstance(normalized, dict) else '(non-object)'
+        url = q(normalized.get('url')) if isinstance(normalized, dict) else ''
         if url and url in seen_urls:
             duplicate_within_input.append({'index': index, 'title': title, 'url': url, 'reasons': ['duplicate_within_input']})
             continue
         if reasons:
-            invalid.append({'index': index, 'title': title or '(untitled)', 'url': url, 'kind': router.classify_kind(item) if isinstance(item, dict) else 'unknown', 'reasons': reasons})
+            invalid.append({'index': index, 'title': title or '(untitled)', 'url': url, 'kind': router.classify_kind(normalized) if isinstance(normalized, dict) else 'unknown', 'reasons': reasons})
             continue
         if url:
             seen_urls.add(url)
-        valid.append(item)
+        valid.append(normalized)
 
     report = {
         'input_count': len(items),

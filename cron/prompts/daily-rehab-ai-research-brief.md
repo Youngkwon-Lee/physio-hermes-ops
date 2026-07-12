@@ -13,7 +13,7 @@
    - 중복 여부는 URL 또는 제목 기준으로 확인한다.
    - 저장은 `/home/yk/physio-hermes-ops/scripts/daily_rehab_brief_notion_router.py` 스크립트를 사용한다.
    - 스크립트에 넘길 JSON array에는 공통 필드 `title`, `item_type`, `url`, `published`, `summary`, `contribution`를 넣는다.
-   - paper 계열은 추가로 `journal`, `authors`, `source`를 넣고, 가능하면 `if`, `evidence`, `quarter`, `category`도 채운다.
+   - paper 계열은 추가로 `journal`, `authors`, `source`를 넣고, 가능하면 `if`, `evidence`, `quarter`, `category`도 채운다. arXiv 링크면 `journal`은 비우지 말고 기본값으로 `arXiv preprint`, `source`는 `arXiv`를 넣는다.
    - dataset 계열은 가능하면 `org` 또는 `source_org`, `dataset_type`, `difficulty`, `quarter`, `category`, `tags`를 채운다.
    - startup 계열은 가능하면 `org` 또는 `company`, `startup_type`, `impact`, `application_area`, `quarter`, `category`, `tags`를 채운다.
    - `source`는 논문 DB select 옵션 중 하나여야 한다: `JAMA`, `NEJM`, `Nature`, `Lancet`, `JMIR`, `PubMed`, `arXiv`
