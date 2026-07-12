@@ -24,6 +24,8 @@ __pycache__/
 # runtime artifacts
 .runtime/
 dashboard/derived/*.json
+dashboard/derived/automation_job_manifests/
+dashboard/runtime/
 lineage/runtime_health_snapshot.md
 lineage/actions_audit.jsonl
 lineage/mission_control_events.jsonl
