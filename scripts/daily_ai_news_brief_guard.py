@@ -2,6 +2,7 @@
 import argparse
 import importlib.util
 import json
+from json import JSONDecodeError
 import sys
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,14 @@ def q(value: Any) -> str:
 
 
 def read_items(path: str) -> list[dict[str, Any]]:
-    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    try:
+        data = json.loads(Path(path).read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        raise SystemExit(f'input_not_found:{path}')
+    except JSONDecodeError as error:
+        raise SystemExit(
+            f'invalid_json:{path}: line {error.lineno} column {error.colno}: {error.msg}'
+        )
     if not isinstance(data, list):
         raise SystemExit('Input must be a JSON array')
     return data
