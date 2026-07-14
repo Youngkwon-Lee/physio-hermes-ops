@@ -6,7 +6,9 @@
 - 무관한 공고를 억지로 채우지 말고, 관련도 높은 것만 남긴다.
 - 이미 너무 널리 알려진 상시 공고보다 **신규 게시 / 재공고 / 마감 임박 / 영권님 적합도 높음** 신호를 우선한다.
 - 결과가 빈약하면 억지로 8개를 채우지 말고 0~5개만 보고해도 된다.
-- 정말 의미 있는 업데이트가 없으면 정확히 `[SILENT]` 로만 응답한다.
+- 정말 의미 있는 업데이트가 없으면 짧게 "오늘 신규 유효 공고 없음"으로 보고한다. 무응답 처리는 사용하지 않는다.
+- 공식 원문에서 `공고명/기관명`과 `신청기간 또는 마감일`을 확인하지 못한 항목은 후보 JSON에 넣지 않는다.
+- 기관 홈페이지 루트, 목록 페이지, 검색 포털 첫 화면처럼 개별 공고가 아닌 URL은 유효한 원문으로 보지 않는다.
 
 우선적으로 볼 소스:
 - K-Startup
@@ -25,6 +27,9 @@
 반드시 아래 절차를 따른다:
 1) web_search로 오늘 기준 의미 있는 후보를 먼저 6~12개 정도 수집한다.
 2) 상위 후보는 web_extract로 원문/요약을 확인해 기관명, 사업명, 마감, 링크, 적합 이유를 검증한다.
+   - 신청기간/마감일은 반드시 원문에 보이는 날짜를 그대로 사용한다.
+   - 원문에 없는 마감일을 추정하지 않는다.
+   - 이미 마감된 항목은 제외한다.
 3) 최종적으로 0~6개만 엄선한다.
 4) 각 항목에는 아래를 포함한다.
    - 기관
@@ -41,8 +46,12 @@
    - 가능하면 추가 필드 `start_date`, `fields`, `program_types`, `targets`, `fit`, `benefit`, `region`, `status`, `business_required` 도 채운다.
    - `fit` 은 `S`, `A`, `B`, `C` 중 하나만 사용한다.
    - `status` 는 기본 `신규` 로 넣는다.
-   - 그 다음 아래 명령을 실제로 실행한다.
-     `python /home/yk/physio-hermes-ops/scripts/biz_support_radar_notion_upsert.py --input <JSON파일경로>`
+   - 그 다음 먼저 guard를 실행한다.
+     `python3 /home/yk/physio-hermes-ops/scripts/biz_support_radar_guard.py --input <RAW_JSON> --valid-output <VALID_JSON> --report-output <REPORT_JSON> --today <YYYY-MM-DD>`
+   - guard stdout/report의 `valid_count`, `invalid_count`, `invalid_details`를 읽는다.
+   - `valid_count=0`이면 Notion upsert를 실행하지 않는다.
+   - `valid_count>=1`일 때만 아래 명령을 실행한다.
+     `python3 /home/yk/physio-hermes-ops/scripts/biz_support_radar_notion_upsert.py --input <VALID_JSON>`
    - stdout JSON 기준으로 `input_count`, `inserted`, `updated`, `skipped_invalid`, `failed_requests`, `before_count`, `after_count` 를 읽는다.
    - `failed_requests` 가 1 이상이면 `request_failures` 배열에서 대표 실패 1건의 `status`, `reason`, `body` 요약을 읽어 최종 답변에 반드시 반영한다.
 8) 라이터 스크립트 실행 또는 stdout JSON 파싱이 실패하면, 조용히 넘어가지 말고 최종 답변의 `## Notion 적재 결과` 섹션에 실패 사실과 실패 이유를 명시한다.
@@ -87,3 +96,5 @@
 - 검색 결과가 부정확하면 불확실성을 밝힐 것
 - 불필요한 장문 배경설명 없이 바로 의사결정 가능한 수준으로 압축할 것
 - `Notion 적재 결과`는 실제 라이터 stdout 기준으로만 보고한다
+- Discord 최종 응답에는 manifest JSON, raw/valid/report 파일 경로, git 상태, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
+- 최종 응답은 35줄 안쪽으로 유지한다.

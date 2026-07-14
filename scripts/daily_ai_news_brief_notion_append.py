@@ -275,6 +275,8 @@ def fetch_url_status(url: str) -> tuple[int | None, str, str]:
                     body = resp.read(256_000).decode("utf-8", errors="ignore")
                 return int(resp.status), resp.geturl(), body
         except urllib.error.HTTPError as error:
+            if method == "HEAD" and error.code in {403, 405}:
+                continue
             if method == "GET" or error.code >= 400:
                 return int(error.code), url, error.read().decode("utf-8", errors="ignore")
         except Exception as error:

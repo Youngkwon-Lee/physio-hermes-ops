@@ -3,6 +3,7 @@ import argparse
 import json
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, datetime
 from pathlib import Path
@@ -11,6 +12,10 @@ from typing import Any
 REQUIRED = ['title', 'organization', 'deadline', 'url', 'summary', 'why_relevant']
 VALID_FIT = {'S', 'A', 'B', 'C'}
 EVENT_WORDS = ['행사', '이벤트', '대회', '밋업', 'meetup', 'luma', 'event', 'conference', '세미나', '설명회', '데모데이']
+GENERIC_TITLE_WORDS = {
+    '2026', '지원사업', '지원', '사업', '프로그램', '모집', '공고', '신규',
+    '실증', '데모', '창업', '스타트업', '패키지', '참여기업',
+}
 
 
 def q(value: Any) -> str:
@@ -38,23 +43,93 @@ def parse_date(value: Any) -> date | None:
     return None
 
 
-def fetch_url_status(url: str) -> tuple[int | None, str]:
+def fetch_url_evidence(url: str) -> tuple[int | None, str, str]:
     if not url.startswith(('http://', 'https://')):
-        return None, 'url_not_http'
+        return None, url, 'url_not_http'
     headers = {'User-Agent': 'Mozilla/5.0 (Kinelo Ops opportunity verifier)'}
+    head_status: int | None = None
+    head_url = url
     for method in ['HEAD', 'GET']:
         try:
             req = urllib.request.Request(url, method=method, headers=headers)
             with urllib.request.urlopen(req, timeout=20) as resp:
-                return int(resp.status), resp.geturl()
+                if method == 'HEAD':
+                    head_status = int(resp.status)
+                    head_url = resp.geturl()
+                    continue
+                body = resp.read(512_000).decode('utf-8', errors='ignore')
+                return int(resp.status), resp.geturl(), body
         except urllib.error.HTTPError as error:
             if error.code in {403, 405} and method == 'HEAD':
                 continue
-            return int(error.code), error.reason or url
+            return int(error.code), url, error.read().decode('utf-8', errors='ignore')
         except Exception as error:
             if method == 'GET':
-                return None, f'{type(error).__name__}: {error}'
-    return None, 'unknown_url_error'
+                if head_status is not None:
+                    return head_status, head_url, ''
+                return None, url, f'{type(error).__name__}: {error}'
+    return None, url, 'unknown_url_error'
+
+
+def strip_html(text: str) -> str:
+    text = re.sub(r'<script\b[^>]*>.*?</script>', ' ', text, flags=re.I | re.S)
+    text = re.sub(r'<style\b[^>]*>.*?</style>', ' ', text, flags=re.I | re.S)
+    text = re.sub(r'<[^>]+>', ' ', text)
+    return ' '.join(text.split())
+
+
+def compact_digits(text: str) -> str:
+    return re.sub(r'\D+', '', text)
+
+
+def deadline_tokens(deadline: date) -> set[str]:
+    y = deadline.year
+    m = deadline.month
+    d = deadline.day
+    return {
+        f'{y}-{m:02d}-{d:02d}',
+        f'{y}.{m:02d}.{d:02d}',
+        f'{y}.{m}.{d}',
+        f'{y}/{m:02d}/{d:02d}',
+        f'{y}/{m}/{d}',
+        f'{y}년 {m}월 {d}일',
+        f'{y}년{m}월{d}일',
+        f'{m:02d}.{d:02d}',
+        f'{m}.{d}',
+    }
+
+
+def deadline_in_source(deadline: date, body: str) -> bool:
+    text = strip_html(body)
+    if any(token in text for token in deadline_tokens(deadline)):
+        return True
+    digits = compact_digits(text)
+    return f'{deadline.year}{deadline.month:02d}{deadline.day:02d}' in digits
+
+
+def title_evidence_in_source(item: dict[str, Any], body: str) -> bool:
+    text = strip_html(body).lower()
+    title = q(item.get('title')).lower()
+    organization = q(item.get('organization')).lower()
+    if title and title in text:
+        return True
+    if organization and organization in text:
+        return True
+    words = [
+        word
+        for word in re.findall(r'[0-9A-Za-z가-힣]+', title)
+        if len(word) >= 3 and word not in GENERIC_TITLE_WORDS
+    ]
+    if not words:
+        return bool(organization and organization in text)
+    matched = sum(1 for word in words if word in text)
+    return matched >= min(2, len(words))
+
+
+def is_generic_homepage(url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    path = parsed.path.strip('/')
+    return not path or path.lower() in {'home', 'main', 'index.html', 'index.do'}
 
 
 def is_event(item: dict[str, Any]) -> bool:
@@ -76,11 +151,21 @@ def validate_item(item: dict[str, Any], today: date) -> list[str]:
     fit = q(item.get('fit'))
     if fit and fit not in VALID_FIT:
         errors.append(f'invalid_fit:{fit}')
-    status, detail = fetch_url_status(q(item.get('url')))
+    url = q(item.get('url'))
+    status, final_url, body = fetch_url_evidence(url)
     if status is None:
-        errors.append(f'url_unverified:{detail[:120]}')
+        errors.append(f'url_unverified:{body[:120]}')
     elif status >= 400:
-        errors.append(f'url_unreachable:{status}:{q(item.get("url"))}')
+        errors.append(f'url_unreachable:{status}:{url}')
+    elif not body:
+        errors.append('source_body_empty')
+    else:
+        if deadline is not None and not deadline_in_source(deadline, body):
+            errors.append(f'deadline_not_found_in_source:{deadline.isoformat()}')
+        if not title_evidence_in_source(item, body):
+            errors.append('title_or_organization_not_found_in_source')
+        if is_generic_homepage(final_url or url) and not title_evidence_in_source(item, body):
+            errors.append('generic_homepage_without_item_evidence')
     return errors
 
 
