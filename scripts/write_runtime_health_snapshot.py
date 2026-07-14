@@ -18,7 +18,6 @@ PHYSIO_APP_ROOT = Path("/home/yk/physio_app")
 MISSION_CONTROL_BASE = "http://127.0.0.1:8792"
 AUTOMATION_HEALTH_PATH = DERIVED_DIR / "automation_health.json"
 RUNTIME_HEALTH_SCRIPT = ROOT / "scripts" / "check_hermes_runtime_health.py"
-CONTROL_CENTER_READ_MODEL_SCRIPT = ROOT / "scripts" / "build_automation_control_center_read_model.py"
 
 
 def now_iso() -> str:
@@ -191,7 +190,6 @@ def main() -> None:
         "physio_app": physio_app,
     }
     write_json(DERIVED_DIR / "runtime_health_snapshot.json", payload)
-    subprocess.run(["python3", str(CONTROL_CENTER_READ_MODEL_SCRIPT)], check=False)
     (LINEAGE_DIR / "runtime_health_snapshot.md").write_text(build_markdown(payload), encoding="utf-8")
     print(str(DERIVED_DIR / "runtime_health_snapshot.json"))
 
