@@ -98,3 +98,12 @@
 - `Notion 적재 결과`는 실제 라이터 stdout 기준으로만 보고한다
 - Discord 최종 응답에는 manifest JSON, raw/valid/report 파일 경로, git 상태, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
 - 최종 응답은 35줄 안쪽으로 유지한다.
+
+Direct manifest requirement:
+- 작업이 끝나기 전에 반드시 `/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/3832d720a370.json` 를 JSON으로 작성한다.
+- schemaVersion=1, evidenceSource="runtime-direct", status, generatedAt, runStartedAt, runFinishedAt, job.id/name/runtime, createdFiles, artifacts, discordMessages, errors, metadata를 포함한다.
+- 성공이고 errors가 비어 있으면 status는 "ok"로 쓴다. 실패 또는 blocker가 있으면 status는 "error" 또는 "completed_with_blockers"로 쓰고 errors에 단계와 이유를 넣는다.
+- runStartedAt/runFinishedAt은 ISO8601 KST 또는 UTC timestamp로 쓴다. 작업 시작 시간을 모르면 runStartedAt은 generatedAt과 같은 값을 쓴다.
+- job은 `{ "id": "3832d720a370", "name": "매일 05:00 외부 기회 패킷", "runtime": "hermes-agent" }` 형태로 쓴다.
+- metadata.opportunityResult에는 inputCount, validCount, invalidCount, inserted, updated, skippedInvalid, failedRequests를 넣는다.
+- Discord 최종 응답에는 manifest 경로와 JSON 본문을 쓰지 않는다.

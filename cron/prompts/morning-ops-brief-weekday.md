@@ -57,3 +57,12 @@
 - 확인한 사실과 추정을 분리
 - 민감정보 출력 금지
 - 실패한 확인은 실패로 명시
+
+Direct manifest requirement:
+- 작업이 끝나기 전에 반드시 `/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/e4f4c4661364.json` 를 JSON으로 작성한다.
+- schemaVersion=1, evidenceSource="runtime-direct", status, generatedAt, runStartedAt, runFinishedAt, job.id/name/runtime, createdFiles, artifacts, discordMessages, errors, metadata를 포함한다.
+- 성공이고 errors가 비어 있으면 status는 "ok"로 쓴다. 실패 또는 blocker가 있으면 status는 "error" 또는 "completed_with_blockers"로 쓰고 errors에 단계와 이유를 넣는다.
+- runStartedAt/runFinishedAt은 ISO8601 KST 또는 UTC timestamp로 쓴다. 작업 시작 시간을 모르면 runStartedAt은 generatedAt과 같은 값을 쓴다.
+- job은 `{ "id": "e4f4c4661364", "name": "평일 06:45 아침 운영 브리프", "runtime": "hermes-agent" }` 형태로 쓴다.
+- metadata.briefInputs에는 calendarEvents, mailItems, rehabEvents를 실제 확인값으로 넣는다.
+- Discord 최종 응답에는 manifest 경로와 JSON 본문을 쓰지 않는다.
