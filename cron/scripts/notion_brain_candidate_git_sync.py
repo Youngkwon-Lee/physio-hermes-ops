@@ -85,19 +85,24 @@ def upstream_counts(repo: Path) -> tuple[int, int]:
 
 def main() -> int:
     stamp = datetime.now(KST).date().isoformat()
+    previous_stamp = (datetime.now(KST).date() - timedelta(days=1)).isoformat()
     repo = SOURCE_BRAIN.expanduser().resolve()
     if not (repo / ".git").exists():
         report("blocked", [f"date: {stamp}", f"reason: not a git repo", f"repo: {repo}"])
         return 0
 
-    target_names = [
-        f"notion-ai-news-weekly-{stamp}.md",
-        f"notion-rehab-research-weekly-{stamp}.md",
-        f"notion-biz-support-radar-weekly-{stamp}.md",
-        f"ai-news-brief-{stamp}.md",
-        f"rehab-ai-brief-{stamp}.md",
-        f"external-opportunity-brief-{stamp}.md",
-    ]
+    target_names = []
+    for candidate_stamp in (stamp, previous_stamp):
+        target_names.extend(
+            [
+                f"notion-ai-news-weekly-{candidate_stamp}.md",
+                f"notion-rehab-research-weekly-{candidate_stamp}.md",
+                f"notion-biz-support-radar-weekly-{candidate_stamp}.md",
+                f"ai-news-brief-{candidate_stamp}.md",
+                f"rehab-ai-brief-{candidate_stamp}.md",
+                f"external-opportunity-brief-{candidate_stamp}.md",
+            ]
+        )
     rel_files = [f"candidates/{name}" for name in target_names if (SOURCE_CANDIDATES / name).exists()]
     if not rel_files:
         report("no_candidate_files", [f"date: {stamp}", f"source: {SOURCE_CANDIDATES}"])
@@ -230,6 +235,43 @@ def main() -> int:
         return 0
 
     push = git(repo, "push", REMOTE, f"HEAD:{BRANCH}")
+    if push.returncode != 0:
+        retry_fetch = git(repo, "fetch", "--prune", REMOTE, BRANCH)
+        if retry_fetch.returncode == 0:
+            retry_rebase = git(repo, "rebase", f"{REMOTE}/{BRANCH}")
+            if retry_rebase.returncode == 0:
+                push = git(repo, "push", REMOTE, f"HEAD:{BRANCH}")
+            else:
+                abort = git(repo, "rebase", "--abort")
+                restore_error = restore_stash(repo, stash_ref, git, compact)
+                lines = [
+                    f"date: {stamp}",
+                    "reason: push failed, then retry rebase failed",
+                    compact(push.stdout + push.stderr),
+                    compact(retry_rebase.stdout + retry_rebase.stderr),
+                ]
+                abort_text = compact(abort.stdout + abort.stderr)
+                if abort.returncode == 0 and abort_text:
+                    lines.append(f"rebase_abort: {abort_text}")
+                elif abort.returncode != 0:
+                    lines.append(f"rebase_abort_error: {abort_text}")
+                if restore_error:
+                    lines.append(f"stash_restore_error: {restore_error}")
+                report("push_failed", lines)
+                return 0
+        else:
+            restore_error = restore_stash(repo, stash_ref, git, compact)
+            lines = [
+                f"date: {stamp}",
+                "reason: push failed, then retry fetch failed",
+                compact(push.stdout + push.stderr),
+                compact(retry_fetch.stdout + retry_fetch.stderr),
+            ]
+            if restore_error:
+                lines.append(f"stash_restore_error: {restore_error}")
+            report("push_failed", lines)
+            return 0
+
     if push.returncode != 0:
         restore_error = restore_stash(repo, stash_ref, git, compact)
         lines = [f"date: {stamp}", compact(push.stdout + push.stderr)]

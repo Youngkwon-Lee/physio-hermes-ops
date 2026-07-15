@@ -21,6 +21,9 @@
    - `status` 는 기본 `new` 로 넣는다.
    - 그 다음 `python /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_notion_append.py --input <JSON파일경로>` 를 실행한다.
    - 스크립트 stdout JSON 기준으로 `inserted`, `skipped_duplicates`, `skipped_invalid`, `before_count`, `after_count` 를 확인한다.
+   - second-brain 후보 파일을 만든 뒤에는 직접 `git add/commit/push`를 하지 말고 반드시 `python /home/yk/physio-hermes-ops/cron/scripts/notion_brain_candidate_git_sync.py` 를 실행해 기록한다.
+   - 이 sync helper는 원격 fetch/rebase/push 재시도를 담당한다. helper stdout의 `status: pushed` 또는 `status: no_changes`면 최종 답변에는 `기록 완료`로만 적는다.
+   - helper가 실패/blocked 상태를 출력해도 manifest 경로, commit SHA, raw stdout 전문을 Discord에 쓰지 말고 `기록 실패: <한 줄 사유>`로만 적는다.
 11) 라이터 스크립트 실행 또는 stdout JSON 파싱이 실패하면, 조용히 넘어가지 말고 최종 답변의 `Notion 적재 결과` 섹션에 실패 사실과 실패 이유를 명시한다.
 12) 최종 답변에는 반드시 `Notion 적재 결과` 섹션이 있어야 한다. 이 섹션이 없으면 작업은 미완료로 간주한다.
 13) 신규 저장 수/중복 스킵 수/유효성 스킵 수는 반드시 라우터 스크립트의 실제 stdout JSON 기준으로만 보고한다. 추정 금지.
@@ -52,6 +55,7 @@
 - Discord 최종 응답에는 manifest JSON, raw/valid/report 파일 경로, git commit SHA, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
 - second-brain/GitHub 결과는 "기록 완료" 또는 "기록 실패: 한 줄 사유"로만 쓴다.
 - 최종 응답은 35줄 안쪽으로 유지한다.
+- 최종 응답에 `/tmp/...`, `/home/yk/...`, `Runtime manifest`, `remoteSynced`, `gitCommit.sha`, `추적된 운영 산출물` 섹션을 쓰지 않는다.
 
 운영 전달 정책:
 - 검증 통과 신규 AI 뉴스가 0건이어도 무응답 처리를 사용하지 않는다.
