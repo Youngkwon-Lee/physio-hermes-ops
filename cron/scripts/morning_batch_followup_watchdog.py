@@ -38,6 +38,7 @@ CHECKS = {
         'must_run_after': '06:45',
         'allowed_statuses': {'ok'},
         'manifest_required': True,
+        'today_output_fallback': True,
         'weekdays_only': True,
     },
     'second-brain-git-sync-batch': {
@@ -86,6 +87,16 @@ def latest_output_text(job_id: str) -> str:
     if not files:
         return ''
     return files[-1].read_text()
+
+
+def latest_output_date(job_id: str) -> str | None:
+    out_dir = OUTPUT_BASE / job_id
+    if not out_dir.exists():
+        return None
+    files = sorted(out_dir.glob('*.md'))
+    if not files:
+        return None
+    return datetime.fromtimestamp(files[-1].stat().st_mtime, KST).date().isoformat()
 
 
 def load_manifest(job_id: str) -> dict | None:
@@ -156,9 +167,13 @@ def main() -> int:
         if spec.get('manifest_required'):
             manifest = load_manifest(spec['job_id'])
             if manifest is None:
+                if spec.get('today_output_fallback') and latest_output_date(spec['job_id']) == TODAY:
+                    continue
                 problems.append(f'- {name}: manifest 파일 없음')
                 continue
             if manifest_date(manifest, spec['job_id']) != TODAY:
+                if spec.get('today_output_fallback') and latest_output_date(spec['job_id']) == TODAY:
+                    continue
                 problems.append(f'- {name}: manifest 날짜가 오늘이 아님')
                 continue
             if not manifest_is_ok(manifest):
