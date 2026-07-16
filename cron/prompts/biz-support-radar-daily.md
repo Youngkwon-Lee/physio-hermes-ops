@@ -97,6 +97,8 @@
 - 불필요한 장문 배경설명 없이 바로 의사결정 가능한 수준으로 압축할 것
 - `Notion 적재 결과`는 실제 라이터 stdout 기준으로만 보고한다
 - Discord 최종 응답에는 manifest JSON, raw/valid/report 파일 경로, git 상태, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
+- Discord 최종 응답에는 `/tmp/...`, `/home/yk/...`, `Manifest`, `운영적 산출물`, `자동 저장`, `runtime`, `job_id`, `guard report path` 같은 내부 운영 산출물 섹션을 쓰지 않는다.
+- Discord 최종 응답의 second-brain/manifest 결과는 "기록 완료" 또는 "기록 실패: 한 줄 사유"로만 쓴다.
 - 최종 응답은 35줄 안쪽으로 유지한다.
 
 Direct manifest requirement:
@@ -106,4 +108,4 @@ Direct manifest requirement:
 - runStartedAt/runFinishedAt은 ISO8601 KST 또는 UTC timestamp로 쓴다. 작업 시작 시간을 모르면 runStartedAt은 generatedAt과 같은 값을 쓴다.
 - job은 `{ "id": "3832d720a370", "name": "매일 05:00 외부 기회 패킷", "runtime": "hermes-agent" }` 형태로 쓴다.
 - metadata.opportunityResult에는 inputCount, validCount, invalidCount, inserted, updated, skippedInvalid, failedRequests를 넣는다.
-- Discord 최종 응답에는 manifest 경로와 JSON 본문을 쓰지 않는다.
+- 이 manifest 작성은 내부 기록용이다. Discord 최종 응답에는 manifest 경로, JSON 본문, 생성 사실을 쓰지 않는다.

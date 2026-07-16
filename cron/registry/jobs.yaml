@@ -154,7 +154,7 @@ jobs:
     deliver_label: "discord/사업/지원사업 레이더 운영 (일일/크론) v2"
     output_type: business_radar
     prompt_file: "cron/prompts/biz-support-radar-daily.md"
-    enabled_toolsets: [web, file]
+    enabled_toolsets: [web, terminal, file]
 
   - name: daily-conversation-curator
     runtime_name: "매일 23:00 기억 후보 찾기"
