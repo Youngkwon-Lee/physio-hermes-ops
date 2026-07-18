@@ -23,6 +23,7 @@
      `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_guard.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.raw.json --valid-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json --report-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.guard-report.json`
    - guard stdout/report의 `valid_count`, `invalid_count`, `invalid_details`를 읽는다.
    - `valid_count`가 0이면 Notion append를 실행하지 말고, TOP 목록도 쓰지 말고, "오늘 신규 고신호 AI 뉴스 없음"만 짧게 보고한다.
+   - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `검토 후보: N건 / 제외 이유: ...`를 한 줄로만 쓴다. 검증 실패 항목의 제목, 링크, 내부 파일 경로는 쓰지 않는다.
    - `valid_count`가 1 이상일 때만 `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_notion_append.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json` 를 실행한다.
    - 스크립트 stdout JSON 기준으로 `inserted`, `skipped_duplicates`, `skipped_invalid`, `before_count`, `after_count` 를 확인한다.
    - second-brain 후보 파일은 valid 항목과 Notion 결과만 반영해 만든다. invalid/보류 항목은 쓰지 않는다.
@@ -67,5 +68,6 @@
 운영 전달 정책:
 - 검증 통과 신규 AI 뉴스가 0건이어도 무응답 처리를 사용하지 않는다.
 - 0건이면 "오늘 신규 고신호 AI 뉴스 없음 / guard valid_count 0 / 기록 완료 여부"만 짧게 보고한다.
+- 0건이어도 사람이 원인을 이해하도록 `검토 후보`와 `제외 이유`를 1줄 추가한다. 예: `- 검토 후보: 3건 / 제외 이유: 원문 날짜 불일치, 공식 원문 불충분`
 - 최종 응답에는 스케줄러의 무응답 토큰 문자열이나 그 이름을 절대 쓰지 않는다. 해당 문자열이 응답에 포함되면 디스코드 배달이 억제된다.
 - 검증 통과 항목이 1건 이상일 때만 TOP 목록을 쓴다.
