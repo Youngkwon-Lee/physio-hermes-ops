@@ -99,6 +99,8 @@
 - Discord 최종 응답에는 manifest JSON, raw/valid/report 파일 경로, git 상태, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
 - Discord 최종 응답에는 `/tmp/...`, `/home/yk/...`, `Manifest`, `운영적 산출물`, `자동 저장`, `runtime`, `job_id`, `guard report path` 같은 내부 운영 산출물 섹션을 쓰지 않는다.
 - Discord 최종 응답의 second-brain/manifest 결과는 "기록 완료" 또는 "기록 실패: 한 줄 사유"로만 쓴다.
+- Discord 최종 응답에는 `운영 기록`, `기록(자동 생성)`, `manifest 생성`, `internal manifest`, `errors: 없음`, `간단 보고 끝` 같은 운영용 표현을 쓰지 않는다.
+- 0건이면 `오늘 신규 유효 공고 없음`, `Notion 적재 없음`, `기록 완료` 정도만 짧게 쓴다.
 - 최종 응답은 35줄 안쪽으로 유지한다.
 
 Direct manifest requirement:
