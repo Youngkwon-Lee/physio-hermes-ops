@@ -48,6 +48,15 @@ TYPE_ALIASES = {
 }
 
 
+class NotionRequestError(RuntimeError):
+    def __init__(self, *, status: int | None, path: str, body: str, reason: str):
+        super().__init__(f"notion_request_failed status={status} path={path}: {reason}")
+        self.status = status
+        self.path = path
+        self.body = body
+        self.reason = reason
+
+
 def q(v: Any) -> str:
     if v is None:
         return ""
@@ -112,8 +121,20 @@ def notion_request(path: str, token: str, method: str = "GET", payload: dict[str
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        body = error.read().decode("utf-8", errors="ignore")
+        reason = body
+        try:
+            parsed = json.loads(body)
+            reason = q(parsed.get("message")) or q(parsed.get("code")) or body
+        except Exception:
+            reason = body[:500]
+        raise NotionRequestError(status=int(error.code), path=path, body=body[:2000], reason=reason) from error
+    except urllib.error.URLError as error:
+        raise NotionRequestError(status=None, path=path, body="", reason=str(error)) from error
 
 
 def get_data_source(data_source_id: str, token: str) -> dict[str, Any]:
@@ -130,6 +151,7 @@ def get_database_id(data_source: dict[str, Any]) -> str:
 
 def read_items(path: str | None) -> list[dict[str, Any]]:
     text = Path(path).read_text(encoding="utf-8") if path else sys.stdin.read()
+    text = text.lstrip("\ufeff")
     data = json.loads(text)
     if not isinstance(data, list):
         raise SystemExit("Input must be a JSON array")
@@ -227,19 +249,30 @@ def canonical_priority(value: Any, allowed: set[str]) -> str:
     return "medium" if "medium" in allowed else (raw or "medium")
 
 
-def canonical_topics(value: Any) -> list[str]:
+def canonical_topics(value: Any, allowed: set[str] | None = None) -> list[str]:
     topics = split_multi(value)
     normalized: list[str] = []
     seen: set[str] = set()
+    allowed = allowed or set()
+    allowed_by_norm = {norm(option): option for option in allowed}
     for topic in topics:
         cleaned = q(topic)[:100]
         if not cleaned:
             continue
         key = norm(cleaned)
+        if allowed:
+            cleaned = allowed_by_norm.get(key, "")
+            if not cleaned:
+                continue
         if key in seen:
             continue
         seen.add(key)
         normalized.append(cleaned)
+    if not normalized and allowed:
+        for fallback in ["briefing", "agents"]:
+            if fallback in allowed:
+                return [fallback]
+        return [sorted(allowed)[0]]
     return normalized or ["agents"]
 
 
@@ -247,8 +280,9 @@ def build_properties(item: dict[str, Any], data_source: dict[str, Any]) -> dict[
     source_options = property_option_names(data_source, "Source")
     type_options = property_option_names(data_source, "Type")
     priority_options = property_option_names(data_source, "Priority")
-    topics = canonical_topics(item.get("topics") or item.get("topic_tags") or item.get("topic"))
-    return {
+    topic_options = property_option_names(data_source, "Topic")
+    topics = canonical_topics(item.get("topics") or item.get("topic_tags") or item.get("topic"), topic_options)
+    properties = {
         "Name": {"title": [{"text": {"content": q(item.get("title"))[:1900]}}]},
         "Date": {"date": {"start": q(item.get("date"))}},
         "Source": {"select": {"name": canonical_source(item.get("source"), source_options)}},
@@ -260,6 +294,8 @@ def build_properties(item: dict[str, Any], data_source: dict[str, Any]) -> dict[
         "Status": {"select": {"name": q(item.get("status")) or "new"}},
         "Week": {"rich_text": [{"text": {"content": str(to_int(item.get("week"), 0))[:1900]}}]},
     }
+    known_properties = set((data_source.get("properties") or {}).keys())
+    return {name: value for name, value in properties.items() if name in known_properties}
 
 
 def fetch_url_status(url: str) -> tuple[int | None, str, str]:
@@ -340,7 +376,7 @@ def print_human_summary(result: dict[str, Any], dry_run: bool) -> None:
     print(
         f"[{mode}] input={result['input_count']} inserted={result['inserted']} "
         f"duplicates={result['skipped_duplicates']} invalid={result['skipped_invalid']} "
-        f"before={before_text} after={after_text}"
+        f"failed_requests={result.get('failed_requests', 0)} before={before_text} after={after_text}"
     )
     for row in result.get("inserted_details", [])[:5]:
         print(f"  + {row['title']} -> {row['page_url']}")
@@ -350,6 +386,8 @@ def print_human_summary(result: dict[str, Any], dry_run: bool) -> None:
         print(f"  = {row['title']} -> {page_url}")
     for row in result.get("invalid_details", [])[:5]:
         print(f"  ! {row['title']} missing={','.join(row['missing'])}")
+    for row in result.get("request_failures", [])[:5]:
+        print(f"  x {row['title']} status={row.get('status')} reason={row.get('reason')}")
     print(json.dumps(result, ensure_ascii=False))
 
 
@@ -375,6 +413,8 @@ def main() -> int:
     invalid_details: list[dict[str, Any]] = []
     duplicate_titles: list[str] = []
     duplicate_details: list[dict[str, Any]] = []
+    failed_requests = 0
+    request_failures: list[dict[str, Any]] = []
     seen_input_urls: set[str] = set()
 
     before_count = count_existing_rows(data_source_id, token) if args.with_counts else None
@@ -429,7 +469,20 @@ def main() -> int:
             "parent": {"type": "data_source_id", "data_source_id": data_source_id},
             "properties": properties,
         }
-        created = notion_request("/pages", token, method="POST", payload=payload)
+        try:
+            created = notion_request("/pages", token, method="POST", payload=payload)
+        except NotionRequestError as error:
+            failed_requests += 1
+            request_failures.append({
+                "title": title,
+                "url": url,
+                "status": error.status,
+                "path": error.path,
+                "reason": error.reason,
+                "body": error.body,
+            })
+            seen_input_urls.add(url)
+            continue
         row_summary = extract_row_summary(created)
         inserted += 1
         inserted_titles.append(title)
@@ -452,13 +505,15 @@ def main() -> int:
         "duplicate_titles": duplicate_titles,
         "duplicate_details": duplicate_details,
         "invalid_details": invalid_details,
+        "failed_requests": failed_requests,
+        "request_failures": request_failures,
     }
 
     if args.json_only:
         print(json.dumps(result, ensure_ascii=False))
     else:
         print_human_summary(result, args.dry_run)
-    return 0
+    return 1 if failed_requests else 0
 
 
 if __name__ == "__main__":

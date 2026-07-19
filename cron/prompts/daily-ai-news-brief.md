@@ -25,7 +25,8 @@
    - `valid_count`가 0이면 Notion append를 실행하지 말고, TOP 목록도 쓰지 말고, "오늘 신규 고신호 AI 뉴스 없음"만 짧게 보고한다.
    - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `검토 후보: N건 / 제외 이유: ...`를 한 줄로만 쓴다. 검증 실패 항목의 제목, 링크, 내부 파일 경로는 쓰지 않는다.
    - `valid_count`가 1 이상일 때만 `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_notion_append.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json` 를 실행한다.
-   - 스크립트 stdout JSON 기준으로 `inserted`, `skipped_duplicates`, `skipped_invalid`, `before_count`, `after_count` 를 확인한다.
+   - 스크립트 stdout JSON 기준으로 `inserted`, `skipped_duplicates`, `skipped_invalid`, `failed_requests`, `request_failures`, `before_count`, `after_count` 를 확인한다.
+   - `failed_requests`가 1 이상이면 `request_failures`의 대표 1건에서 `status`, `reason`을 읽고 최종 답변의 `Notion 적재 결과`에 한 줄로 명시한다. 이때 raw body 전문, token, 내부 path는 쓰지 않는다.
    - second-brain 후보 파일은 valid 항목과 Notion 결과만 반영해 만든다. invalid/보류 항목은 쓰지 않는다.
    - second-brain 후보 파일을 만든 뒤에는 직접 `git add/commit/push`를 하지 말고 반드시 `python3 /home/yk/physio-hermes-ops/cron/scripts/notion_brain_candidate_git_sync.py` 를 실행해 기록한다.
    - 이 sync helper는 원격 fetch/rebase/push 재시도를 담당한다. helper stdout의 `status: pushed` 또는 `status: no_changes`면 최종 답변에는 `기록 완료`로만 적는다.
@@ -48,6 +49,7 @@
   - 신규 저장 수
   - 중복 스킵 수
   - 유효성 스킵 수
+  - 요청 실패 수
   - 신규 저장된 대표 항목 1~3개 또는 `오늘은 신규 저장 없음`
   - 실패 시: 실패 단계와 오류 한 줄 요약
 
