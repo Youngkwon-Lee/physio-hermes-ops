@@ -25,6 +25,7 @@
 4) 너무 범용적이더라도 규모/파급력이 크면 포함 가능
 
 반드시 아래 절차를 따른다:
+0) 최종 응답의 기준 시각, JSON 파일명, guard `--today`, manifest `generatedAt/runStartedAt/runFinishedAt` 날짜는 반드시 terminal로 `TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST'` 와 `TZ=Asia/Seoul date +%F`를 실행해 얻은 KST 값을 사용한다. 이전 실행 날짜, 검색 결과 날짜, UTC 날짜를 재사용하지 않는다.
 1) web_search로 오늘 기준 의미 있는 후보를 먼저 6~12개 정도 수집한다.
    - 실제로 확인한 소스 묶음을 메모해 최종 0건 보고의 `확인 범위`에 반영한다. 예: `K-Startup, 기업마당/비즈인포, NIPA/KISED, 서울AI허브`.
 2) 상위 후보는 web_extract로 원문/요약을 확인해 기관명, 사업명, 마감, 링크, 적합 이유를 검증한다.
@@ -102,6 +103,8 @@
 - Discord 최종 응답에는 `/tmp/...`, `/home/yk/...`, `Manifest`, `운영적 산출물`, `자동 저장`, `runtime`, `job_id`, `guard report path` 같은 내부 운영 산출물 섹션을 쓰지 않는다.
 - Discord 최종 응답의 second-brain/manifest 결과는 "기록 완료" 또는 "기록 실패: 한 줄 사유"로만 쓴다.
 - Discord 최종 응답에는 `운영 기록`, `기록(자동 생성)`, `manifest 생성`, `internal manifest`, `errors: 없음`, `간단 보고 끝` 같은 운영용 표현을 쓰지 않는다.
+- Discord 최종 응답에는 `운영 로그`, `운영 로그 요약`, `생성된 내부 기록`, `Guard 스크립트`, `Notion 업서트 실행`, `파일 생성`, `status: ok`, `errors: []` 같은 실행 흔적을 쓰지 않는다.
+- 0건일 때는 아래 6줄 안팎의 사람용 판단만 남기고, 별도 기술 요약이나 종결 문장을 붙이지 않는다.
 - 0건이면 `오늘 신규 유효 공고 없음`, `Notion 적재 없음`, `기록 완료` 정도만 짧게 쓴다.
 - 0건이어도 사람이 판단할 수 있도록 `확인 범위`, `검토 후보: N건 / 제외 이유: ...`, `다음 확인 축`을 포함한다. 내부 경로, manifest, guard 파일명은 쓰지 않는다.
 - `검토 후보: 0건 / 제외 이유: 없음`은 금지한다. 후보가 없으면 `검토 후보: 0건 / 제외 이유: 공식 원문에서 공고명·기관·마감일을 모두 확인한 신규 항목 없음`으로 쓴다.
@@ -116,6 +119,7 @@
 
 Direct manifest requirement:
 - 작업이 끝나기 전에 반드시 `/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/3832d720a370.json` 를 JSON으로 작성한다.
+- manifest 날짜와 metadata 날짜도 위에서 얻은 TODAY_KST 기준이어야 한다. 이미 존재하는 어제 manifest를 복사하거나 재사용하지 않는다.
 - schemaVersion=1, evidenceSource="runtime-direct", status, generatedAt, runStartedAt, runFinishedAt, job.id/name/runtime, createdFiles, artifacts, discordMessages, errors, metadata를 포함한다.
 - 성공이고 errors가 비어 있으면 status는 "ok"로 쓴다. 실패 또는 blocker가 있으면 status는 "error" 또는 "completed_with_blockers"로 쓰고 errors에 단계와 이유를 넣는다.
 - runStartedAt/runFinishedAt은 ISO8601 KST 또는 UTC timestamp로 쓴다. 작업 시작 시간을 모르면 runStartedAt은 generatedAt과 같은 값을 쓴다.

@@ -89,10 +89,26 @@ WEEKDAY_TODO = {
 
 VISIT_REHAB_CALENDAR_ID = "${VISIT_REHAB_CALENDAR_ID}"
 CALENDAR_IDS = ["primary", VISIT_REHAB_CALENDAR_ID]
+STATIC_CALENDAR_IDS = set(CALENDAR_IDS)
 CALENDAR_NAME_MAP = {
     VISIT_REHAB_CALENDAR_ID: "방문재활",
     "primary": "기본",
 }
+EXCLUDED_CALENDAR_SUMMARY_HINTS = [
+    "birthday",
+    "birthdays",
+    "생일",
+    "holiday",
+    "holidays",
+    "휴일",
+]
+AUTOMATIC_EVENT_KEYWORDS = [
+    "heartbeat",
+    "billing heartbeat",
+    "health heartbeat",
+    "자동 점검",
+    "자동확인",
+]
 
 
 def load_creds(path: Path) -> Credentials:
@@ -124,6 +140,11 @@ def is_lunch_event(summary: str) -> bool:
     return any(k in s for k in ["점심", "런치", "lunch"])
 
 
+def is_automatic_event(summary: str) -> bool:
+    s = (summary or "").lower()
+    return any(k in s for k in AUTOMATIC_EVENT_KEYWORDS)
+
+
 def is_cancelled_event(event: dict[str, Any], summary: str) -> bool:
     if event.get("status") == "cancelled":
         return True
@@ -132,17 +153,63 @@ def is_cancelled_event(event: dict[str, Any], summary: str) -> bool:
 
 def format_event(event: dict[str, Any]) -> str | None:
     summary = (event.get("summary") or "(제목 없음)").strip()
-    if is_lunch_event(summary) or is_cancelled_event(event, summary):
+    if is_lunch_event(summary) or is_automatic_event(summary) or is_cancelled_event(event, summary):
         return None
     start, end, all_day = parse_event_time(event)
     if not all_day and (start is None or end is None):
         return None
-    cal_id = event.get("organizer", {}).get("email") or event.get("calendarId") or ""
+    cal_id = event.get("calendarId") or event.get("organizer", {}).get("email") or ""
     cal_name = CALENDAR_NAME_MAP.get(cal_id, event.get("organizer", {}).get("displayName") or "기타")
     time_text = "하루종일" if all_day else f"{start.strftime('%H:%M')}-{end.strftime('%H:%M')}"
     location = (event.get("location") or "").strip()
     loc_text = f" | {location}" if location else ""
     return f"- {time_text} | {summary} [{cal_name}]{loc_text}"
+
+
+def should_include_calendar(calendar: dict[str, Any]) -> bool:
+    summary = (calendar.get("summary") or "").lower()
+    if calendar.get("hidden"):
+        return False
+    if any(hint in summary for hint in EXCLUDED_CALENDAR_SUMMARY_HINTS):
+        return False
+    if calendar.get("primary"):
+        return True
+    if calendar.get("id") in STATIC_CALENDAR_IDS:
+        return True
+    if calendar.get("selected"):
+        return True
+    return calendar.get("accessRole") in {"owner", "writer"}
+
+
+def get_calendar_sources(svc: Any, issues: list[str]) -> list[str]:
+    seen: set[str] = set()
+    sources: list[str] = []
+
+    def add(calendar_id: str) -> None:
+        if calendar_id and calendar_id not in seen:
+            seen.add(calendar_id)
+            sources.append(calendar_id)
+
+    try:
+        calendars = svc.calendarList().list(maxResults=100).execute().get("items", [])
+    except Exception as e:
+        issues.append(f"calendarList: {type(e).__name__}: {e}")
+        calendars = []
+
+    for calendar in calendars:
+        calendar_id = "primary" if calendar.get("primary") else calendar.get("id", "")
+        summary = calendar.get("summary") or calendar_id or "기타"
+        if calendar_id:
+            CALENDAR_NAME_MAP[calendar_id] = summary
+        raw_id = calendar.get("id")
+        if raw_id:
+            CALENDAR_NAME_MAP[raw_id] = summary
+        if should_include_calendar(calendar):
+            add(calendar_id)
+
+    for calendar_id in CALENDAR_IDS:
+        add(calendar_id)
+    return sources or CALENDAR_IDS
 
 
 def get_calendar_items() -> tuple[list[str], list[str], list[str], list[str]]:
@@ -152,11 +219,12 @@ def get_calendar_items() -> tuple[list[str], list[str], list[str], list[str]]:
     upcoming_lines: list[str] = []
     svc = build("calendar", "v3", credentials=load_creds(PRIMARY_TOKEN))
     now = datetime.now(KST)
+    calendar_sources = get_calendar_sources(svc, issues)
 
     def fetch_events(time_min: str, time_max: str, max_results: int) -> list[dict[str, Any]]:
         merged: list[dict[str, Any]] = []
         seen: set[str] = set()
-        for calendar_id in CALENDAR_IDS:
+        for calendar_id in calendar_sources:
             try:
                 events = svc.events().list(
                     calendarId=calendar_id,
@@ -199,7 +267,8 @@ def get_calendar_items() -> tuple[list[str], list[str], list[str], list[str]]:
         start, _, _ = parse_event_time(event)
         if not start:
             continue
-        day_key = start.strftime("%m-%d(%a)")
+        display_day = start if start.date() >= start_3.date() else start_3
+        day_key = display_day.strftime("%m-%d(%a)")
         grouped[day_key].append(line[2:])
     for day_key, items in grouped.items():
         upcoming_lines.append(f"- {day_key}: " + " / ".join(items[:3]))
