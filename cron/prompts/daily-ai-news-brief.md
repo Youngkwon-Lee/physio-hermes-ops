@@ -3,6 +3,8 @@
 반드시 다음 절차를 따른다.
 1) web_search와 필요시 web_extract를 사용해 최근 AI/LLM/VLM/멀티모달/헬스케어 AI/에이전트 관련 업데이트를 찾는다.
 2) 검색은 넓게 많이 하지 말고, **고신호 쿼리 3~4개 정도만 보수적으로** 사용한다.
+   - 사용한 검색 축을 짧게 기록해 최종 0건 보고의 `확인 범위`에 반영한다. 예: `OpenAI/Google/Anthropic/Mistral 공식 업데이트, arXiv/agent workflow`.
+   - 후보를 raw JSON에 넣지 않은 경우에도 사람이 이해할 수 있도록 검토 후보 수와 제외 사유 묶음을 메모한다.
 3) 일반 대중 뉴스나 반복성 높은 저품질 요약은 버리고, 제품 출시/연구 발표/API 변화/실무 영향이 큰 항목만 남긴다.
 4) 가능하면 회사 공식 블로그, 공식 문서, arXiv, 주요 기관 발표 같은 **원문 1차 소스**를 우선한다. 출처가 약하면 제외한다.
    - URL 검증이 HEAD 403/405처럼 애매하면 GET 또는 web_extract로 한 번 더 확인한다.
@@ -23,7 +25,8 @@
      `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_guard.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.raw.json --valid-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json --report-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.guard-report.json`
    - guard stdout/report의 `valid_count`, `invalid_count`, `invalid_details`를 읽는다.
    - `valid_count`가 0이면 Notion append를 실행하지 말고, TOP 목록도 쓰지 말고, "오늘 신규 고신호 AI 뉴스 없음"만 짧게 보고한다.
-   - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `검토 후보: N건 / 제외 이유: ...`를 한 줄로만 쓴다. 검증 실패 항목의 제목, 링크, 내부 파일 경로는 쓰지 않는다.
+   - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `확인 범위`, `검토 후보: N건 / 제외 이유: ...`, `다음 확인 축`을 한 줄씩 쓴다. 검증 실패 항목의 제목, 링크, 내부 파일 경로는 쓰지 않는다.
+   - raw 후보 수가 0이면 `검토 후보: 0건 / 제외 이유: 없음`이라고 쓰지 않는다. 대신 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 공식 원문 기준 후보 없음`처럼 판단 가능한 이유를 쓴다.
    - `valid_count`가 1 이상일 때만 `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_notion_append.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json` 를 실행한다.
    - 스크립트 stdout JSON 기준으로 `inserted`, `skipped_duplicates`, `skipped_invalid`, `failed_requests`, `request_failures`, `before_count`, `after_count` 를 확인한다.
    - `failed_requests`가 1 이상이면 `request_failures`의 대표 1건에서 `status`, `reason`을 읽고 최종 답변의 `Notion 적재 결과`에 한 줄로 명시한다. 이때 raw body 전문, token, 내부 path는 쓰지 않는다.
@@ -70,6 +73,10 @@
 운영 전달 정책:
 - 검증 통과 신규 AI 뉴스가 0건이어도 무응답 처리를 사용하지 않는다.
 - 0건이면 "오늘 신규 고신호 AI 뉴스 없음 / guard valid_count 0 / 기록 완료 여부"만 짧게 보고한다.
-- 0건이어도 사람이 원인을 이해하도록 `검토 후보`와 `제외 이유`를 1줄 추가한다. 예: `- 검토 후보: 3건 / 제외 이유: 원문 날짜 불일치, 공식 원문 불충분`
+- 0건이어도 사람이 원인을 이해하도록 `확인 범위`, `검토 후보`, `제외 이유`, `다음 확인 축`을 포함한다.
+  예: `- 확인 범위: 공식 블로그/문서, arXiv, 주요 모델사 업데이트`
+  예: `- 검토 후보: 3건 / 제외 이유: 원문 날짜 불일치, 공식 원문 불충분`
+  예: `- 다음 확인 축: agent runtime, multimodal clinical AI`
+- raw 후보가 0건이면 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 공식 원문 기준 후보 없음`으로 쓴다. `제외 이유: 없음`은 금지한다.
 - 최종 응답에는 스케줄러의 무응답 토큰 문자열이나 그 이름을 절대 쓰지 않는다. 해당 문자열이 응답에 포함되면 디스코드 배달이 억제된다.
 - 검증 통과 항목이 1건 이상일 때만 TOP 목록을 쓴다.

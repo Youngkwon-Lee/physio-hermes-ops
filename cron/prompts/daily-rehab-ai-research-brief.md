@@ -5,6 +5,8 @@
 1) web_search와 필요시 web_extract를 사용해 최근 24~72시간 기준으로 재활/물리치료/rehabilitation/physical therapy/robotics/VLM/multimodal AI 관련 고신호 항목을 찾는다.
    - 고신호 항목이 0건이면 최근 7일 범위로 fallback 검색을 2~3개 쿼리만 추가 수행한다.
    - fallback에서도 Notion 적재 기준을 낮추지 않는다. 단, 최종 답변에는 제목/링크 없이 `검토 후보: N건 / 제외 이유: ...` 한 줄로 왜 0건인지 설명한다.
+   - 사용한 검색 축을 짧게 기록해 최종 0건 보고의 `확인 범위`에 반영한다. 예: `rehabilitation AI, robotic rehabilitation, EMG/wearable sensing, multimodal clinical AI`.
+   - 이 daily 브리프는 최근 24~72시간 고신호 원문 중심이다. Notion/weekly 후보는 최근 7일 장기 후보 큐이므로 daily가 0건이어도 weekly 후보가 있을 수 있다. 0건 보고에는 이 기준 차이를 한 줄로 밝힌다.
 2) 과장 금지. 실제로 확인된 링크만 사용한다.
 3) 논문/뉴스/기업 업데이트가 섞여도 되지만, 영권님의 관심축(재활, 물리치료, 임상 적용 가능성, 데이터 구조화, multimodal sensing)에 맞는 것만 남긴다.
 4) 중복성 높은 일반 AI 뉴스는 버린다.
@@ -58,14 +60,17 @@
 - 검증 통과 신규 재활 AI 논문/뉴스가 0건이어도 무응답 처리를 사용하지 않는다.
 - Discord 최종 응답은 사람용 요약만 남긴다. manifest JSON, raw/valid/report 파일 경로, git HEAD SHA, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
 - Discord 최종 응답에는 스케줄러의 무응답 토큰 문자열이나 그 이름을 절대 쓰지 않는다. 해당 문자열이 응답에 포함되면 디스코드 배달이 억제된다.
-- 0건일 때 최종 응답은 아래 6줄 이내로 쓴다.
+- 0건일 때 최종 응답은 아래 8줄 이내로 쓴다.
   - `재활 AI 브리프`
   - `- 상태: 정상 실행`
   - `- 신규 고신호: 0건`
+  - `- 확인 범위: 최근 24~72시간 + fallback 7일 / 재활 AI·로보틱스·웨어러블·멀티모달 임상 AI`
   - `- 검토 후보: N건 / 제외 이유: 신규성 부족, 원문 불충분, 재활 관련도 낮음`
+  - `- 기준 메모: daily는 24~72시간 원문 고신호, weekly는 7일 장기 후보 큐`
   - `- Notion: 적재 없음`
   - `- second-brain: 후보 기록 완료`
 - 검증 통과 항목이 1건 이상일 때도 전체 응답은 35줄 이내로 유지하고, 제목/의미/링크/Notion 결과/다음 행동만 남긴다.
+- `검토 후보: 0건 / 제외 이유: 없음`은 금지한다. 후보가 없으면 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 신규 원문 후보 없음`으로 쓴다.
 
 Direct manifest requirement:
 - 작업이 끝나기 전에 반드시 `/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/daeb6079f4f0.json` 를 JSON으로 작성한다.
