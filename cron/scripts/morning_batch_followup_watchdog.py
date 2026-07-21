@@ -15,6 +15,20 @@ OUTPUT_BASE = Path('/home/yk/.hermes/cron/output')
 MANIFEST_BASE = Path('/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests')
 
 CHECKS = {
+    'biz-support-radar-daily': {
+        'job_id': '3832d720a370',
+        'must_run_after': '05:00',
+        'allowed_statuses': {'ok'},
+        'output_must_include_today': True,
+        'disallow_silent_token': True,
+    },
+    'daily-ai-news-brief': {
+        'job_id': '6ce3128480c9',
+        'must_run_after': '05:30',
+        'allowed_statuses': {'ok'},
+        'output_must_include_today': True,
+        'disallow_silent_token': True,
+    },
     'daily-rehab-ai-research-brief': {
         'job_id': 'daeb6079f4f0',
         'must_run_after': '06:00',
@@ -135,6 +149,11 @@ def output_status(text: str) -> str:
     return m.group(1).strip() if m else 'unknown'
 
 
+def has_mixed_silent_token(text: str) -> bool:
+    stripped = text.strip()
+    return '[SILENT]' in stripped and stripped != '[SILENT]'
+
+
 def main() -> int:
     jobs = load_jobs()
     problems: list[str] = []
@@ -185,6 +204,10 @@ def main() -> int:
             if TODAY not in text:
                 problems.append(f'- {name}: 오늘 output 파일 확인 실패')
                 continue
+
+        if spec.get('disallow_silent_token') and has_mixed_silent_token(text):
+            problems.append(f'- {name}: [SILENT] 토큰이 본문과 함께 출력됨')
+            continue
 
         if name == 'second-brain-git-sync-batch':
             text = latest_output_text(spec['job_id'])

@@ -47,6 +47,21 @@ TYPE_ALIASES = {
     "research": "research",
 }
 
+TRUSTED_SOURCE_DOMAINS = {
+    "anthropic": ("anthropic.com",),
+    "anthropic blog": ("anthropic.com",),
+    "arxiv": ("arxiv.org",),
+    "google": ("google.com", "blog.google", "deepmind.google", "ai.google"),
+    "google deepmind": ("deepmind.google", "google.com"),
+    "meta": ("meta.com", "ai.meta.com"),
+    "microsoft": ("microsoft.com", "azure.microsoft.com", "blogs.microsoft.com"),
+    "mistral": ("mistral.ai",),
+    "nvidia": ("nvidia.com",),
+    "openai": ("openai.com", "developers.openai.com", "help.openai.com"),
+    "openai blog": ("openai.com", "developers.openai.com", "help.openai.com"),
+    "xai": ("x.ai",),
+}
+
 
 class NotionRequestError(RuntimeError):
     def __init__(self, *, status: int | None, path: str, body: str, reason: str):
@@ -65,6 +80,12 @@ def q(v: Any) -> str:
 
 def norm(s: str) -> str:
     return " ".join(q(s).lower().split())
+
+
+def truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return norm(q(value)) in {"1", "true", "yes", "y", "verified", "확인", "검증됨"}
 
 
 def to_int(v: Any, default: int) -> int:
@@ -328,6 +349,68 @@ def fetch_url_body(url: str) -> str:
         return resp.read(256_000).decode("utf-8", errors="ignore")
 
 
+def strip_html(text: str) -> str:
+    text = re.sub(r"<script\b[^>]*>.*?</script>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<style\b[^>]*>.*?</style>", " ", text, flags=re.I | re.S)
+    text = re.sub(r"<[^>]+>", " ", text)
+    return " ".join(text.split())
+
+
+def source_claims(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [q(item) for item in value if q(item)]
+    text = q(value)
+    if not text:
+        return []
+    return [part.strip() for part in re.split(r"[\n;]+", text) if part.strip()]
+
+
+def source_domain_allowed(source: str, url: str) -> bool:
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.netloc.lower().split("@")[-1].split(":")[0]
+    if not host:
+        return False
+    lowered = norm(source)
+    allowed = TRUSTED_SOURCE_DOMAINS.get(lowered)
+    if not allowed:
+        canonical = SOURCE_ALIASES.get(lowered)
+        allowed = TRUSTED_SOURCE_DOMAINS.get(norm(canonical or ""))
+    if not allowed:
+        return True
+    return any(host == domain or host.endswith(f".{domain}") for domain in allowed)
+
+
+def meaningful_words(text: str) -> list[str]:
+    stop = {
+        "and", "the", "for", "with", "from", "into", "api", "news", "notes",
+        "update", "updates", "release", "releases", "announces", "plans",
+        "공지", "발표", "출시", "업데이트", "뉴스", "관련", "안내",
+    }
+    return [
+        word.lower()
+        for word in re.findall(r"[0-9A-Za-z가-힣][0-9A-Za-z가-힣.+_-]{2,}", text)
+        if word.lower() not in stop
+    ]
+
+
+def claim_in_source(claim: str, body: str) -> bool:
+    if not claim:
+        return False
+    text = norm(strip_html(body))
+    compact_claim = norm(claim)
+    if compact_claim and compact_claim in text:
+        return True
+    words = meaningful_words(claim)
+    if not words:
+        return False
+    versioned_words = [word for word in words if any(char.isdigit() for char in word)]
+    if versioned_words and any(word not in text for word in versioned_words):
+        return False
+    matched = sum(1 for word in words if word in text)
+    needed = min(len(words), max(2, (len(words) + 1) // 2))
+    return matched >= needed
+
+
 def extract_arxiv_title(html: str) -> str:
     match = re.search(r'<h1[^>]*class="title[^>]*>\s*<span[^>]*>Title:\s*</span>\s*(.*?)\s*</h1>', html, re.I | re.S)
     if not match:
@@ -339,24 +422,38 @@ def extract_arxiv_title(html: str) -> str:
 def validate_source_url(item: dict[str, Any]) -> list[str]:
     url = q(item.get("url"))
     title = q(item.get("title"))
+    source = q(item.get("source"))
     if not url:
         return []
+    errors: list[str] = []
+    if not source_domain_allowed(source, url):
+        errors.append(f"untrusted_source_domain:{source}:{urllib.parse.urlparse(url).netloc}")
+    if not truthy(item.get("source_url_verified")):
+        errors.append("source_url_verified_required")
+    claims = source_claims(item.get("source_claims") or item.get("verified_claims"))
+    if not claims:
+        errors.append("source_claims_required")
     status, final_url, body = fetch_url_status(url)
     if status is None:
-        return [f"url_unverified:{url}:{body[:120]}"]
+        return errors + [f"url_unverified:{url}:{body[:120]}"]
     if status >= 400:
-        return [f"url_unreachable:{status}:{url}"]
+        return errors + [f"url_unreachable:{status}:{url}"]
     parsed = urllib.parse.urlparse(final_url or url)
+    if not body:
+        try:
+            body = fetch_url_body(final_url or url)
+        except Exception as error:
+            return errors + [f"url_body_unverified:{url}:{type(error).__name__}: {error}"]
+    if title and not claim_in_source(title, body):
+        errors.append("title_not_found_in_source")
+    for claim in claims:
+        if not claim_in_source(claim, body):
+            errors.append(f"claim_not_found_in_source:{claim[:80]}")
     if parsed.netloc.lower().endswith("arxiv.org") and parsed.path.startswith("/abs/"):
-        if not body:
-            try:
-                body = fetch_url_body(final_url or url)
-            except Exception as error:
-                return [f"url_unverified:{url}:{type(error).__name__}: {error}"]
         actual_title = extract_arxiv_title(body)
         if actual_title and title and norm(title) not in norm(actual_title) and norm(actual_title) not in norm(title):
-            return [f"url_title_mismatch: expected={title[:80]} actual={actual_title[:80]}"]
-    return []
+            errors.append(f"url_title_mismatch: expected={title[:80]} actual={actual_title[:80]}")
+    return errors
 
 
 def validate_item(item: dict[str, Any]) -> list[str]:

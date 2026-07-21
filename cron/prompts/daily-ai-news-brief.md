@@ -8,6 +8,7 @@
 3) 일반 대중 뉴스나 반복성 높은 저품질 요약은 버리고, 제품 출시/연구 발표/API 변화/실무 영향이 큰 항목만 남긴다.
 4) 가능하면 회사 공식 블로그, 공식 문서, arXiv, 주요 기관 발표 같은 **원문 1차 소스**를 우선한다. 출처가 약하면 제외한다.
    - URL 검증이 HEAD 403/405처럼 애매하면 GET 또는 web_extract로 한 번 더 확인한다.
+   - 공식 원문에 실제로 보이는 제목/날짜/핵심 문구만 채택한다. 모델명, 버전, 폐기 일정, API 명칭을 원문에서 직접 확인하지 못하면 후보 JSON에 넣지 않는다.
    - 최종 guard를 통과하지 못한 항목은 TOP 목록, 오늘 바로 볼 것, Notion 적재, second-brain 후보 본문에서 모두 제외한다.
 5) 재활, 임상, 지식관리, 에이전트 운영, 개발 워크플로와 연결될 만한 항목을 우선한다.
 6) 링크는 검증 가능한 원문만 쓴다.
@@ -17,6 +18,10 @@
 10) 반드시 terminal 도구를 사용해 아래 순서로 수행한다.
    - 선택한 적재 후보를 JSON array 파일로 저장한다. 경로는 `/tmp/daily_ai_news_brief_<YYYY-MM-DD>.raw.json` 형식을 사용한다.
    - 각 item에는 최소 필드 `title`, `date`, `source`, `type`, `topics`, `insight`, `url`, `priority`, `status`, `week` 를 넣는다.
+   - 각 item에는 추가로 `source_url_verified`, `source_url_checked_at`, `source_claims` 를 반드시 넣는다.
+     - `source_url_verified`: web_extract/GET으로 공식 원문을 직접 읽었을 때만 `true`.
+     - `source_url_checked_at`: terminal로 얻은 KST 날짜/시각.
+     - `source_claims`: 원문에서 직접 확인한 핵심 문구 1~3개 배열. 예: 모델명, API명, 날짜, deprecation 문구. 원문에 없는 해석/추정 문장은 넣지 않는다.
    - `source` 예시: `OpenAI`, `Anthropic`, `Google`, `xAI`, `Meta`, `Mistral`, `Microsoft`, `Other`
    - `type` 예시: `news`, `product`, `api`, `research`, `agent`, `infra`, `policy`, `briefing`
    - `priority` 는 `high`, `medium`, `low` 중 하나를 사용한다.
@@ -24,6 +29,7 @@
    - 그 다음 반드시 guard를 실행한다:
      `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_guard.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.raw.json --valid-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json --report-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.guard-report.json`
    - guard stdout/report의 `valid_count`, `invalid_count`, `invalid_details`를 읽는다.
+   - guard가 `source_url_verified_required`, `source_claims_required`, `title_not_found_in_source`, `claim_not_found_in_source`, `untrusted_source_domain` 을 보고한 항목은 원문 검증 실패로 보고하고, 제목/링크를 본문에 쓰지 않는다.
    - `valid_count`가 0이면 Notion append를 실행하지 말고, TOP 목록도 쓰지 말고, "오늘 신규 고신호 AI 뉴스 없음"만 짧게 보고한다.
    - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `확인 범위`, `검토 후보: N건 / 제외 이유: ...`, `다음 확인 축`을 한 줄씩 쓴다. 검증 실패 항목의 제목, 링크, 내부 파일 경로는 쓰지 않는다.
    - raw 후보 수가 0이면 `검토 후보: 0건 / 제외 이유: 없음`이라고 쓰지 않는다. 대신 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 공식 원문 기준 후보 없음`처럼 판단 가능한 이유를 쓴다.
@@ -69,6 +75,7 @@
 - 최종 응답에 `/tmp/...`, `/home/yk/...`, `Runtime manifest`, `remoteSynced`, `gitCommit.sha`, `추적된 운영 산출물` 섹션을 쓰지 않는다.
 - 최종 응답에 helper stdout, 스크립트명, 파일 경로, "부가", "실행 로그", "종결" 같은 운영 흔적을 쓰지 않는다.
 - 원문 검증 실패/보류 항목은 제목을 포함해 본문에 쓰지 않는다.
+- 공식 원문이 아닌 help mirror, 검색결과, 요약글, 루트 페이지, 뉴스레터, 모델이 추정한 release note는 Notion 후보로 쓰지 않는다.
 
 운영 전달 정책:
 - 검증 통과 신규 AI 뉴스가 0건이어도 무응답 처리를 사용하지 않는다.
