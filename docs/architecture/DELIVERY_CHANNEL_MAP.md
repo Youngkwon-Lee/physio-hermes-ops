@@ -36,7 +36,8 @@
 | weekly-pt-kpi-brief | kpi_brief | `discord/사업/지원사업 회의실` | PT MVP 운영 지표 공유 | Hermes cron output |
 | biz-support-radar-daily | business_radar | `discord/사업/지원사업 레이더 운영 (일일/크론) v2` | 재활·의료AI·스타트업 인접 지원사업 일일 스캔 | Hermes cron output |
 | daily-conversation-curator | curator | `discord/비서/장기기억 기록 도우미` | 장기 기억 후보/큐레이션 | Hermes cron output |
-| daily-discord-digest | digest | `discord/비서/하루 대화 요약 리포터` | 하루 대화 핵심 요약 | Hermes cron output |
+| daily-discord-nightly-packet | digest | `local wrapper -> discord/비서/하루 대화 요약 리포터` | action staging, paused legacy daily digest, postsync를 묶어서 실행 | Hermes cron output + manifest |
+| daily-discord-digest | digest | `discord/비서/하루 대화 요약 리포터` | 하루 대화 핵심 요약. 중복 방지를 위해 직접 스케줄은 paused일 수 있고 nightly packet이 호출 | Hermes cron output |
 | calendar-auto-classify | maintenance | `local-only` | 사용자-facing delivery 없음 | local runtime only |
 | ensure-kinelo-8888-server | watchdog | `local-only` | 사용자-facing delivery 없음 | local runtime only |
 | hermes-ops-watchdog | watchdog | `discord/비서/장기기억 기록 도우미` | Hermes gateway/cron 이상만 짧게 알리는 운영 watchdog | Hermes cron output |

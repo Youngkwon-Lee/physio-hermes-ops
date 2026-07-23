@@ -34,6 +34,15 @@ CHECKS = {
         'must_run_after': '06:00',
         'allowed_statuses': {'ok'},
         'manifest_required': True,
+        'forbidden_output_patterns': [
+            r'운영\s*메타',
+            r'\[작업\s*로그',
+            r'자동화\s*아티팩트',
+            r'/tmp/',
+            r'/home/yk/',
+            r'before_count',
+            r'after_count',
+        ],
     },
     'notion-brain-candidate-exporter': {
         'job_id': '202384ffa9d3',
@@ -54,6 +63,13 @@ CHECKS = {
         'manifest_required': True,
         'today_output_fallback': True,
         'weekdays_only': True,
+        'forbidden_output_patterns': [
+            r'/home/yk/',
+            r'/tmp/',
+            r'Record:\s*manifest',
+            r'manifest\s+created',
+            r'매니페스트',
+        ],
     },
     'second-brain-git-sync-batch': {
         'job_id': '291191b0acd7',
@@ -154,6 +170,13 @@ def has_mixed_silent_token(text: str) -> bool:
     return '[SILENT]' in stripped and stripped != '[SILENT]'
 
 
+def matched_forbidden_pattern(text: str, patterns: list[str] | None) -> str | None:
+    for pattern in patterns or []:
+        if re.search(pattern, text, flags=re.I):
+            return pattern
+    return None
+
+
 def main() -> int:
     jobs = load_jobs()
     problems: list[str] = []
@@ -207,6 +230,11 @@ def main() -> int:
 
         if spec.get('disallow_silent_token') and has_mixed_silent_token(text):
             problems.append(f'- {name}: [SILENT] 토큰이 본문과 함께 출력됨')
+            continue
+
+        forbidden = matched_forbidden_pattern(text, spec.get('forbidden_output_patterns'))
+        if forbidden:
+            problems.append(f'- {name}: 사람용 본문에 내부 실행 흔적 포함 ({forbidden})')
             continue
 
         if name == 'second-brain-git-sync-batch':

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import time
@@ -153,14 +154,31 @@ def run_script_job(name: str) -> tuple[bool, str]:
     return proc.returncode == 0, output or f'{name} returned {proc.returncode}'
 
 
+def compact_detail(output: str) -> str:
+    text = ' '.join(output.split()) if output else ''
+    if not text:
+        return ''
+    text = re.sub(r'Output saved to:\s+\S+', 'output saved', text)
+    text = re.sub(r'source:\s+\S+', 'source: saved digest', text)
+    text = re.sub(r'candidate:\s+\S+', 'candidate: saved', text)
+    text = re.sub(r'commit:\s+[0-9a-f]{7,40}', 'commit: pushed', text)
+    text = re.sub(r'notion_db_id:\s+\S+', 'notion_db_id: present', text)
+    text = re.sub(r'notion_data_source_id:\s+\S+', 'notion_data_source_id: present', text)
+    text = re.sub(r'longterm_memory_db_id:\s+\S+', 'longterm_memory_db_id: present', text)
+    text = re.sub(r'longterm_memory_data_source_id:\s+\S+', 'longterm_memory_data_source_id: present', text)
+    return text[:900]
+
+
 def main() -> int:
     started_at = datetime.now(KST)
     stamp = started_at.strftime('%Y-%m-%d %H:%M:%S %Z')
     lines = [
         '[daily-discord-nightly-packet]',
         f'run_at: {stamp}',
+        'mode: wrapper invokes paused legacy digest jobs to avoid duplicate direct schedules',
     ]
     failures = 0
+    subjobs: list[dict] = []
     for key, job_id, name, mode in JOBS:
         if mode == 'cron':
             ok, output = run_cron_job(job_id, name)
@@ -168,8 +186,8 @@ def main() -> int:
             ok, output = run_script_job(name)
         status = 'ok' if ok else 'error'
         lines.append(f'{key}: {status} | {job_id} | {name}')
-        compact = ' '.join(output.split()) if output else ''
-        if output:
+        compact = compact_detail(output)
+        if compact:
             lines.append(f'{key}_detail: {compact[:1400]}')
         subjobs.append({'key': key, 'jobId': job_id, 'name': name, 'mode': mode, 'status': status, 'detail': compact[:1400]})
         if not ok:

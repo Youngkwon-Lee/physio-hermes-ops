@@ -171,12 +171,13 @@ jobs:
   - name: daily-discord-digest
     runtime_name: "매일 23:50 디스코드 하루 요약"
     operator_label: "[Home desktop Hermes] 23:35 Discord Digest"
-    purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions.
+    purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions when invoked by the nightly packet wrapper.
     schedule: "50 23 * * *"
     mode: agent
-    status: active
+    status: wrapped
     deliver_label: "discord/비서/하루 대화 요약 리포터"
     output_type: digest
+    source_state: wrapped_by_daily_discord_nightly_packet
     prompt_file: "cron/prompts/daily-discord-digest.md"
     enabled_toolsets: [session_search, file]
 
@@ -619,7 +620,7 @@ jobs:
   - name: daily-discord-nightly-packet
     runtime_name: "매일 23:25 디스코드 nightly 패킷"
     runtime_job_id: "a05100ef81ac"
-    purpose: Produce the nightly Discord packet from the live Hermes runtime.
+    purpose: Produce the nightly Discord packet from the live Hermes runtime; this wrapper invokes action staging, the paused legacy daily digest, and postsync to avoid duplicate direct schedules.
     schedule: "25 23 * * *"
     mode: script
     status: active

@@ -138,10 +138,16 @@ hermes cron list
 - 다음날 아침 브리핑 계열에 영향을 줄 blocker가 없는지
 
 대상 예시:
-- `daily-discord-digest`
+- `daily-discord-nightly-packet`
+- `daily-discord-digest` (직접 스케줄은 paused, nightly packet wrapper가 호출)
 - `daily-conversation-curator`
 - `calendar-auto-classify`
 - watchdog jobs
+
+운영 기준:
+- `매일 23:25 디스코드 nightly 패킷`이 action staging, legacy daily digest, postsync를 한 번에 실행한다.
+- `매일 23:50 디스코드 하루 요약`과 관련 후처리 잡은 중복 발송 방지를 위해 직접 스케줄이 paused일 수 있다.
+- 따라서 하루 요약 상태 판단은 legacy digest job의 `enabled=false`만 보지 말고 nightly packet의 `last_status`, subjob output, postsync 결과를 함께 본다.
 
 ### C. watchdog 운영 메모
 현재 운영에는 `hermes-ops-watchdog` 같은 경량 watchdog job을 둘 수 있다.
