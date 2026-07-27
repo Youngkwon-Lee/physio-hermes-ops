@@ -10,6 +10,12 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+try:
+    from hermes_ledger import LedgerEvent, post_ledger_command
+except Exception:  # pragma: no cover - unavailable outside the live Hermes runtime
+    LedgerEvent = None
+    post_ledger_command = None
+
 MANIFEST_DIR = Path(os.environ.get('AUTOMATION_MANIFEST_DIR', '/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests'))
 
 KST = timezone(timedelta(hours=9))
@@ -25,6 +31,12 @@ JOBS = [
 
 JOB_ID = 'a05100ef81ac'
 JOB_NAME = '매일 23:25 디스코드 nightly 패킷'
+
+
+def ledger(job_id: str, name: str, phase: str, status: str, marker: str, detail: str = '') -> None:
+    if LedgerEvent is None or post_ledger_command is None:
+        return
+    post_ledger_command(JOB_ID, JOB_NAME, LedgerEvent(job_id, name, phase, status, marker, detail))
 
 
 def write_manifest(started_at: datetime, lines: list[str], subjobs: list[dict], failures: int) -> None:
@@ -90,6 +102,8 @@ def terminate_process_group(proc: subprocess.Popen[str]) -> None:
 def run_cron_job(job_id: str, name: str) -> tuple[bool, str]:
     before = load_job(job_id) or {}
     before_last_run = before.get('last_run_at')
+    run_marker = datetime.now(KST).strftime('%Y%m%d%H%M%S')
+    ledger(job_id, name, 'start', 'doing', run_marker)
     proc = subprocess.Popen(
         [HERMES, 'cron', 'run', job_id, '--now', '--accept-hooks'],
         text=True,
@@ -121,15 +135,21 @@ def run_cron_job(job_id: str, name: str) -> tuple[bool, str]:
             stdout, stderr = '', ''
         output = ' '.join(part for part in [stdout.strip(), stderr.strip(), status_line] if part).strip()
         current = load_job(job_id) or {}
-        return current.get('last_status') == 'ok', output
+        ok = current.get('last_status') == 'ok'
+        ledger(job_id, name, 'finish', 'done' if ok else 'todo', run_marker, output)
+        return ok, output
 
     if proc.poll() is None:
         terminate_process_group(proc)
         current = load_job(job_id) or {}
         if current.get('last_run_at') != before_last_run and current.get('last_status') in {'ok', 'error'}:
             output = f'timeout but status advanced: {current.get("last_status")} {current.get("last_run_at")} {current.get("last_error")}'
-            return current.get('last_status') == 'ok', output
-        return False, f'timed out waiting for {name}'
+            ok = current.get('last_status') == 'ok'
+            ledger(job_id, name, 'finish', 'done' if ok else 'todo', run_marker, output)
+            return ok, output
+        output = f'timed out waiting for {name}'
+        ledger(job_id, name, 'finish', 'todo', run_marker, output)
+        return False, output
 
     try:
         stdout, stderr = proc.communicate(timeout=5)
@@ -140,6 +160,7 @@ def run_cron_job(job_id: str, name: str) -> tuple[bool, str]:
     ok = proc.returncode == 0 and current.get('last_status') == 'ok'
     if current.get('last_run_at') != before_last_run:
         output = ' '.join(part for part in [output, f'status={current.get("last_status")}', f'last_run_at={current.get("last_run_at")}'] if part)
+    ledger(job_id, name, 'finish', 'done' if ok else 'todo', run_marker, output)
     return ok, output
 
 

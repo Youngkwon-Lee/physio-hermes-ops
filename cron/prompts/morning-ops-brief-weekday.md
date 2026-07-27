@@ -7,7 +7,7 @@ Create one short, readable morning brief from all human calendar events, home re
 User-facing rules:
 - The final Discord response is for a human morning read. Keep it short and practical.
 - Do not paste operational logs, JSON schema, generatedAt, metadata, long file paths, command output, manifest details, raw stdout, or internal file paths into the final response.
-- Do not include `/home/yk/`, `/tmp/`, manifest paths, `status ok`, `Record: manifest created`, or similar internal run artifacts in the final response.
+- Do not include `/home/yk/`, `/tmp/`, manifest paths, the words `Manifest`/`manifest`/`매니페스트`, `status ok`, `Record: manifest created`, or similar internal run artifacts in the final response.
 - Record evidence and manifest details in the manifest file, not in the Discord body.
 - Lead with human schedules, home rehab visits, and real actions.
 - Use the calendar/mail source file as the source of truth for the full day schedule. Include non-rehab human events from calendars such as 일정, 개인, 사업, 연구, 개발, 운동, and 특수케이스 when present.
@@ -64,7 +64,7 @@ Final response format:
 
 ## Run Status
 - Readback: one short human-facing line covering calendar/mail, rehab, session_search, lunch search, and any allowed exclusions.
-- Do not include a `Record:` line unless a source failed; if a source failed, write the failure in plain Korean without paths.
+- Do not include any `Record:`, `Manifest:`, `manifest`, or `매니페스트` line. If a source failed, write the failure in plain Korean without paths.
 
 Manifest rules:
 - JSON schemaVersion: 1, evidenceSource: runtime-direct.
