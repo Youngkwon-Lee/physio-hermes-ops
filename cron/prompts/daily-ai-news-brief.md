@@ -9,7 +9,9 @@
 4) 가능하면 회사 공식 블로그, 공식 문서, arXiv, 주요 기관 발표 같은 **원문 1차 소스**를 우선한다. 출처가 약하면 제외한다.
    - URL 검증이 HEAD 403/405처럼 애매하면 GET 또는 web_extract로 한 번 더 확인한다.
    - 공식 원문에 실제로 보이는 제목/날짜/핵심 문구만 채택한다. 모델명, 버전, 폐기 일정, API 명칭을 원문에서 직접 확인하지 못하면 후보 JSON에 넣지 않는다.
-   - 최종 guard를 통과하지 못한 항목은 TOP 목록, 오늘 바로 볼 것, Notion 적재, second-brain 후보 본문에서 모두 제외한다.
+   - 최종 guard를 통과하지 못한 항목은 Notion 적재와 TOP 목록에서는 제외한다.
+   - 단, 공식 원문 페이지에서 제목/날짜/핵심 문구 중 최소 2개를 직접 확인했지만 guard 입력 필드 부족, 동적 페이지, HEAD/GET 제한, 중복 확인 대기 때문에 탈락한 항목은 `보류 후보`로 최대 4개까지 사람에게 보여준다.
+   - `보류 후보`는 Notion/second-brain 적재 대상이 아니며, "재검증 필요" 상태로만 표시한다.
 5) 재활, 임상, 지식관리, 에이전트 운영, 개발 워크플로와 연결될 만한 항목을 우선한다.
 6) 링크는 검증 가능한 원문만 쓴다.
 7) 최종 답변은 한국어로 아래 형식을 따른다.
@@ -29,9 +31,10 @@
    - 그 다음 반드시 guard를 실행한다:
      `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_guard.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.raw.json --valid-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json --report-output /tmp/daily_ai_news_brief_<YYYY-MM-DD>.guard-report.json`
    - guard stdout/report의 `valid_count`, `invalid_count`, `invalid_details`를 읽는다.
-   - guard가 `source_url_verified_required`, `source_claims_required`, `title_not_found_in_source`, `claim_not_found_in_source`, `untrusted_source_domain` 을 보고한 항목은 원문 검증 실패로 보고하고, 제목/링크를 본문에 쓰지 않는다.
-   - `valid_count`가 0이면 Notion append를 실행하지 말고, TOP 목록도 쓰지 말고, "오늘 신규 고신호 AI 뉴스 없음"만 짧게 보고한다.
-   - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `확인 범위`, `검토 후보: N건 / 제외 이유: ...`, `다음 확인 축`을 한 줄씩 쓴다. 검증 실패 항목의 제목, 링크, 내부 파일 경로는 쓰지 않는다.
+   - guard가 `untrusted_source_domain`, `title_not_found_in_source`, `claim_not_found_in_source` 을 보고한 항목은 원문 검증 실패로 보고하고, 제목/링크를 본문에 쓰지 않는다.
+   - guard가 `source_url_verified_required` 또는 `source_claims_required`만 보고했고 공식 원문 페이지에서 제목/날짜/핵심 문구 중 최소 2개를 직접 확인한 항목은 `보류 후보`에 제목과 공식 링크를 쓸 수 있다.
+   - `valid_count`가 0이면 Notion append를 실행하지 말고, TOP 목록도 쓰지 말고, "검증 통과 0건"으로 보고한다. 공식 원문 보류 후보가 있으면 "보류 후보 N건"을 함께 보여준다.
+   - 이때도 raw 후보 수(`input_count`)와 guard 제외 사유 묶음은 읽고, 최종 답변에 `확인 범위`, `검토 후보: N건 / 제외 이유: ...`, `다음 확인 축`을 한 줄씩 쓴다. 내부 파일 경로는 쓰지 않는다.
    - raw 후보 수가 0이면 `검토 후보: 0건 / 제외 이유: 없음`이라고 쓰지 않는다. 대신 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 공식 원문 기준 후보 없음`처럼 판단 가능한 이유를 쓴다.
    - `valid_count`가 1 이상일 때만 `python3 /home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_notion_append.py --input /tmp/daily_ai_news_brief_<YYYY-MM-DD>.valid.json` 를 실행한다.
    - 스크립트 stdout JSON 기준으로 `inserted`, `skipped_duplicates`, `skipped_invalid`, `failed_requests`, `request_failures`, `before_count`, `after_count` 를 확인한다.
@@ -49,6 +52,8 @@
 - 핵심 3줄
 - TOP 5
   - 제목 | 한줄 요약 | 왜 중요한지 | 링크
+- 보류 후보
+  - 제목 | 보류 이유 | 공식 링크
 - 영권님 관점 메모
   - 3개 이내
 - 오늘 바로 볼 것
@@ -74,12 +79,12 @@
 - 최종 응답은 35줄 안쪽으로 유지한다.
 - 최종 응답에 `/tmp/...`, `/home/yk/...`, `Runtime manifest`, `remoteSynced`, `gitCommit.sha`, `추적된 운영 산출물` 섹션을 쓰지 않는다.
 - 최종 응답에 helper stdout, 스크립트명, 파일 경로, "부가", "실행 로그", "추적", "실행 기록", "raw 후보를 /tmp", "종결" 같은 운영 흔적을 쓰지 않는다.
-- 원문 검증 실패/보류 항목은 제목을 포함해 본문에 쓰지 않는다.
+- 보류 후보는 공식 원문 페이지에서 직접 확인한 경우에만 제목/공식 링크를 쓴다. 검색 결과, 요약글, 추정 제목은 쓰지 않는다.
 - 공식 원문이 아닌 help mirror, 검색결과, 요약글, 루트 페이지, 뉴스레터, 모델이 추정한 release note는 Notion 후보로 쓰지 않는다.
 
 운영 전달 정책:
 - 검증 통과 신규 AI 뉴스가 0건이어도 무응답 처리를 사용하지 않는다.
-- 0건이면 "오늘 신규 고신호 AI 뉴스 없음 / guard valid_count 0 / 기록 완료 여부"만 짧게 보고한다.
+- 0건이면 "검증 통과 0건 / 보류 후보 N건 / Notion 적재 없음 / 기록 완료 여부"만 짧게 보고한다.
 - 0건이어도 사람이 원인을 이해하도록 `확인 범위`, `검토 후보`, `제외 이유`, `다음 확인 축`을 포함한다.
   예: `- 확인 범위: 공식 블로그/문서, arXiv, 주요 모델사 업데이트`
   예: `- 검토 후보: 3건 / 제외 이유: 원문 날짜 불일치, 공식 원문 불충분`
@@ -88,3 +93,14 @@
 - 최종 응답에는 스케줄러의 무응답 토큰 문자열이나 그 이름을 절대 쓰지 않는다. 해당 문자열이 응답에 포함되면 디스코드 배달이 억제된다.
 - 검증 통과 항목이 1건 이상일 때만 TOP 목록을 쓴다.
 - 0건 보고 끝에는 별도 `추적/실행 기록/간단 메모/끝` 섹션을 붙이지 않는다. 마지막 줄은 `기록: 완료` 또는 `기록: 실패 - <한 줄 사유>`처럼 사람용으로만 쓴다.
+- 0건 보고 예시는 아래처럼 쓴다.
+  - `AI 뉴스 아침 브리핑`
+  - `- 검증 통과: 0건`
+  - `- 보류 후보: 3건`
+  - `- Notion: 적재 없음`
+  - `- 확인 범위: OpenAI/Anthropic/Google 공식 업데이트, arXiv`
+  - `- 검토 후보: 3건 / 제외 이유: source_claims 보강 필요`
+  - `보류 후보`
+  - `1. OpenAI Health in ChatGPT — 공식 페이지 확인, source_claim 재검증 필요`
+  - `- 다음 확인 축: agent runtime, multimodal clinical AI`
+  - `- 기록: 완료`
