@@ -104,7 +104,7 @@
 - Discord 최종 응답에는 manifest JSON, raw/valid/report 파일 경로, git 상태, 긴 stdout, 내부 실행 로그를 쓰지 않는다.
 - Discord 최종 응답에는 `/tmp/...`, `/home/yk/...`, `Manifest`, `운영적 산출물`, `자동 저장`, `runtime`, `job_id`, `guard report path` 같은 내부 운영 산출물 섹션을 쓰지 않는다.
 - Discord 최종 응답의 second-brain/manifest 결과는 "기록 완료" 또는 "기록 실패: 한 줄 사유"로만 쓴다.
-- Discord 최종 응답에는 `운영 기록`, `기록(자동 생성)`, `manifest 생성`, `internal manifest`, `errors: 없음`, `간단 보고 끝` 같은 운영용 표현을 쓰지 않는다.
+- Discord 최종 응답에는 `운영 기록`, `기록(자동 생성)`, `manifest 생성`, `internal manifest`, `errors: 없음`, `간단 보고 끝`, `간단 메모`, `(간단 메모)` 같은 운영용 표현을 쓰지 않는다.
 - Discord 최종 응답에는 `운영 로그`, `운영 로그 요약`, `생성된 내부 기록`, `Guard 스크립트`, `Notion 업서트 실행`, `파일 생성`, `status: ok`, `errors: []` 같은 실행 흔적을 쓰지 않는다.
 - Discord 최종 응답에는 `자동화 스크립트`, `후보 JSON`, `guard 검증 결과`, `입력 0건`, `간단 보고 끝`, `(보고 끝)` 같은 운영용 마무리나 내부 처리 설명을 쓰지 않는다.
 - Discord 최종 응답에는 `[SILENT]` 문자열을 절대 쓰지 않는다. 다른 문장과 함께 쓰는 것도, 마지막 줄에 붙이는 것도 금지한다.
@@ -119,7 +119,7 @@
   - `- 검토 후보: N건 / 제외 이유: ...`
   - `- Notion: 적재 없음`
   - `- 다음 확인 축: 디지털헬스 실증, 의료AI 바우처, 재활/돌봄 PoC`
-- 0건 보고는 위 예시 구조에서 끝낸다. `추가 메모`, `운영`, `자동 저장`, `JSON`, `guard`, `manifest` 섹션을 뒤에 붙이지 않는다.
+- 0건 보고는 위 예시 구조에서 끝낸다. `추가 메모`, `간단 메모`, `필요하면`, `운영`, `자동 저장`, `JSON`, `guard`, `manifest` 섹션을 뒤에 붙이지 않는다.
 - 최종 응답은 35줄 안쪽으로 유지한다.
 
 Direct manifest requirement:
