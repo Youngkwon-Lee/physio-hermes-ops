@@ -16,6 +16,11 @@ try:
 except ImportError:  # pragma: no cover - module path fallback for tests/imports
     from scripts import hometax_codef_client as hometax_client
 
+try:
+    from capture_route_dispatch import CaptureRouteError, CaptureRouteStore, DispatchBlocked
+except ImportError:  # pragma: no cover - module path fallback for tests/imports
+    from scripts.capture_route_dispatch import CaptureRouteError, CaptureRouteStore, DispatchBlocked
+
 ROOT = Path(__file__).resolve().parents[1]
 HOST = os.getenv("OPS_CTL_HOST", "127.0.0.1")
 PORT = int(os.getenv("OPS_CTL_PORT", "8788"))
@@ -50,6 +55,10 @@ MAX_RETRIES = max(1, int(os.getenv("OPS_CTL_MAX_RETRIES", "2")))
 RETRY_DELAY = float(os.getenv("OPS_CTL_RETRY_DELAY_SEC", "1.0"))
 KNOWLEDGE_DIR = Path(os.getenv("OPS_KNOWLEDGE_DIR", str(ROOT / "ops_knowledge")))
 KNOWLEDGE_AUTOGIT = os.getenv("OPS_KNOWLEDGE_AUTOGIT", "0") == "1"
+CAPTURE_ROUTE_STATE_PATH = Path(
+    os.getenv("CAPTURE_ROUTE_STATE_PATH", str(MISSION_CONTROL_STATE_DIR / "capture_routes.json"))
+)
+CAPTURE_ROUTE_STORE = CaptureRouteStore(CAPTURE_ROUTE_STATE_PATH)
 
 COMMANDS = {
     "refresh": [["python3", "scripts/export_cron_status.py"]],
@@ -993,6 +1002,7 @@ class Handler(BaseHTTPRequestHandler):
                 "continuity_notify_log": str(HANDOFF_NOTIFY_LOG),
                 "handoff_inbox": str(HANDOFF_INBOX_PATH),
                 "handoff_inbox_legacy": str(LEGACY_HANDOFF_INBOX_PATH),
+                "capture_route_state": str(CAPTURE_ROUTE_STATE_PATH),
                 "mission_control": {
                     "plans_enabled": True,
                     "tasks_enabled": True,
@@ -1000,6 +1010,7 @@ class Handler(BaseHTTPRequestHandler):
                     "actions_enabled": True,
                     "next_action_enabled": True,
                     "snapshot_enabled": True,
+                    "capture_routes_enabled": True,
                 },
             })
 
@@ -1020,8 +1031,19 @@ class Handler(BaseHTTPRequestHandler):
                     "actions": list_mission_action_items(organization_id, limit=50),
                     "nextAction": next_mission_action_item(organization_id),
                     "handoffs": list_handoff_items(organization_id, limit=30),
+                    "captureRoutes": CAPTURE_ROUTE_STORE.list(organization_id),
                 },
             })
+
+        if parsed.path == "/capture-routes":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            organization_id = (params.get("organizationId") or [""])[0].strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            items = CAPTURE_ROUTE_STORE.list(organization_id)
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
 
         if parsed.path == "/plans":
             auth_ctx = self._require_auth("read")
@@ -1168,7 +1190,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         auth_ctx = None
         parsed = urlparse(self.path)
-        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks", "/mission-actions", "/integrations/hometax/fetch"} or (
+        if parsed.path in {"/action", "/knowledge/inject", "/handoffs", "/plans", "/tasks", "/mission-actions", "/capture-routes/sync", "/integrations/hometax/fetch"} or (
             parsed.path.startswith("/handoffs/") and parsed.path.endswith("/status")
         ) or (
             parsed.path.startswith("/plans/") and parsed.path.endswith("/status")
@@ -1178,6 +1200,8 @@ class Handler(BaseHTTPRequestHandler):
             parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/status")
         ) or (
             parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/claim")
+        ) or (
+            parsed.path.startswith("/capture-routes/") and parsed.path.endswith("/decision")
         ):
             auth_ctx = self._require_auth("exec")
             if REQUIRE_TOKEN and not auth_ctx:
@@ -1212,6 +1236,53 @@ class Handler(BaseHTTPRequestHandler):
                 "storedAt": str(HANDOFF_NOTIFY_LOG),
                 "validationErrors": [],
             })
+
+        if parsed.path == "/capture-routes/sync":
+            organization_id = str(data.get("organizationId") or "").strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            queue = data.get("queue") if isinstance(data.get("queue"), dict) else data
+            try:
+                result = CAPTURE_ROUTE_STORE.sync(organization_id, queue)
+            except CaptureRouteError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            audit({
+                "time": now(),
+                "action": "capture_routes_synced",
+                "ok": True,
+                "organizationId": organization_id,
+                **result,
+            })
+            return self._json(200, {"ok": True, "success": True, "data": result})
+
+        if parsed.path.startswith("/capture-routes/") and parsed.path.endswith("/decision"):
+            capture_id = parsed.path.split("/")[2]
+            organization_id = str(data.get("organizationId") or "").strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            try:
+                item = CAPTURE_ROUTE_STORE.decide(
+                    organization_id,
+                    capture_id,
+                    str(data.get("decision") or "").strip(),
+                    str(data.get("actor") or "operator").strip(),
+                    str(data.get("destination") or "").strip() or None,
+                )
+            except DispatchBlocked as error:
+                return self._json(409, {"ok": False, "error": str(error)})
+            except CaptureRouteError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            audit({
+                "time": now(),
+                "action": "capture_route_decided",
+                "ok": True,
+                "organizationId": organization_id,
+                "captureId": capture_id,
+                "decision": item.get("decision"),
+                "destination": item.get("proposedDestination"),
+                "actor": item.get("decidedBy"),
+            })
+            return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
 
         if parsed.path == "/plans":
             try:
