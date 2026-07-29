@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-APPEND_SCRIPT = Path('/home/yk/physio-hermes-ops/scripts/daily_ai_news_brief_notion_append.py')
+APPEND_SCRIPT = Path(__file__).resolve().with_name('daily_ai_news_brief_notion_append.py')
 spec = importlib.util.spec_from_file_location('daily_ai_news_brief_notion_append', APPEND_SCRIPT)
 append = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
