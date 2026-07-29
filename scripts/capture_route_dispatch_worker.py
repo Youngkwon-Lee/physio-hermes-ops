@@ -30,16 +30,29 @@ def run_once(
     max_attempts: int = 3,
     http_request: HttpRequest = request_json,
 ) -> dict[str, Any]:
+    resolved_organizations = list(organization_ids)
     summary: dict[str, Any] = {
         "ok": True,
-        "organizations": len(organization_ids),
+        "organizations": 0,
         "eligible": 0,
         "dispatched": 0,
         "failed": 0,
         "skippedMaxAttempts": 0,
         "results": [],
     }
-    for organization_id in organization_ids:
+    if not resolved_organizations:
+        status, body = http_request(f"{base_url}/capture-routes/organizations", token=token)
+        if status != 200 or not isinstance(body, dict):
+            summary["ok"] = False
+            summary["failed"] = 1
+            summary["results"].append({"ok": False, "stage": "discover", "statusCode": status})
+            return summary
+        raw_organizations = body.get("items") or body.get("data") or []
+        resolved_organizations = _organization_ids(
+            ",".join(str(value) for value in raw_organizations) if isinstance(raw_organizations, list) else ""
+        )
+    summary["organizations"] = len(resolved_organizations)
+    for organization_id in resolved_organizations:
         query = urlencode({"organizationId": organization_id})
         status, body = http_request(f"{base_url}/capture-routes?{query}", token=token)
         if status != 200 or not isinstance(body, dict):
@@ -90,7 +103,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default=os.getenv("MISSION_CONTROL_BASE_URL", "http://127.0.0.1:8792"))
     parser.add_argument(
         "--organization-ids",
-        default=os.getenv("CAPTURE_ROUTE_ORGANIZATION_IDS", os.getenv("MISSION_CONTROL_ORGANIZATION_ID", "org-smoke")),
+        default=os.getenv("CAPTURE_ROUTE_ORGANIZATION_IDS", ""),
     )
     parser.add_argument("--max-attempts", type=int, default=int(os.getenv("CAPTURE_ROUTE_MAX_DISPATCH_ATTEMPTS", "3")))
     return parser.parse_args()
@@ -99,9 +112,6 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     organizations = _organization_ids(args.organization_ids)
-    if not organizations:
-        print(json.dumps({"ok": False, "error": "organization_ids_required"}))
-        return 2
     token = (
         os.getenv("MISSION_CONTROL_SHARED_TOKEN", "").strip()
         or os.getenv("OPS_CTL_EXEC_ADMIN_TOKEN", "").strip()

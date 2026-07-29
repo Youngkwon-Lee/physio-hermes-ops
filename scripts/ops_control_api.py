@@ -1045,6 +1045,15 @@ class Handler(BaseHTTPRequestHandler):
             items = CAPTURE_ROUTE_STORE.list(organization_id)
             return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
 
+        if parsed.path == "/capture-routes/organizations":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            state = CAPTURE_ROUTE_STORE.load()
+            routes_by_org = state.get("routesByOrg") if isinstance(state.get("routesByOrg"), dict) else {}
+            items = sorted(str(value).strip() for value in routes_by_org if str(value).strip())
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
+
         if parsed.path == "/plans":
             auth_ctx = self._require_auth("read")
             if REQUIRE_TOKEN and not auth_ctx:

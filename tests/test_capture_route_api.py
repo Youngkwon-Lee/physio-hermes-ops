@@ -59,6 +59,10 @@ def test_capture_route_sync_snapshot_and_approval(tmp_path, monkeypatch):
         assert status == 200
         assert body["data"]["created"] == 1
 
+        status, body = request(server, "GET", "/capture-routes/organizations")
+        assert status == 200
+        assert body["items"] == ["org-1"]
+
         status, body = request(server, "GET", "/capture-routes?organizationId=org-1")
         assert status == 200
         assert body["items"][0]["status"] == "pending"

@@ -60,7 +60,7 @@ MacBook Codex App, desktop Hermes, Discord, Mission Control이 서로 이어받�
 
 - worker: `python3 scripts/capture_route_dispatch_worker.py`
 - systemd: `deploy/systemd/capture-route-dispatch-worker.{service,timer}`
-- organization scope: set non-secret `CAPTURE_ROUTE_ORGANIZATION_IDS` in the installed service
+- organization scope: authenticated discovery covers every organization in the capture-route store; `CAPTURE_ROUTE_ORGANIZATION_IDS` can optionally narrow the worker scope
 - credentials: reuse the existing protected Ops Control environment file; never add tokens to the unit or repository
 - Second Brain/Physio routes: completion requires a successful Mission Control task GET readback
 - safety: `pending`, `held`, `rejected`, and restricted routes are never dispatched
