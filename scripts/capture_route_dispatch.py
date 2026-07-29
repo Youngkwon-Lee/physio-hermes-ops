@@ -318,10 +318,16 @@ def dispatch_route(
         raise CaptureRouteError("capture route not found")
     if item.get("status") == "dispatched" and isinstance(item.get("dispatch"), dict):
         return item["dispatch"]
-    if item.get("status") != "approved":
+    if item.get("status") not in {"approved", "dispatch_failed"}:
         raise DispatchBlocked("route must be explicitly approved before dispatch")
     if item.get("approvedPayloadHash") != _payload_hash(item):
         raise DispatchBlocked("approved payload changed after approval")
+
+    previous_dispatch = item.get("dispatch") if isinstance(item.get("dispatch"), dict) else {}
+    try:
+        attempt = max(0, int(previous_dispatch.get("attempt") or 0)) + 1
+    except (TypeError, ValueError):
+        attempt = 1
 
     destination = item["proposedDestination"]
     if destination == "kinelo_ops":
@@ -353,8 +359,15 @@ def dispatch_route(
     if missing:
         raise DispatchBlocked("missing dispatch configuration: " + ", ".join(missing))
 
+    readback: dict[str, Any]
     if destination == "kinelo_ops":
         status, body = http_request(url, method="POST", payload=payload, extra_headers=headers)
+        response_id = body.get("taskId") if isinstance(body, dict) else None
+        readback = {
+            "ok": 200 <= status < 300 and bool(response_id),
+            "verifiedBy": "write_response",
+            "recordId": response_id,
+        }
     else:
         task_id = payload["id"]
         query = urlencode({"organizationId": organization_id, "limit": 100})
@@ -366,13 +379,29 @@ def dispatch_route(
             status, body = 200, {"ok": True, "deduped": True, "taskId": task_id}
         else:
             status, body = http_request(url, method="POST", token=token, payload=payload)
+        read_status, read_body = http_request(f"{base_url}/tasks?{query}", token=token)
+        read_items = []
+        if read_status == 200 and isinstance(read_body, dict):
+            read_items = read_body.get("items") or read_body.get("data") or []
+        read_item = next(
+            (row for row in read_items if isinstance(row, dict) and row.get("id") == task_id),
+            None,
+        )
+        readback = {
+            "ok": read_status == 200 and read_item is not None,
+            "verifiedBy": "mission_control_tasks_get",
+            "statusCode": read_status,
+            "recordId": task_id if read_item is not None else None,
+        }
     result = {
-        "ok": 200 <= status < 300,
+        "ok": 200 <= status < 300 and readback["ok"],
         "dryRun": False,
         "captureId": capture_id,
         "destination": destination,
+        "attempt": attempt,
         "statusCode": status,
         "response": body,
+        "readback": readback,
         "dispatchedAt": now_iso(),
     }
     return store.record_dispatch(organization_id, capture_id, result).get("dispatch") or result

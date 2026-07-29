@@ -17,9 +17,9 @@ except ImportError:  # pragma: no cover - module path fallback for tests/imports
     from scripts import hometax_codef_client as hometax_client
 
 try:
-    from capture_route_dispatch import CaptureRouteError, CaptureRouteStore, DispatchBlocked
+    from capture_route_dispatch import CaptureRouteError, CaptureRouteStore, DispatchBlocked, dispatch_route
 except ImportError:  # pragma: no cover - module path fallback for tests/imports
-    from scripts.capture_route_dispatch import CaptureRouteError, CaptureRouteStore, DispatchBlocked
+    from scripts.capture_route_dispatch import CaptureRouteError, CaptureRouteStore, DispatchBlocked, dispatch_route
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = os.getenv("OPS_CTL_HOST", "127.0.0.1")
@@ -1045,6 +1045,15 @@ class Handler(BaseHTTPRequestHandler):
             items = CAPTURE_ROUTE_STORE.list(organization_id)
             return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
 
+        if parsed.path == "/capture-routes/organizations":
+            auth_ctx = self._require_auth("read")
+            if REQUIRE_TOKEN and not auth_ctx:
+                return
+            state = CAPTURE_ROUTE_STORE.load()
+            routes_by_org = state.get("routesByOrg") if isinstance(state.get("routesByOrg"), dict) else {}
+            items = sorted(str(value).strip() for value in routes_by_org if str(value).strip())
+            return self._json(200, {"ok": True, "success": True, "items": items, "data": items})
+
         if parsed.path == "/plans":
             auth_ctx = self._require_auth("read")
             if REQUIRE_TOKEN and not auth_ctx:
@@ -1202,6 +1211,8 @@ class Handler(BaseHTTPRequestHandler):
             parsed.path.startswith("/mission-actions/") and parsed.path.endswith("/claim")
         ) or (
             parsed.path.startswith("/capture-routes/") and parsed.path.endswith("/decision")
+        ) or (
+            parsed.path.startswith("/capture-routes/") and parsed.path.endswith("/dispatch")
         ):
             auth_ctx = self._require_auth("exec")
             if REQUIRE_TOKEN and not auth_ctx:
@@ -1283,6 +1294,38 @@ class Handler(BaseHTTPRequestHandler):
                 "actor": item.get("decidedBy"),
             })
             return self._json(200, {"ok": True, "success": True, "item": item, "data": item})
+
+        if parsed.path.startswith("/capture-routes/") and parsed.path.endswith("/dispatch"):
+            capture_id = parsed.path.split("/")[2]
+            organization_id = str(data.get("organizationId") or "").strip()
+            if not organization_id:
+                return self._json(400, {"ok": False, "error": "organizationId_required"})
+            try:
+                result = dispatch_route(
+                    CAPTURE_ROUTE_STORE,
+                    organization_id,
+                    capture_id,
+                    execute=True,
+                )
+            except DispatchBlocked as error:
+                return self._json(409, {"ok": False, "error": str(error)})
+            except CaptureRouteError as error:
+                return self._json(400, {"ok": False, "error": str(error)})
+            ok = bool(result.get("ok"))
+            audit({
+                "time": now(),
+                "action": "capture_route_dispatched",
+                "ok": ok,
+                "organizationId": organization_id,
+                "captureId": capture_id,
+                "destination": result.get("destination"),
+                "attempt": result.get("attempt"),
+                "readbackOk": bool((result.get("readback") or {}).get("ok")),
+            })
+            return self._json(
+                200 if ok else 502,
+                {"ok": ok, "success": ok, "item": result, "data": result},
+            )
 
         if parsed.path == "/plans":
             try:

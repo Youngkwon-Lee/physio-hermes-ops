@@ -54,6 +54,17 @@ MacBook Codex App, desktop Hermes, Discord, Mission Control이 서로 이어받�
 - runbook: `docs/runbook/CONTINUITY_HANDOFF_RUNBOOK_V0_1.md`
 - script: `python3 scripts/capture_continuity_handoff.py --input handoff.json`
 
+## Open Minis capture approval dispatch
+
+`capture-route-dispatch-worker.timer` polls the authenticated local Ops API every minute. It dispatches only routes whose status is `approved` (or a retryable `dispatch_failed`), stops after three failed attempts, and stores destination readback with the route state.
+
+- worker: `python3 scripts/capture_route_dispatch_worker.py`
+- systemd: `deploy/systemd/capture-route-dispatch-worker.{service,timer}`
+- organization scope: authenticated discovery covers every organization in the capture-route store; `CAPTURE_ROUTE_ORGANIZATION_IDS` can optionally narrow the worker scope
+- credentials: reuse the existing protected Ops Control environment file; never add tokens to the unit or repository
+- Second Brain/Physio routes: completion requires a successful Mission Control task GET readback
+- safety: `pending`, `held`, `rejected`, and restricted routes are never dispatched
+
 ## dashboard read model 생성
 - `python scripts/build_dashboard_read_models.py`
 - 생성 위치: `dashboard/derived/`
