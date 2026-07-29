@@ -1,0 +1,15 @@
+[Unit]
+Description=Dispatch approved Open Minis capture routes
+After=network.target ops-control-api.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/physio-hermes-ops
+Environment=MISSION_CONTROL_BASE_URL=http://127.0.0.1:8792
+Environment=CAPTURE_ROUTE_ORGANIZATION_IDS=org-smoke
+Environment=CAPTURE_ROUTE_MAX_DISPATCH_ATTEMPTS=3
+EnvironmentFile=%h/.config/physio-hermes-ops/ops-control-api.env
+ExecStart=/usr/bin/python3 %h/physio-hermes-ops/scripts/capture_route_dispatch_worker.py
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full

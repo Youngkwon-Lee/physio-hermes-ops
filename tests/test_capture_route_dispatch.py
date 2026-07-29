@@ -81,6 +81,7 @@ def test_kinelo_dispatch_is_idempotent_after_success(tmp_path: Path, monkeypatch
     first = dispatch_route(store, "org-1", "CAP-ONE", execute=True, http_request=fake_request)
     second = dispatch_route(store, "org-1", "CAP-ONE", execute=True, http_request=fake_request)
     assert first["ok"] is True
+    assert first["readback"]["recordId"] == "task-1"
     assert second == first
     assert len(calls) == 1
     assert calls[0][1]["payload"]["source_external_id"] == "CAP-ONE"
@@ -100,12 +101,48 @@ def test_non_ops_destinations_create_bounded_mission_tasks(tmp_path: Path, monke
     def fake_request(url, **kwargs):
         calls.append((url, kwargs))
         if kwargs.get("method", "GET") == "GET":
-            return 200, {"items": []}
+            items = [{"id": "capture-second_brain-cap-one"}] if len(calls) > 2 else []
+            if destination == "physio_app" and len(calls) > 2:
+                items = [{"id": "capture-physio_app-cap-one"}]
+            return 200, {"items": items}
         return 200, {"ok": True, "item": {"id": kwargs["payload"]["id"]}}
 
     result = dispatch_route(store, "org-1", "CAP-ONE", execute=True, http_request=fake_request)
     assert result["ok"] is True
-    post = calls[-1]
+    assert result["readback"] == {
+        "ok": True,
+        "verifiedBy": "mission_control_tasks_get",
+        "statusCode": 200,
+        "recordId": f"capture-{destination}-cap-one",
+    }
+    post = next(call for call in calls if call[1].get("method") == "POST")
     assert post[1]["payload"]["repo"] == repo
     assert post[1]["payload"]["status"] == "ready"
     assert "patient" not in str(post[1]["payload"]).casefold()
+
+
+def test_failed_dispatch_can_retry_and_increments_attempt(tmp_path: Path, monkeypatch):
+    store = CaptureRouteStore(tmp_path / "routes.json")
+    store.sync("org-1", queue(candidate(destination="second_brain")))
+    store.decide("org-1", "CAP-ONE", "approve", "youngkwon")
+    monkeypatch.setenv("MISSION_CONTROL_BASE_URL", "https://mission.example")
+    calls = 0
+
+    def fake_request(url, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls <= 3:
+            if kwargs.get("method", "GET") == "POST":
+                return 503, {"ok": False}
+            return 200, {"items": []}
+        return 200, {"items": [{"id": "capture-second_brain-cap-one"}]}
+
+    first = dispatch_route(store, "org-1", "CAP-ONE", execute=True, http_request=fake_request)
+    assert first["ok"] is False
+    assert first["attempt"] == 1
+    assert store.get("org-1", "CAP-ONE")["status"] == "dispatch_failed"
+
+    second = dispatch_route(store, "org-1", "CAP-ONE", execute=True, http_request=fake_request)
+    assert second["ok"] is True
+    assert second["attempt"] == 2
+    assert store.get("org-1", "CAP-ONE")["status"] == "dispatched"

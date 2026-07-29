@@ -72,9 +72,21 @@ def test_capture_route_sync_snapshot_and_approval(tmp_path, monkeypatch):
         assert status == 200
         assert body["item"]["status"] == "approved"
 
+        monkeypatch.setenv("MISSION_CONTROL_BASE_URL", f"http://127.0.0.1:{server.server_address[1]}")
+        status, body = request(
+            server,
+            "POST",
+            "/capture-routes/CAP-API/dispatch",
+            {"organizationId": "org-1"},
+        )
+        assert status == 200
+        assert body["item"]["ok"] is True
+        assert body["item"]["readback"]["recordId"] == "capture-physio_app-cap-api"
+
         status, body = request(server, "GET", "/snapshot?organizationId=org-1")
         assert status == 200
         assert body["data"]["captureRoutes"][0]["captureId"] == "CAP-API"
+        assert body["data"]["captureRoutes"][0]["status"] == "dispatched"
     finally:
         server.shutdown()
         server.server_close()
