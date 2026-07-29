@@ -63,7 +63,7 @@ Final response format:
 3. ...
 
 ## Run Status
-- Readback: one short human-facing line covering calendar/mail, rehab, session_search, lunch search, and any allowed exclusions.
+- Readback: one short human-facing line covering calendar/mail, rehab, session_search, lunch search, and any allowed exclusions. This line must not mention manifest writing or internal record status.
 - Do not include any `Record:`, `Manifest:`, `manifest`, or `매니페스트` line. If a source failed, write the failure in plain Korean without paths.
 
 Manifest rules:
