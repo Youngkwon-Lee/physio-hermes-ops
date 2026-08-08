@@ -16,3 +16,15 @@ export type {
   CodexBridgeTaskStatus,
   CodexRemoteSmokeResult,
 } from './codex-bridge';
+
+export {
+  HEALTH_MEMORY_CONTEXT_SCHEMA_VERSION,
+  HealthMemoryKernelError,
+  createHealthMemoryKernelClient,
+} from './health-memory-kernel';
+export type {
+  HealthMemoryContextItem,
+  HealthMemoryContextPack,
+  HealthMemoryKernelClientOptions,
+  HealthMemoryReadInput,
+} from './health-memory-kernel';
