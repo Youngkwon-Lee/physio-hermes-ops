@@ -90,6 +90,23 @@
 - 검증 통과 항목이 1건 이상일 때도 전체 응답은 35줄 이내로 유지하고, 제목/의미/링크/Notion 결과/다음 행동만 남긴다.
 - `검토 후보: 0건 / 제외 이유: 없음`은 금지한다. 후보가 없으면 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 신규 원문 후보 없음`으로 쓴다.
 
+## 실행 우선 규칙
+- 최근 24~72시간 검색에서 후보가 부족하면 위의 12개 검색 축을 실제로 모두 나눠 확인하고, 7일 fallback도 실행한다. 검색 결과 제목만으로 후보를 만들지 않는다.
+- web_extract가 실패하면 terminal의 GET/urllib/curl로 PubMed, arXiv, 대학·기관 원문을 직접 읽어 제목·날짜·초록/핵심 문구를 확인한다. 원문을 읽지 못한 항목은 관찰 후보에도 넣지 않는다.
+
+## 최종 응답 강제 형식
+- 프롬프트, 실행 단계, 내부 경로, manifest, 스크립트명, 자동화 메타, 다음 권장 행동, 주간 재검색 권유는 출력하지 않는다.
+- 0건이면 정확히 아래 9줄 이내로만 출력한다:
+  `재활 AI 브리프`
+  `- 상태: 정상 실행`
+  `- 신규 고신호: 0건`
+  `- 관찰 후보: N건`
+  `- 확인 범위: ...`
+  `- 검토 후보: N건 / 제외 이유: ...`
+  `- 기준 메모: daily는 24~72시간, weekly는 7일 후보 큐`
+  `- Notion: 적재 없음`
+  `- 기록: 완료`
+
 Direct manifest requirement:
 - 작업이 끝나기 전에 반드시 `/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/daeb6079f4f0.json` 를 JSON으로 작성한다.
 - generatedAt/runStartedAt/runFinishedAt과 createdFiles의 candidate 파일명은 TODAY_KST와 같은 날짜여야 한다.

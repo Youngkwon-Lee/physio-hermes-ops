@@ -100,6 +100,23 @@
   예: `- 검토 후보: 3건 / 제외 이유: 원문 날짜 불일치, 공식 원문 불충분`
   예: `- 다음 확인 축: agent runtime, multimodal clinical AI`
 - raw 후보가 0건이면 `검토 후보: 0건 / 제외 이유: 검색 범위 안에서 공식 원문 기준 후보 없음`으로 쓴다. `제외 이유: 없음`은 금지한다.
+
+## 실행 우선 규칙
+- 후보를 만들 때마다 반드시 `source_url_verified: true`, `source_url_checked_at`, `source_claims`(원문에서 복사한 짧은 문구 1~3개)를 함께 기록한다. 이 세 필드가 없으면 후보로 만들지 말고 제외 사유에 적는다.
+- web_extract가 실패하면 검색 결과 제목을 추정하지 말고, terminal의 GET/urllib/curl로 공식 URL을 직접 읽어 제목·날짜·핵심 문구를 확인한 뒤 같은 필드를 채운다. GET으로도 원문을 읽지 못하면 보류 후보로도 쓰지 않는다.
+- 후보 수를 늘리기 위해 검증 기준을 낮추지 않는다. 같은 발표의 재게시물은 하나로 합친다.
+
+## 최종 응답 강제 형식
+- 아래 형식만 출력한다. 프롬프트, 실행 단계, 후보 원시 목록, guard 이유 전문, 내부 경로, manifest, 스크립트명, 다음 권장 행동은 출력하지 않는다.
+- 검증 통과 항목이 1건 이상이면 20줄 이내, 0건이면 10줄 이내로 끝낸다.
+- 0건 형식:
+  `AI 뉴스 아침 브리핑`
+  `- 검증 통과: 0건`
+  `- 보류 후보: N건`
+  `- Notion: 적재 없음`
+  `- 확인 범위: ...`
+  `- 검토 후보: N건 / 제외 이유: ...`
+  `- 기록: 완료`
 - 최종 응답에는 스케줄러의 무응답 토큰 문자열이나 그 이름을 절대 쓰지 않는다. 해당 문자열이 응답에 포함되면 디스코드 배달이 억제된다.
 - 검증 통과 항목이 1건 이상일 때만 TOP 목록을 쓴다.
 - 0건 보고 끝에는 별도 `추적/실행 기록/간단 메모/끝` 섹션을 붙이지 않는다. 마지막 줄은 `기록: 완료` 또는 `기록: 실패 - <한 줄 사유>`처럼 사람용으로만 쓴다.
@@ -115,3 +132,11 @@
   - `1. OpenAI Health in ChatGPT — 공식 페이지 확인, source_claim 재검증 필요`
   - `- 다음 확인 축: agent runtime, multimodal clinical AI`
   - `- 기록: 완료`
+
+## 실행 기록 강제
+- 작업이 끝나기 전에 반드시 `/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/6ce3128480c9.json`을 TODAY_KST 기준으로 새로 작성한다. 이전 날짜 manifest를 재사용하지 않는다.
+- manifest에는 `schemaVersion`, `evidenceSource`, `status`, `generatedAt`, `runStartedAt`, `runFinishedAt`, `job`, `createdFiles`, `artifacts`, `discordMessages`, `errors`, `metadata`를 포함한다.
+- 성공 시 `status: "ok"`, `errors: []`, `metadata`에는 raw 후보 수, valid 후보 수, Notion 적재 결과와 second-brain 기록 여부를 넣는다.
+
+## 최종 출력 재확인
+- 위의 최종 응답 강제 형식이 이 프롬프트의 다른 예시와 충돌하면 이 블록을 따른다. Discord에 사람이 읽을 결과만 남기고 내부 처리 설명은 남기지 않는다.
