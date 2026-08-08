@@ -3,7 +3,9 @@
 반드시 다음 절차를 따른다.
 0) 파일명, manifest, 최종 제목에 들어갈 날짜는 반드시 terminal로 `TZ=Asia/Seoul date +%F`를 실행해 얻은 TODAY_KST를 사용한다. UTC 날짜나 검색 대상 날짜를 파일명으로 쓰지 않는다.
 1) web_search와 필요시 web_extract를 사용해 최근 24~72시간 기준으로 재활/물리치료/rehabilitation/physical therapy/robotics/VLM/multimodal AI 관련 고신호 항목을 찾는다.
-   - 고신호 항목이 0건이면 최근 7일 범위로 fallback 검색을 2~3개 쿼리만 추가 수행한다.
+   - 다음 검색 축을 고르게 사용해 raw 후보를 최대 12개까지 모은다: rehabilitation AI, physical therapy AI, robotic rehabilitation, exoskeleton/gait analysis, EMG·wearable sensing, computer vision·VLM, multimodal clinical AI, stroke/neuro rehabilitation, telerehabilitation, assistive technology, clinical trial, PubMed·arXiv·medRxiv.
+   - 고신호 항목이 0건이면 최근 7일 범위로 fallback 검색을 5~7개 쿼리 추가 수행한다.
+   - 공식 대학·연구기관 발표, PubMed, DOI/Crossref, arXiv, medRxiv, NIH/FDA 등 원문 소스를 균형 있게 확인한다.
    - fallback에서도 Notion 적재 기준을 낮추지 않는다.
    - 단, 최근 7일 fallback에서 공식 원문/논문 페이지로 제목·날짜·초록/핵심 문구를 확인했지만 daily 적재 기준(신규성, 강한 재활 관련성, Notion 중복 확인, 라우터 필드 완성)을 충족하지 못한 항목은 `관찰 후보`로 최대 4개까지 제목과 링크를 보여준다.
    - `관찰 후보`는 Notion 적재 대상이 아니라 weekly 큐/추가 검토 대상으로만 표시한다.
@@ -33,6 +35,12 @@
 8) **라이터 스크립트 실행 또는 stdout JSON 파싱이 실패하면, 조용히 넘어가지 말고 최종 답변의 `Notion 적재 결과` 섹션에 실패 사실과 실패 이유를 명시한다.**
 9) **최종 답변에는 반드시 `Notion 적재 결과` 섹션이 있어야 한다. 이 섹션이 없으면 작업은 미완료로 간주한다.**
 10) **신규 저장 수/중복 스킵 수/유효성 스킵 수는 반드시 라우터 스크립트의 실제 stdout JSON 기준으로만 보고한다. 추정치 금지.**
+
+추가 운영 규칙:
+- 최근 24~72시간의 검증 통과 후보는 최대 5개까지 적재하고, 7일 fallback의 원문 확인 후보는 최대 6개까지 관찰 큐로 남긴다.
+- 검색 결과가 한 출처에 치우치지 않도록 연구·제품·임상·데이터셋·로보틱스 축을 각각 최소 한 번 확인한다.
+- 이 프롬프트와 운영 규칙을 최종 Discord 답변에 그대로 인용하거나 재출력하지 않는다.
+- 최종 답변은 사람이 읽는 요약만 남기고 35줄 이내로 끝낸다.
 
 # 재활 AI 아침 브리핑
 - 핵심 3줄
