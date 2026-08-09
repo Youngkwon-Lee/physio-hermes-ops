@@ -22,5 +22,8 @@
 a09b4b6d66568e600645dd7e380b2b909abecd6c:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:28
 a09b4b6d66568e600645dd7e380b2b909abecd6c:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:29
 8944e26d64cbb2e08d645d6a0390320e8e824ab9:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:19
+
+# --- FALSE POSITIVE: test-only placeholder token, not a credential ---
+97986c30434b6ad89e1754bf6f6fdf85ddf0f740:tests/test_health_memory_read.py:generic-env-secret-assignment:33
 8944e26d64cbb2e08d645d6a0390320e8e824ab9:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:20
 f03d79505edd50eee3c126dfc59ec2d915f8ed7c:docs/runbook/OPS_CONTROL_API_RUNBOOK.md:generic-env-secret-assignment:14
