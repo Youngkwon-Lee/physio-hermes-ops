@@ -30,7 +30,7 @@ class HealthMemoryReadTests(unittest.TestCase):
     def setUp(self):
         self.config = health_memory_read.HealthMemoryConfig(
             base_url="https://kinelo.example",
-            api_token="secret-not-for-output",
+            api_token="test-secret-placeholder",
             service_account_id="svc-hermes",
             organization_id="org-1",
             subject_person_id="person-1",
@@ -76,7 +76,7 @@ class HealthMemoryReadTests(unittest.TestCase):
         self.assertEqual(context["schemaVersion"], "health-memory-context.v1")
         request = urlopen.call_args.args[0]
         self.assertEqual(request.full_url, "https://kinelo.example/api/kernel/v0")
-        self.assertEqual(request.get_header("X-hermes-api-key"), "secret-not-for-output")
+        self.assertEqual(request.get_header("X-hermes-api-key"), "test-secret-placeholder")
 
 
 if __name__ == "__main__":
