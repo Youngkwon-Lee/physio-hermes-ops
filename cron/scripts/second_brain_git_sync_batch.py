@@ -99,8 +99,9 @@ def main() -> int:
         if should_run_raw():
             tasks.append("raw_handoff_digest_git_sync.py")
         tasks.append("second_brain_safe_sync.py")
-        tasks.append("windows_obsidian_managed_candidate_push.py")
-        tasks.append("windows_obsidian_mirror_pull.py")
+        # The live Obsidian vault is now owned by Syncthing. Do not write to or
+        # Git-pull the Windows live mirror from this batch; automation writers
+        # remain on the separate canonical/writer checkouts.
 
         failures = 0
         outputs: list[str] = []
