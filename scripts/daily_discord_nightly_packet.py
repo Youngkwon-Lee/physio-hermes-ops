@@ -90,7 +90,7 @@ def run_cron_job(job_id: str, name: str) -> tuple[bool, str]:
     before = load_job(job_id) or {}
     before_last_run = before.get('last_run_at')
     proc = subprocess.Popen(
-        [HERMES, 'cron', 'run', job_id, '--now', '--accept-hooks'],
+        [HERMES, 'cron', 'run', job_id, '--accept-hooks'],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -108,8 +108,8 @@ def run_cron_job(job_id: str, name: str) -> tuple[bool, str]:
             completion_seen = True
             status_line = f'jobs.json completion detected: status={last_status} last_run_at={last_run} error={last_error}'
             break
-        if proc.poll() is not None:
-            break
+        # `hermes cron run` queues the job; completion is recorded on the next
+        # scheduler tick, so keep polling after the CLI process exits.
         time.sleep(POLL_SECONDS)
 
     if completion_seen:
