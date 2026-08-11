@@ -513,17 +513,20 @@ jobs:
     source_state: runtime_snapshot
     script_file: "cron/scripts/desktop-secondbrain-codex-capture-4h.sh"
 
-  - name: desktop-secondbrain-keep-capture-2200
-    runtime_name: "desktop-secondbrain-keep-capture-2200"
+  - name: desktop-secondbrain-keep-capture-2205
+    runtime_name: "desktop-secondbrain-keep-capture-2205"
     runtime_job_id: "73b5a4255fa0"
     purpose: Capture Keep-based second-brain candidates nightly from the desktop runtime.
-    schedule: "0 22 * * *"
+    schedule: "5 22 * * *"
     mode: script
     status: active
     deliver_label: "runtime-configured"
     output_type: capture
     source_state: runtime_snapshot
     script_file: "cron/scripts/desktop-secondbrain-keep-capture-2200.sh"
+    runtime_notes:
+      - runs five minutes after the 30-minute second-brain Git sync batch
+      - preserves clean-worktree safety while avoiding the :00 sync/capture race
 
   - name: event-platform-radar-daily
     runtime_name: "매일 06:15 이벤트 플랫폼 레이더"
