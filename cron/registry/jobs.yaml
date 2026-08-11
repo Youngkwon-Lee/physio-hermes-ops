@@ -650,7 +650,8 @@ jobs:
     purpose: Capture ChatGPT browser candidates nightly from the home desktop runtime.
     schedule: "45 22 * * *"
     mode: agent
-    status: active
+    status: paused
+    pause_reason: "Browser capture is not currently enabled in the runtime; re-enable only after a visible-tab smoke test."
     deliver_label: "runtime-configured"
     output_type: capture
     source_state: runtime_snapshot
@@ -665,7 +666,8 @@ jobs:
     purpose: Label low-value GitHub notification mail from the home desktop runtime.
     schedule: "20 20 * * *"
     mode: agent
-    status: active
+    status: paused
+    pause_reason: "Gmail label mutation is intentionally paused until auth and mailbox-scope checks are confirmed."
     deliver_label: "runtime-configured"
     output_type: inbox_triage
     source_state: runtime_snapshot
@@ -680,7 +682,8 @@ jobs:
     purpose: Produce an important Gmail action digest from the home desktop runtime.
     schedule: "30 20 * * *"
     mode: agent
-    status: active
+    status: paused
+    pause_reason: "Gmail digest is intentionally paused until auth and read-scope checks are confirmed."
     deliver_label: "runtime-configured"
     output_type: inbox_digest
     source_state: runtime_snapshot
@@ -710,7 +713,8 @@ jobs:
     purpose: Review candidate promotions weekly from the home desktop runtime.
     schedule: "10 21 * * 0"
     mode: agent
-    status: active
+    status: paused
+    pause_reason: "Superseded by the active daily promotion triage flow; retain for historical comparison."
     deliver_label: "runtime-configured"
     output_type: memory_review
     source_state: runtime_snapshot
