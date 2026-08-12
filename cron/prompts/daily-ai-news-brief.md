@@ -21,6 +21,13 @@
 - second-brain 동기화는 기존 helper를 사용한다. 직접 git add/commit/push하지 않는다.
 - 실행 실패는 내부 기록에 남기고, 사용자 본문에는 이해하기 쉬운 짧은 상태만 쓴다.
 
+## 필수 기록 절차
+- 후보가 없어도 raw JSON을 빈 배열로 만들고 guard를 실행한다.
+- guard 결과의 valid_count가 1 이상일 때만 기존 Notion append 명령을 실행한다.
+- valid 항목을 만든 경우 기존 second-brain 후보 동기화 helper를 실행한다.
+- 작업이 끝나기 전에 /home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests/6ce3128480c9.json을 오늘 KST 기준으로 새로 작성한다. status, generatedAt, runStartedAt, runFinishedAt, job, errors, metadata를 포함하고, 성공이면 status는 ok, errors는 빈 배열로 쓴다.
+- manifest와 저장 결과는 내부 기록용이며 Discord 본문에 쓰지 않는다.
+
 ## Discord 출력
 - 개발자가 아닌 사람이 바로 읽는 한국어로 쓴다.
 - URL, 링크, 도메인, 마크다운 링크를 쓰지 않는다. 카드 마지막 줄은 출처: 기관명·문서명으로 끝낸다.

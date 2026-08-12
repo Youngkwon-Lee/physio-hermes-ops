@@ -11,6 +11,7 @@ NOW = datetime.now(KST)
 TODAY = NOW.date().isoformat()
 JOBS_PATH = Path('/home/yk/.hermes/cron/jobs.json')
 OUTPUT_BASE = Path('/home/yk/.hermes/cron/output')
+MANIFEST_BASE = Path('/home/yk/physio-hermes-ops/dashboard/runtime/automation_job_manifests')
 
 PIPELINE = {
     'daily-rehab-ai-research-brief': {
@@ -60,18 +61,25 @@ def latest_output_text(job_id: str) -> str:
 
 
 def has_missing_rehab_write_signals(text: str) -> list[str]:
-    issues: list[str] = []
-    if '## Response' not in text:
-        issues.append('response section missing')
-        return issues
-    response = text.split('## Response', 1)[1]
-    if 'Notion 적재 결과' not in response:
-        issues.append('final response missing Notion section')
-    if 'Now, I will prepare the JSON' in response:
-        issues.append('response stopped at tool-intent text before actual write')
-    if '/tmp/daily_rehab_brief_notion_' in response and 'Notion 적재 결과' not in response:
-        issues.append('tmp JSON path mentioned without reported write result')
-    return issues
+    return []
+
+
+def manifest_issues(job_id: str) -> list[str]:
+    path = MANIFEST_BASE / f'{job_id}.json'
+    if not path.exists():
+        return ['manifest missing']
+    try:
+        data = json.loads(path.read_text())
+    except Exception as error:
+        return [f'manifest unreadable: {type(error).__name__}']
+    generated_at = data.get('generatedAt') or data.get('runFinishedAt')
+    if not generated_at or not str(generated_at).startswith(TODAY):
+        return [f'manifest date is not today: {generated_at!r}']
+    if data.get('status') not in {'ok', 'posted'}:
+        return [f'manifest status={data.get("status")!r}']
+    if data.get('errors') not in (None, []):
+        return ['manifest contains errors']
+    return []
 
 
 def should_have_run(time_str: str) -> bool:
@@ -113,7 +121,7 @@ def main() -> int:
         text = latest_output_text(spec['job_id'])
 
         if name == 'daily-rehab-ai-research-brief':
-            for issue in has_missing_rehab_write_signals(text):
+            for issue in manifest_issues(spec['job_id']):
                 problems.append(f'- {name}: {issue}')
 
         if name == 'second-brain-git-sync-batch':
