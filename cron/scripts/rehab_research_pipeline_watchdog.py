@@ -127,7 +127,11 @@ def main() -> int:
         if name == 'second-brain-git-sync-batch':
             if TODAY not in text:
                 problems.append(f'- {name}: 오늘 output 파일 확인 실패')
-            elif 'status: pushed' not in text and 'status: no changes' not in text:
+            elif (
+                'status: pushed' not in text
+                and 'status: no_changes' not in text
+                and 'status: no changes' not in text
+            ):
                 m = re.search(r'status:\s*(.+)', text)
                 status_line = m.group(1).strip() if m else 'unknown'
                 problems.append(f'- {name}: output status={status_line}')
