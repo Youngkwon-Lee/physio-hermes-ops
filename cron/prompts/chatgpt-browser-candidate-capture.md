@@ -21,6 +21,7 @@ Required workflow:
 3. Inspect only the current visible ChatGPT conversation or explicit user-provided pointer. Do not open or crawl private ChatGPT history.
 4. Before reading full turns, collect only title, URL, and visible/current turn count when available. Search existing `operations/candidates/` and `candidates/` for the exact `source_url`. If the same URL already exists and the turn count has not increased, do not create a duplicate. Report `duplicate_skipped` with the existing file path.
 5. If the same URL exists but the turn count increased, update the existing candidate metadata (`last_checked_at`, `last_turn_count`, `new_turn_count`) or create a small `*-update-YYYY-MM-DD.md` note. Do not duplicate the original summary unless the new turns change decisions or next actions.
+   - Example: inspect 10 sidebar items, create records only for the 4 genuinely new conversations, skip the other 6 unchanged items. For an older conversation with 2 new turns, create only a delta update with `new_turn_count: 2`.
 6. Classify importance using the routing policy: high, medium, low. Use title, URL, and a short recent excerpt first; read full turns only after high classification or explicit user request.
 7. For high importance, create a candidate under `operations/candidates/chatgpt-screen-capture-YYYY-MM-DD-<slug>.md` with Summary, Decisions, Next Actions, Reusable Concepts, Suggested Destinations, and bounded Raw Turns if needed as evidence.
 8. For medium importance, save only Summary, Decisions, Next Actions, Reusable Concepts, and Suggested Destinations.
