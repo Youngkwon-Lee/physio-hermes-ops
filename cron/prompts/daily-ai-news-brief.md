@@ -13,6 +13,12 @@
 - 오늘 새 항목이 적으면 최근 30일 안의 공식 원문을 추가로 확인한다. 원문이 확인된 항목은 최근 소식으로 표시한다.
 - 최대 5개만 고른다. 억지로 수를 채우지 않는다.
 
+## 원문 검증용 내부 데이터 형식
+- raw JSON 각 항목은 `title`, `date`, `url`, `source`, `insight`, `source_url_verified`, `source_claims` 필드를 정확히 사용한다.
+- `date`는 원문 게시일의 YYYY-MM-DD 값이며 `published`나 `published_at`을 쓰지 않는다. `insight`는 원문에서 확인한 핵심 사실 한 문장이다.
+- 공식 원문을 직접 읽은 뒤에만 `source_url_verified: true`로 기록하고, `source_claims`에는 원문에서 확인 가능한 짧은 사실 문장 1~3개를 배열로 넣는다.
+- 사람이 보는 Discord 문장과 raw JSON 필드를 섞지 않는다. raw JSON을 먼저 만들고 검증·저장·출력을 진행한다.
+
 ## 기록
 - 기존 방식대로 raw JSON, guard, Notion 저장, second-brain 기록, 오늘 manifest를 실행한다.
 - AI 뉴스 raw 파일은 /tmp/daily_ai_news_brief_<YYYY-MM-DD>.raw.json에 만든다.
