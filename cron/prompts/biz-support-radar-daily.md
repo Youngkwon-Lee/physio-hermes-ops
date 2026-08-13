@@ -13,6 +13,12 @@
 - 이미 마감된 항목, 기간이 없는 항목, 중복 항목은 제외한다.
 - 최대 5개만 고르며 억지로 수를 채우지 않는다.
 
+## 원문 검증용 내부 데이터 형식
+- raw JSON 각 항목은 `title`, `date`, `url`, `source`, `insight`, `source_url_verified`, `source_claims` 필드를 정확히 사용한다.
+- `date`는 공고 원문 게시일의 YYYY-MM-DD 값이며 `published`나 `published_at`을 쓰지 않는다. `insight`는 공식 공고에서 확인한 지원 내용 한 문장이다.
+- 공식 개별 공고문을 직접 읽은 뒤에만 `source_url_verified: true`로 기록하고, `source_claims`에는 공고문에서 확인 가능한 짧은 사실 문장 1~3개를 배열로 넣는다.
+- 사람이 보는 Discord 문장과 raw JSON 필드를 섞지 않는다. raw JSON을 먼저 만들고 검증·저장·출력을 진행한다.
+
 ## 기록
 - 기존 방식대로 지원사업 DB, second-brain 기록, 오늘 manifest를 실행한다.
 - 실행 실패는 내부 기록에 남기고, 사용자 본문에는 내부 용어를 쓰지 않는다.
