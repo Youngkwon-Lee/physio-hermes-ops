@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-ROOT = Path("/home/yk/physio-hermes-ops")
+ROOT = Path(__file__).resolve().parents[1]
 DERIVED_DIR = ROOT / "dashboard" / "derived"
 LINEAGE_DIR = ROOT / "lineage"
 PHYSIO_APP_ROOT = Path("/home/yk/physio_app")
