@@ -1,5 +1,5 @@
 version: 0.1
-updated_at: 2026-06-11
+updated_at: 2026-08-11
 owner: Youngkwon-Lee
 purpose: Canonical registry for public-safe Hermes cron job definitions used in physio operations.
 notes:
@@ -30,9 +30,10 @@ jobs:
     purpose: Convert the morning AI news brief into actionable discussion questions and experiment prompts.
     schedule: "30 7 * * *"
     mode: agent
-    status: active
+    status: retired
     deliver_label: "discord/news/AI 뉴스 토론"
     output_type: kickoff
+    source_state: retired_runtime
     prompt_file: "cron/prompts/daily-ai-news-discussion-kickoff.md"
     enabled_toolsets: [session_search, file]
     depends_on:
@@ -50,14 +51,32 @@ jobs:
     prompt_file: "cron/prompts/daily-rehab-ai-research-brief.md"
     enabled_toolsets: [web, terminal, file]
 
+  - name: daily-rehab-sns-signal-packet
+    runtime_name: "매일 06:20 재활 SNS 신호 수집"
+    runtime_job_id: "c77126d40330"
+    operator_label: "[Home desktop Hermes] 06:20 Rehab SNS Signal Packet"
+    purpose: Run the Kinelo Ops rehab SNS signal collector and post only when successful signals exist.
+    schedule: "20 6 * * *"
+    mode: script
+    status: active
+    deliver_label: "discord/research/물리치료·재활 일일 브리핑 토론장"
+    output_type: sns_signal_packet
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/rehab_sns_signal_packet.sh"
+    runtime_workdir: "/home/yk/kinelo-ops"
+    runtime_notes:
+      - wrapper calls kinelo-ops/scripts/collect-rehab-sns-signals.mjs with --no-post, then prints a Discord-deliverable summary only when non-empty signals are found
+      - artifacts are written under /home/yk/.hermes/rehab-sns
+
   - name: overnight-pt-morning-summary
     runtime_name: "평일 07:05 밤새 PT 요약"
     purpose: Summarize overnight PT/rehab/research discussions into a short morning handoff.
     schedule: "5 7 * * 1-5"
     mode: agent
-    status: active
+    status: retired
     deliver_label: "discord/research/연구 토론방"
     output_type: handoff
+    source_state: retired_runtime
     prompt_file: "cron/prompts/overnight-pt-morning-summary.md"
     enabled_toolsets: [session_search, file]
 
@@ -90,9 +109,10 @@ jobs:
     purpose: Recommend lunch options based on the day's home-rehab route and prior preferences.
     schedule: "0 8 * * 1-5"
     mode: agent
-    status: needs_review
+    status: retired
     deliver_label: "discord/비서/맛집 추천 기록"
     output_type: recommendation
+    source_state: retired_runtime
     prompt_file: "cron/prompts/home-rehab-lunch-recommendation.md"
     enabled_toolsets: [web, terminal, file]
     known_issue: recent runtime error observed; verify before relying on output
@@ -154,7 +174,7 @@ jobs:
     deliver_label: "discord/사업/지원사업 레이더 운영 (일일/크론) v2"
     output_type: business_radar
     prompt_file: "cron/prompts/biz-support-radar-daily.md"
-    enabled_toolsets: [web, file]
+    enabled_toolsets: [web, terminal, file]
 
   - name: daily-conversation-curator
     runtime_name: "매일 23:00 기억 후보 찾기"
@@ -171,14 +191,27 @@ jobs:
   - name: daily-discord-digest
     runtime_name: "매일 23:50 디스코드 하루 요약"
     operator_label: "[Home desktop Hermes] 23:35 Discord Digest"
-    purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions.
+    purpose: Produce an end-of-day digest of meaningful Discord conversations and decisions when invoked by the nightly packet wrapper.
     schedule: "50 23 * * *"
     mode: agent
-    status: active
+    status: wrapped
     deliver_label: "discord/비서/하루 대화 요약 리포터"
     output_type: digest
+    source_state: wrapped_by_daily_discord_nightly_packet
     prompt_file: "cron/prompts/daily-discord-digest.md"
     enabled_toolsets: [session_search, file]
+
+  - name: discord-reflection-coach-nightly-wrapper
+    runtime_name: "디스코드 회고 코치 (nightly wrapper 전용)"
+    runtime_job_id: "851efbda287e"
+    purpose: Render privacy-safe count-only context for the nightly Discord reflection coach wrapper.
+    schedule: "50 23 * * *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: reflection_context
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/render_reflection_coach_context.py"
 
   - name: calendar-auto-classify
     runtime_name: "매일 23:10 캘린더 자동 분류"
@@ -222,9 +255,10 @@ jobs:
     purpose: Lightweight Hermes runtime watchdog for gateway health, cron error state, and overdue active jobs.
     schedule: "every 10m"
     mode: script
-    status: active
+    status: retired
     deliver_label: "discord/비서/장기기억 기록 도우미"
     output_type: watchdog
+    source_state: retired_runtime
     script_file: "cron/scripts/hermes_ops_watchdog.py"
     runtime_notes:
       - silent-by-default; emits output only when an issue is detected
@@ -276,10 +310,12 @@ jobs:
     model: "gpt-5.4"
 
   - name: hourly-continuity-handoff-summary
-    runtime_name: "매시 58분 작업 인수인계 요약"
+    runtime_name: "하루 2회 작업 인수인계 요약"
+    runtime_aliases:
+      - "매시 58분 작업 인수인계 요약"
     runtime_job_id: "6cd11d8bbd31"
-    purpose: Produce an hourly continuity handoff summary from the live Hermes runtime.
-    schedule: "58 * * * *"
+    purpose: Produce a twice-daily continuity handoff summary from the live Hermes runtime.
+    schedule: "58 11,23 * * *"
     mode: agent
     status: paused
     deliver_label: "runtime-configured"
@@ -287,8 +323,8 @@ jobs:
     source_state: runtime_snapshot
     prompt_file: "cron/prompts/hourly-continuity-handoff-summary.md"
     enabled_toolsets: [file, session_search]
-    provider: "gemini"
-    model: "gemini-2.5-flash"
+    provider: "openai-api"
+    model: "gpt-5-mini"
 
   - name: weekly-memory-candidate-review
     runtime_name: "일요일 21:00 장기기억 후보 검토"
@@ -440,16 +476,55 @@ jobs:
     prompt_file: "cron/prompts/daily-discord-action-cleanup.md"
     enabled_toolsets: [session_search, file]
 
+  - name: discord-reflection-route-dispatcher
+    runtime_name: "Discord 회고 분류 제안 (dispatcher 전용)"
+    runtime_job_id: "f2cae8dff47e"
+    purpose: Render a bounded Discord reflection routing context for dispatcher-only review.
+    schedule: "0 0 1 1 *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: reflection_context
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/render_discord_reflection_route_context.py"
+    runtime_workdir: "/home/yk/brain-linux"
+
+  - name: second-brain-candidate-promotion-preview-dispatcher
+    runtime_name: "Second Brain 변경 미리보기 (dispatcher 전용)"
+    runtime_job_id: "dd7729a20366"
+    purpose: Render one approved second-brain candidate route as a bounded promotion preview context.
+    schedule: "0 0 1 1 *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: promotion_preview
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/render_candidate_promotion_preview_context.py"
+    runtime_workdir: "/home/yk/brain-linux"
+
+  - name: second-brain-knowledge-promotion-preview-dispatcher
+    runtime_name: "Second Brain 지식 변경 미리보기 (dispatcher 전용)"
+    runtime_job_id: "ac9fb0792078"
+    purpose: Render the next general-knowledge promotion request as a bounded preview context.
+    schedule: "0 0 1 1 *"
+    mode: script
+    status: paused
+    deliver_label: "runtime-configured"
+    output_type: promotion_preview
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/render_knowledge_promotion_preview_context.py"
+    runtime_workdir: "/home/yk/brain-linux"
+
   - name: rehab-research-pipeline-watchdog
     runtime_name: "매일 06:50 연구 파이프라인 확인"
     runtime_job_id: "9ff452874c27"
     purpose: Check the rehab research pipeline daily from the live Hermes runtime.
     schedule: "50 6 * * *"
     mode: script
-    status: paused
+    status: retired
     deliver_label: "runtime-configured"
     output_type: watchdog
-    source_state: runtime_snapshot
+    source_state: retired_runtime
     script_file: "cron/scripts/rehab_research_pipeline_watchdog.py"
 
   - name: daily-discord-digest-postsync
@@ -487,6 +562,18 @@ jobs:
     output_type: watchdog
     source_state: runtime_snapshot
     script_file: "cron/scripts/morning_batch_followup_watchdog.py"
+
+  - name: daily-plan-prompt
+    runtime_name: "매일 08:30 오늘 할 일 질문"
+    runtime_job_id: "fd7d238b561b"
+    purpose: Render the deterministic Discord morning-plan prompt from the live Hermes runtime.
+    schedule: "30 8 * * *"
+    mode: script
+    status: active
+    deliver_label: "runtime-configured"
+    output_type: planning_prompt
+    source_state: runtime_snapshot
+    script_file: "cron/scripts/render_daily_plan_prompt.py"
 
   - name: raw-handoff-digest-git-sync-hourly
     runtime_name: "매시 02분 raw 인수인계 Git 동기화"
@@ -553,16 +640,13 @@ jobs:
     runtime_job_id: "e688910e7718"
     purpose: Review second-brain promotion candidates nightly from the live Hermes runtime.
     schedule: "30 23 * * *"
-    mode: agent
+    mode: script
     status: active
     deliver_label: "runtime-configured"
     output_type: memory_review
     source_state: runtime_snapshot
-    prompt_file: "cron/prompts/second-brain-promotion-review-daily.md"
-    enabled_toolsets: [session_search, file, terminal]
+    script_file: "cron/scripts/sync_capture_review_queue.py"
     runtime_workdir: "/home/yk/brain-linux"
-    provider: "openai-codex"
-    model: "gpt-5.4"
 
   - name: morning-ops-brief-weekday
     runtime_name: "평일 06:45 아침 운영 브리프"
@@ -597,10 +681,10 @@ jobs:
     purpose: Run batched home desktop health checks from the live Hermes runtime.
     schedule: "*/10 * * * *"
     mode: script
-    status: paused
+    status: retired
     deliver_label: "runtime-configured"
     output_type: watchdog
-    source_state: runtime_snapshot
+    source_state: retired_runtime
     script_file: "cron/scripts/home_desktop_watchdog_batch.py"
 
   - name: weekly-memory-packet
@@ -617,10 +701,12 @@ jobs:
     runtime_workdir: "/mnt/c/Users/82106/Documents/brain"
 
   - name: daily-discord-nightly-packet
-    runtime_name: "매일 23:25 디스코드 nightly 패킷"
+    runtime_name: "매일 22:00 디스코드 nightly 패킷"
+    runtime_aliases:
+      - "매일 23:25 디스코드 nightly 패킷"
     runtime_job_id: "a05100ef81ac"
-    purpose: Produce the nightly Discord packet from the live Hermes runtime.
-    schedule: "25 23 * * *"
+    purpose: Produce the nightly Discord packet from the live Hermes runtime; this wrapper invokes action staging, the paused legacy daily digest, and postsync to avoid duplicate direct schedules.
+    schedule: "0 22 * * *"
     mode: script
     status: active
     deliver_label: "runtime-configured"

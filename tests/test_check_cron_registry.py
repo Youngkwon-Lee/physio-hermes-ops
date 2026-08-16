@@ -54,6 +54,19 @@ def test_runtime_only_job_names_are_sorted():
     assert names == ["a-job", "z-job"]
 
 
+def test_retired_job_names_are_sorted():
+    names = registry.retired_job_names(
+        {
+            "z-job": {"name": "z-job", "status": "retired"},
+            "tracked-job": {"name": "tracked-job", "status": "active"},
+            "a-job": {"name": "a-job", "source_state": "retired_runtime"},
+            "wrapped-job": {"name": "wrapped-job", "status": "wrapped"},
+        }
+    )
+
+    assert names == ["a-job", "wrapped-job", "z-job"]
+
+
 def test_live_environment_issue_reports_empty_live_jobs():
     issue = registry.live_environment_issue(
         {"calendar-auto-classify": {"name": "calendar-auto-classify"}},
@@ -128,6 +141,23 @@ def test_live_environment_issue_is_clear_when_any_job_overlaps():
     assert issue is None
 
 
+def test_live_environment_issue_ignores_retired_jobs_for_overlap():
+    issue = registry.live_environment_issue(
+        {
+            "old-job": {
+                "name": "old-job",
+                "runtime_name": "Old Runtime Job",
+                "status": "retired",
+            },
+            "calendar-auto-classify": {"name": "calendar-auto-classify"},
+        },
+        {"calendar-auto-classify": {"name": "calendar-auto-classify"}},
+        "desktop",
+    )
+
+    assert issue is None
+
+
 def test_compare_matches_runtime_name_and_reports_real_schedule_mismatch():
     issues = registry.compare(
         {
@@ -179,6 +209,38 @@ def test_compare_allows_runtime_only_agent_without_prompt_file():
     assert issues == []
 
 
+def test_compare_skips_retired_jobs_missing_from_live():
+    issues = registry.compare(
+        {
+            "old-runtime-job": {
+                "name": "old-runtime-job",
+                "runtime_name": "Old Runtime Job",
+                "schedule": "0 1 * * *",
+                "mode": "agent",
+                "status": "retired",
+                "prompt_file": "missing.md",
+            },
+            "active-runtime-job": {
+                "name": "active-runtime-job",
+                "schedule": "0 2 * * *",
+                "mode": "script",
+                "source_state": "runtime_only",
+                "runtime_script": "active.py",
+            },
+        },
+        {
+            "active-runtime-job": {
+                "name": "active-runtime-job",
+                "schedule": "0 2 * * *",
+                "mode": "script",
+                "script": "active.py",
+            }
+        },
+    )
+
+    assert issues == []
+
+
 def test_main_reports_runtime_only_inventory(monkeypatch, capsys):
     monkeypatch.setattr(
         registry,
@@ -214,6 +276,7 @@ def test_main_reports_runtime_only_inventory(monkeypatch, capsys):
     assert exit_code == 0
     assert summary["runtime_only_jobs"] == 1
     assert summary["runtime_only_job_names"] == ["runtime-agent"]
+    assert summary["retired_registry_jobs"] == 0
 
 
 def test_compare_allows_runtime_only_script_with_runtime_script():

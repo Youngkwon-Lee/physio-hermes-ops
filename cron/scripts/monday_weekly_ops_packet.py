@@ -90,7 +90,7 @@ def run_cron_job(job_id: str, name: str) -> tuple[bool, str]:
     before = load_job(job_id) or {}
     before_last_run = before.get('last_run_at')
     proc = subprocess.Popen(
-        [HERMES, 'cron', 'run', job_id, '--now', '--accept-hooks'],
+        [HERMES, 'cron', 'run', job_id, '--accept-hooks'],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -149,6 +149,7 @@ def main() -> int:
         '[monday-weekly-ops-packet]',
         f'run_at: {stamp}',
     ]
+    subjobs: list[dict] = []
     failures = 0
     for key, job_id, name in JOBS:
         ok, output = run_cron_job(job_id, name)
