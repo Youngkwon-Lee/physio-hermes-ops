@@ -15,6 +15,8 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILE_ENV = "HERMES_CRON_PROFILE"
+RETIRED_STATUSES = {"retired", "archived", "removed", "wrapped"}
+RETIRED_SOURCE_STATES = {"retired", "retired_runtime", "wrapped_by_daily_discord_nightly_packet"}
 
 
 def load_registry() -> dict[str, dict[str, Any]]:
@@ -73,11 +75,26 @@ def registry_live_names(job: dict[str, Any]) -> list[str]:
 
 
 def registry_candidate_names(registry: dict[str, dict[str, Any]]) -> set[str]:
-    return {name for job in registry.values() for name in registry_live_names(job)}
+    return {
+        name
+        for job in registry.values()
+        if not is_retired_registry_job(job)
+        for name in registry_live_names(job)
+    }
 
 
 def runtime_only_job_names(registry: dict[str, dict[str, Any]]) -> list[str]:
     return sorted(name for name, job in registry.items() if job.get("source_state") == "runtime_only")
+
+
+def is_retired_registry_job(job: dict[str, Any]) -> bool:
+    status = str(job.get("status") or "").strip().lower()
+    source_state = str(job.get("source_state") or "").strip().lower()
+    return status in RETIRED_STATUSES or source_state in RETIRED_SOURCE_STATES
+
+
+def retired_job_names(registry: dict[str, dict[str, Any]]) -> list[str]:
+    return sorted(name for name, job in registry.items() if is_retired_registry_job(job))
 
 
 def find_live_job(
@@ -127,7 +144,8 @@ def live_environment_issue(
     live: dict[str, dict[str, Any]],
     profile: str | None,
 ) -> dict[str, str] | None:
-    if not registry:
+    active_registry = {name: job for name, job in registry.items() if not is_retired_registry_job(job)}
+    if not active_registry:
         return None
     if not live:
         return {
@@ -138,7 +156,7 @@ def live_environment_issue(
                 f"{PROFILE_ENV} points at the desktop Hermes runtime."
             ),
         }
-    if registry_candidate_names(registry).isdisjoint(live):
+    if registry_candidate_names(active_registry).isdisjoint(live):
         return {
             "kind": "no_registry_job_overlap",
             "profile": profile or "default",
@@ -158,6 +176,8 @@ def compare(registry: dict[str, dict[str, Any]], live: dict[str, dict[str, Any]]
 
     for name in sorted(registry):
         reg = registry[name]
+        if is_retired_registry_job(reg):
+            continue
         runtime_only = reg.get("source_state") == "runtime_only"
         live_name, runtime = find_live_job(reg, live)
         if runtime is None:
@@ -234,17 +254,21 @@ def summary_payload(
     registry: dict[str, dict[str, Any]],
     live_count: int,
     runtime_only_names: list[str],
+    retired_names: list[str],
     environment_issue: dict[str, str] | None,
     issues: list[dict[str, str]],
 ) -> dict[str, Any]:
     return {
         "profile": profile or "default",
         "registry_jobs": len(registry),
+        "active_registry_jobs": len(registry) - len(retired_names),
         "live_jobs": live_count,
         "errors": sum(1 for item in issues if item["severity"] == "error"),
         "warnings": sum(1 for item in issues if item["severity"] == "warn"),
         "runtime_only_jobs": len(runtime_only_names),
         "runtime_only_job_names": runtime_only_names,
+        "retired_registry_jobs": len(retired_names),
+        "retired_registry_job_names": retired_names,
         "environment_issue": environment_issue,
         "issues": issues,
     }
@@ -263,21 +287,30 @@ def main() -> int:
     profile = args.profile.strip() if args.profile else None
     registry = load_registry()
     runtime_only_names = runtime_only_job_names(registry)
+    retired_names = retired_job_names(registry)
     try:
         live = get_live_jobs(profile)
     except RuntimeError as exc:
         issue = {"kind": "live_command_failed", "profile": profile or "default", "message": str(exc)}
-        summary = summary_payload(profile, registry, 0, runtime_only_names, issue, [])
+        summary = summary_payload(profile, registry, 0, runtime_only_names, retired_names, issue, [])
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 2
     environment_issue = live_environment_issue(registry, live, profile)
     if environment_issue:
-        summary = summary_payload(profile, registry, len(live), runtime_only_names, environment_issue, [])
+        summary = summary_payload(
+            profile,
+            registry,
+            len(live),
+            runtime_only_names,
+            retired_names,
+            environment_issue,
+            [],
+        )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 2
 
     issues = compare(registry, live)
-    summary = summary_payload(profile, registry, len(live), runtime_only_names, None, issues)
+    summary = summary_payload(profile, registry, len(live), runtime_only_names, retired_names, None, issues)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 
     if summary["errors"]:
