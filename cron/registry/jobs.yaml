@@ -487,8 +487,8 @@ jobs:
     status: paused
     deliver_label: "runtime-configured"
     output_type: reflection_context
-    source_state: runtime_snapshot
-    script_file: "cron/scripts/render_discord_reflection_route_context.py"
+    source_state: runtime_only
+    runtime_script: "render_discord_reflection_route_context.py"
     runtime_workdir: "/home/yk/brain-linux"
 
   - name: second-brain-candidate-promotion-preview-dispatcher
@@ -500,8 +500,8 @@ jobs:
     status: paused
     deliver_label: "runtime-configured"
     output_type: promotion_preview
-    source_state: runtime_snapshot
-    script_file: "cron/scripts/render_candidate_promotion_preview_context.py"
+    source_state: runtime_only
+    runtime_script: "render_candidate_promotion_preview_context.py"
     runtime_workdir: "/home/yk/brain-linux"
 
   - name: second-brain-knowledge-promotion-preview-dispatcher
@@ -513,8 +513,8 @@ jobs:
     status: paused
     deliver_label: "runtime-configured"
     output_type: promotion_preview
-    source_state: runtime_snapshot
-    script_file: "cron/scripts/render_knowledge_promotion_preview_context.py"
+    source_state: runtime_only
+    runtime_script: "render_knowledge_promotion_preview_context.py"
     runtime_workdir: "/home/yk/brain-linux"
 
   - name: rehab-research-pipeline-watchdog
@@ -574,8 +574,9 @@ jobs:
     status: active
     deliver_label: "runtime-configured"
     output_type: planning_prompt
-    source_state: runtime_snapshot
-    script_file: "cron/scripts/render_daily_plan_prompt.py"
+    source_state: runtime_only
+    runtime_script: "render_daily_plan_prompt.py"
+    runtime_workdir: "/home/yk/brain-linux"
 
   - name: raw-handoff-digest-git-sync-hourly
     runtime_name: "매시 02분 raw 인수인계 Git 동기화"
@@ -649,8 +650,8 @@ jobs:
     status: active
     deliver_label: "runtime-configured"
     output_type: memory_review
-    source_state: runtime_snapshot
-    script_file: "cron/scripts/sync_capture_review_queue.py"
+    source_state: runtime_only
+    runtime_script: "sync_capture_review_queue.py"
     runtime_workdir: "/home/yk/brain-linux"
 
   - name: morning-ops-brief-weekday
